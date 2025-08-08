@@ -1,0 +1,29 @@
+[package]
+name = "rq"
+version = "0.1.0"
+authors = ["Micah Kepe <micahkepe@gmail.com>"]
+edition = "2024"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/micah-kepe/rq"
+homepage = "https://github.com/micah-kepe/rq"
+description = "A JSONPath-inspired query language for JSON documents"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.43", features = ["derive"] }
+clap-verbosity-flag = "3.0.3"
+env_logger = "0.11.8"
+log = "0.4.27"
+pest = "2.8.1"
+pest_derive = "2.8.1"
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"]}
+serde_json = "1.0.142"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
