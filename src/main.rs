@@ -41,9 +41,9 @@ use std::{
     path::PathBuf,
 };
 
-use rq::{query::*, schema::JSONValue};
+use jsongrep::{query::*, schema::JSONValue};
 
-/// Query an input JSON document against a rq query.
+/// Query an input JSON document against a jsongrep query.
 #[derive(Parser, Debug)]
 #[command(version, about, arg_required_else_help = true, long_about = None)]
 struct Args {

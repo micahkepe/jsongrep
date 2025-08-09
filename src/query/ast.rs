@@ -12,7 +12,7 @@ This module provides a fluent API for constructing queries using the
 For example, to construct a query that accesses a field named "foo", you can
 use:
 ```
-use rq::query::{Query, QueryBuilder};
+use jsongrep::query::{Query, QueryBuilder};
 let query = QueryBuilder::new().field("foo").build();
 assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
 ```
@@ -20,7 +20,7 @@ assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
 In addition, the query can be constructed from a raw string:
 
 ```
-use rq::query::Query;
+use jsongrep::query::Query;
 let query : Query = "foo".parse().expect("Invalid query");
 assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
 ```
@@ -176,7 +176,7 @@ impl QueryBuilder {
     ///
     /// # Examples
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let builder = QueryBuilder::new();
     /// assert!(matches!(builder.build(), Query::Sequence(_)));
     /// ```
@@ -191,7 +191,7 @@ impl QueryBuilder {
     /// # Examples
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().field("foo").build();
     /// assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
     /// ```
@@ -212,7 +212,7 @@ impl QueryBuilder {
     /// # Examples
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().index(3).build();
     /// assert_eq!(query, Query::Sequence(vec![Query::Index(3)]));
     /// ```
@@ -236,7 +236,7 @@ impl QueryBuilder {
     ///
     /// This example shows how to use the `optional` method to wrap a field query
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().field("foo").optional().build();
     ///
     /// assert!(
@@ -246,7 +246,7 @@ impl QueryBuilder {
     ///
     /// If the query is empty, it creates a new sequence with the optional as the only element:
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().optional().build();
     ///
     /// assert!(
@@ -275,7 +275,7 @@ impl QueryBuilder {
     /// # Examples
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().field("foo").kleene_star().build();
     /// assert!(matches!(query, Query::Sequence(ref seq) if matches!(seq[0], Query::KleeneStar(_))));
     /// ```
@@ -297,7 +297,7 @@ impl QueryBuilder {
     ///
     /// Apply a range to the last atom in the query:
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     ///
     /// // Query: "foo[3:5]"
     /// let query = QueryBuilder::new().field("foo").range(Some(3), Some(5)).build();
@@ -331,7 +331,7 @@ impl QueryBuilder {
     ///
     /// Apply a field wildcard to the last atom in the query:
     /// ```
-    /// use rq::query::{QueryBuilder, Query};
+    /// use jsongrep::query::{QueryBuilder, Query};
     /// // Query: "foo.*"
     /// let query = QueryBuilder::new().field("foo").field_wildcard().build();
     ///
@@ -357,7 +357,7 @@ impl QueryBuilder {
     ///
     /// Apply an array wildcard to the last atom in the query:
     /// ```
-    /// use rq::query::{QueryBuilder, Query};
+    /// use jsongrep::query::{QueryBuilder, Query};
     /// // Query: "foo[*]"
     /// let query = QueryBuilder::new().field("foo").array_wildcard().build();
     ///
@@ -383,7 +383,7 @@ impl QueryBuilder {
     ///
     /// Apply a regex to the last atom in the query:
     /// ```
-    /// use rq::query::{QueryBuilder, Query};
+    /// use jsongrep::query::{QueryBuilder, Query};
     /// use regex::Regex;
     /// // Create a regex to match any string starting with "foo"
     /// let re = r"^foo";
@@ -413,7 +413,7 @@ impl QueryBuilder {
     /// # Examples
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new()
     ///    .disjunction(vec![
     ///    Query::Field("foo".to_string()),
@@ -431,7 +431,7 @@ impl QueryBuilder {
     ///
     /// Sequential field accesses:
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// // Create a sequence of queries: "foo.bar.baz"
     /// let query = QueryBuilder::new().sequence(vec![
     ///   Query::Field("foo".to_string()),
@@ -459,7 +459,7 @@ impl QueryBuilder {
     /// Simple field access query: `foo`
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().field("foo").build();
     ///
     /// assert!(
@@ -470,7 +470,7 @@ impl QueryBuilder {
     /// Query containing mixed atoms and modifiers: "foo.bar\[3\]?.baz*"
     ///
     /// ```
-    /// use rq::query::{Query, QueryBuilder};
+    /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new()
     ///                         .field("foo")
     ///                         .field("bar")

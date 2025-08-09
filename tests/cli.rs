@@ -1,11 +1,11 @@
-//! Integration test suite for `rq` CLI
+//! Integration test suite for `jsongrep` CLI
 use assert_cmd::Command;
 use serde_json::Value;
 
 /// Helper function to run the `main` binary with the given arguments and return a
 /// [`assert_cmd::assert::Assert`].
 fn run_main(args: &[&str]) -> assert_cmd::assert::Assert {
-    let mut cmd = Command::cargo_bin("rq").expect("Failed to find main binary");
+    let mut cmd = Command::cargo_bin("jg").expect("Failed to find main binary");
     cmd.args(args);
     cmd.assert()
 }

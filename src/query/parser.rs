@@ -12,7 +12,7 @@ For example, we can construct the associated [`Query`] for the query string
 "foo | bar\[2\].baz?" as so:
 
 ```rust
-use rq::query::{Query, parser};
+use jsongrep::query::{Query, parser};
 let query = "foo | bar[2].baz?";
 let parsed: Query = parser::parse_query("foo | bar[2].baz?").expect("Invalid query string");
 assert_eq!("foo | bar[2].baz?", parsed.to_string());
@@ -24,14 +24,14 @@ If the input query string is invalid, [`parse_query`] returns a [`QueryParseErro
 describing how the parsing failed:
 
 ```rust
-use rq::query::parser::{self, QueryParseError};
+use jsongrep::query::parser::{self, QueryParseError};
 
 let result = parser::parse_query("foo[notanindex]");
 assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
 ```
 
 ```rust
-use rq::query::parser::{self, QueryParseError};
+use jsongrep::query::parser::{self, QueryParseError};
 
 let result = parser::parse_query("?");
 assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));

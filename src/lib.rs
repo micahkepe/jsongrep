@@ -1,7 +1,8 @@
 /*!
-# `rq` Library
+This crate provides a query language for JSON data that can be used to search
+for matching **regular** paths the JSON tree, using a derivation of [regular expressions].
 
-Provides means of efficiently working with JSON data.
+[regular expressions]: https://en.wikipedia.org/wiki/Regular_expression
 */
 
 pub mod query;

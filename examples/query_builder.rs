@@ -1,6 +1,6 @@
 //! An example of using the [`QueryBuilder`] fluent API to construct a query AST
 //! object.
-use rq::query::{Query, QueryBuilder};
+use jsongrep::query::{Query, QueryBuilder};
 
 fn main() {
     // Construct the query "foo.bar"

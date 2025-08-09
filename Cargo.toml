@@ -1,12 +1,12 @@
 [package]
-name = "rq"
+name = "jsongrep"
 version = "0.1.0"
 authors = ["Micah Kepe <micahkepe@gmail.com>"]
 edition = "2024"
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/micah-kepe/rq"
-homepage = "https://github.com/micah-kepe/rq"
+repository = "https://github.com/micah-kepe/jsongrep"
+homepage = "https://github.com/micah-kepe/jsongrep"
 description = "A JSONPath-inspired query language for JSON documents"
 
 [dependencies]
@@ -23,6 +23,10 @@ serde_json = "1.0.142"
 
 [dev-dependencies]
 assert_cmd = "2.0"
+
+[[bin]]
+path = "src/main.rs"
+name = "jg"
 
 [[test]]
 name = "cli"
