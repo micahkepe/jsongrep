@@ -72,6 +72,7 @@ jobs:
         if: matrix.strip
         run: strip "target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
       - name: Create archive
+        if: matrix.os != 'windows-latest'
         run: |
           version="${{ github.ref_name }}"
           archive="jsongrep-${version#v}-${{ matrix.target }}"
@@ -82,8 +83,9 @@ jobs:
           shasum -a 256 "$archive.tar.gz" > "$archive.tar.gz.sha256"
           echo "ASSET=$archive.tar.gz" >> $GITHUB_ENV
           echo "ASSET_SUM=$archive.tar.gz.sha256" >> $GITHUB_ENV
-        if: matrix.os != 'windows-latest'
       - name: Create archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
           version="${{ github.ref_name }}"
           archive="jsongrep-${version#v}-${{ matrix.target }}"
@@ -94,7 +96,6 @@ jobs:
           certutil -hashfile "$archive.zip" SHA256 > "$archive.zip.sha256"
           echo "ASSET=$archive.zip" >> $GITHUB_ENV
           echo "ASSET_SUM=$archive.zip.sha256" >> $GITHUB_ENV
-        if: matrix.os == 'windows-latest'
       - name: Upload release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
