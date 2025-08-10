@@ -26,7 +26,7 @@ jobs:
       - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --notes "Release $VERSION of jsongrep\n\n- Initial release of the JSONPath-inspired query language and jg CLI tool."
+        run: gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --notes "Release $VERSION of jsongrep"
 
   publish-crates:
     name: Publish to crates.io
