@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+# Permissions to create releases
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+      - name: Verify Cargo.toml version
+        run: |
+          if ! grep -q "version = \"$VERSION\"" Cargo.toml; then
+            echo "Cargo.toml version does not match tag $VERSION" >&2
+            exit 1
+          fi
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --notes "Release $VERSION of jsongrep\n\n- Initial release of the JSONPath-inspired query language and jg CLI tool."
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Publish to crates.io
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  build-release:
+    name: Build Release Binaries
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            ext: ""
+            strip: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: ""
+            strip: true
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: ".exe"
+            strip: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Strip binary (Unix)
+        if: matrix.strip
+        run: strip "target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
+      - name: Create archive
+        run: |
+          version="${{ github.ref_name }}"
+          archive="jsongrep-${version#v}-${{ matrix.target }}"
+          mkdir -p "$archive"
+          cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
+          cp README.md LICENSE "$archive/"
+          tar czf "$archive.tar.gz" "$archive"
+          shasum -a 256 "$archive.tar.gz" > "$archive.tar.gz.sha256"
+          echo "ASSET=$archive.tar.gz" >> $GITHUB_ENV
+          echo "ASSET_SUM=$archive.tar.gz.sha256" >> $GITHUB_ENV
+        if: matrix.os != 'windows-latest'
+      - name: Create archive (Windows)
+        run: |
+          version="${{ github.ref_name }}"
+          archive="jsongrep-${version#v}-${{ matrix.target }}"
+          mkdir -p "$archive"
+          cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
+          cp README.md LICENSE "$archive/"
+          7z a "$archive.zip" "$archive"
+          certutil -hashfile "$archive.zip" SHA256 > "$archive.zip.sha256"
+          echo "ASSET=$archive.zip" >> $GITHUB_ENV
+          echo "ASSET_SUM=$archive.zip.sha256" >> $GITHUB_ENV
+        if: matrix.os == 'windows-latest'
+      - name: Upload release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "$ASSET" "$ASSET_SUM"
