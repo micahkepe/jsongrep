@@ -20,12 +20,7 @@ struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     fn new(input: &'a [u8]) -> Self {
-        let mut lexer = Self {
-            input,
-            position: 0,
-            read_position: 0,
-            byte: 0,
-        };
+        let mut lexer = Self { input, position: 0, read_position: 0, byte: 0 };
         // put the lexer in an initial working state
         lexer.read_byte();
         lexer

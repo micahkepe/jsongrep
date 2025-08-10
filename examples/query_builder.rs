@@ -10,15 +10,15 @@ fn main() {
     assert_eq!("foo.bar", query.to_string());
 
     // Another, more complex example: "bar[2]? | foo[2:5].**.[*]"
-    let subquery1 = QueryBuilder::new().field("bar").index(2).optional().build();
+    let subquery1 =
+        QueryBuilder::new().field("bar").index(2).optional().build();
     let subquery2 = QueryBuilder::new()
         .field("foo")
         .range(Some(2), Some(5))
         .field_wildcard()
         .array_wildcard()
         .build();
-    let query = QueryBuilder::new()
-        .disjunction(vec![subquery1, subquery2])
-        .build();
+    let query =
+        QueryBuilder::new().disjunction(vec![subquery1, subquery2]).build();
     assert_eq!("bar[2]? | foo[2:5].**.[*]", query.to_string());
 }

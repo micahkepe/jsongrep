@@ -71,8 +71,12 @@ impl Error for QueryParseError {}
 impl fmt::Display for QueryParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            QueryParseError::UnexpectedToken(token) => write!(f, "Unexpected token: {}", token),
-            QueryParseError::UnexpectedEndOfInput => write!(f, "Unexpected end of input"),
+            QueryParseError::UnexpectedToken(token) => {
+                write!(f, "Unexpected token: {}", token)
+            }
+            QueryParseError::UnexpectedEndOfInput => {
+                write!(f, "Unexpected end of input")
+            }
         }
     }
 }
@@ -109,7 +113,9 @@ pub fn parse_query(input: &str) -> Result<Query, QueryParseError> {
 }
 
 /// Parse a disjunction rule into a Query.
-fn parse_disjunction(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_disjunction(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::disjunction {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected disjunction rule, got {:?}",
@@ -132,7 +138,9 @@ fn parse_disjunction(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryPa
 }
 
 /// Parse a sequence rule into a `Query::Sequence(_)`.
-fn parse_sequence(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_sequence(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::sequence {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected sequence rule, got {:?}",
@@ -152,7 +160,9 @@ fn parse_sequence(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParse
 }
 
 /// Parse a step rule into a [`Query`].
-fn parse_step(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_step(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::step {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected step rule, got {:?}",
@@ -164,7 +174,8 @@ fn parse_step(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErro
     let mut queries: Vec<Query> = vec![];
 
     // Process the first pair (field or atom)
-    let first_pair = inner.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
+    let first_pair =
+        inner.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
     match first_pair.as_rule() {
         Rule::field => {
             let field = parse_field(first_pair)?;
@@ -228,7 +239,9 @@ fn parse_step(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErro
     if let Some(modifier_pair) = inner.next() {
         if modifier_pair.as_rule() == Rule::modifier {
             let last_query = queries.pop().ok_or_else(|| {
-                QueryParseError::UnexpectedToken("No query to apply modifier to".to_string())
+                QueryParseError::UnexpectedToken(
+                    "No query to apply modifier to".to_string(),
+                )
             })?;
             let modified_query = match modifier_pair.as_str() {
                 "*" => Query::KleeneStar(Box::new(last_query)),
@@ -259,7 +272,9 @@ fn parse_step(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErro
 
 /// Parse a field rule into a [`Query::Field`]. This handles both cases of quoted and unquoted
 /// field accesses, e.g. `\"\"foo\"\"` and `\"foo\"`
-fn parse_field(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_field(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::field {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected field rule, got {:?}",
@@ -271,7 +286,9 @@ fn parse_field(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
 }
 
 /// Parse a group rule into a [`Query::Disjunction`]
-fn parse_group(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_group(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::group {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected group rule, got {:?}",
@@ -280,12 +297,15 @@ fn parse_group(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
     }
 
     let mut inner = pair.into_inner();
-    let disjunction_pair = inner.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
+    let disjunction_pair =
+        inner.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
     parse_disjunction(disjunction_pair)
 }
 
 /// Parse an index rule into a [`Query::Index`]
-fn parse_index(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_index(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::index {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected index rule, got {:?}",
@@ -296,16 +316,17 @@ fn parse_index(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
         .into_inner()
         .next()
         .ok_or(QueryParseError::UnexpectedEndOfInput)?;
-    let idx = number_pair
-        .as_str()
-        .parse::<usize>()
-        .map_err(|_| QueryParseError::UnexpectedToken(number_pair.as_str().to_string()))?;
+    let idx = number_pair.as_str().parse::<usize>().map_err(|_| {
+        QueryParseError::UnexpectedToken(number_pair.as_str().to_string())
+    })?;
     Ok(Query::Index(idx))
 }
 
 /// Parse a range rule into a range (Query::Range, Query::RangeFrom, or
 /// Query::ArrayWildcard).
-fn parse_range(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_range(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::range {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected range rule, got {:?}",
@@ -319,9 +340,9 @@ fn parse_range(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
     let start = inner
         .next()
         .map(|p| {
-            p.as_str()
-                .parse::<usize>()
-                .map_err(|_| QueryParseError::UnexpectedToken(p.as_str().to_string()))
+            p.as_str().parse::<usize>().map_err(|_| {
+                QueryParseError::UnexpectedToken(p.as_str().to_string())
+            })
         })
         .transpose()?;
 
@@ -332,9 +353,9 @@ fn parse_range(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
     let end = inner
         .next()
         .map(|p| {
-            p.as_str()
-                .parse::<usize>()
-                .map_err(|_| QueryParseError::UnexpectedToken(p.as_str().to_string()))
+            p.as_str().parse::<usize>().map_err(|_| {
+                QueryParseError::UnexpectedToken(p.as_str().to_string())
+            })
         })
         .transpose()?;
 
@@ -347,7 +368,9 @@ fn parse_range(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
 }
 
 /// Parse a regex rule into a Query::Regex.
-fn parse_regex(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseError> {
+fn parse_regex(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::regex {
         return Err(QueryParseError::UnexpectedToken(format!(
             "Expected regex rule, got {:?}",
@@ -356,7 +379,10 @@ fn parse_regex(pair: pest::iterators::Pair<Rule>) -> Result<Query, QueryParseErr
     }
 
     let regex_str = pair.as_str();
-    if regex_str.len() < 2 || !regex_str.starts_with('/') || !regex_str.ends_with('/') {
+    if regex_str.len() < 2
+        || !regex_str.starts_with('/')
+        || !regex_str.ends_with('/')
+    {
         return Err(QueryParseError::UnexpectedToken(regex_str.to_string()));
     }
 

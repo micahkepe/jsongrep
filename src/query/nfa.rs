@@ -96,10 +96,18 @@ impl Display for QueryNFA {
         writeln!(f, "Factors set:")?;
         for (i, followers) in self.factors.iter().enumerate() {
             if followers.is_empty() {
-                writeln!(f, "\t[{}] {} cannot be followed", i, &self.pos_to_label[i])?;
+                writeln!(
+                    f,
+                    "\t[{}] {} cannot be followed",
+                    i, &self.pos_to_label[i]
+                )?;
                 continue;
             }
-            writeln!(f, "\t[{}] {} can be followed by:", i, &self.pos_to_label[i])?;
+            writeln!(
+                f,
+                "\t[{}] {} can be followed by:",
+                i, &self.pos_to_label[i]
+            )?;
             for &j in followers {
                 writeln!(f, "\t\t[{}] {}", j, &self.pos_to_label[j])?;
             }
@@ -202,8 +210,7 @@ impl QueryNFA {
             Query::Field(name) => {
                 // create a new key state if it does not exist
                 let name_rc: Rc<String> = Rc::new(name.clone());
-                self.pos_to_label
-                    .push(TransitionLabel::Field(name_rc.clone()));
+                self.pos_to_label.push(TransitionLabel::Field(name_rc.clone()));
             }
             Query::FieldWildcard => {
                 let field_wildcard = TransitionLabel::FieldWildcard;
@@ -219,7 +226,9 @@ impl QueryNFA {
                 let range = TransitionLabel::Range(*s, *e);
                 self.pos_to_label.push(range);
             }
-            Query::RangeFrom(s) => self.pos_to_label.push(TransitionLabel::RangeFrom(*s)),
+            Query::RangeFrom(s) => {
+                self.pos_to_label.push(TransitionLabel::RangeFrom(*s))
+            }
             Query::ArrayWildcard => {
                 // Treat array wildcard as unbounded range query, as they are
                 // equivalent
@@ -302,7 +311,11 @@ pub fn contains_empty_word(query: &Query) -> bool {
 
 /// Recursively computes the set of letters which occur as the first letter
 /// of a word in L(e').
-pub fn compute_first_set(first_set: &mut [bool], query: &Query, position: &mut usize) {
+pub fn compute_first_set(
+    first_set: &mut [bool],
+    query: &Query,
+    position: &mut usize,
+) {
     match query {
         Query::Field(_)
         | Query::Index(_)
@@ -343,7 +356,11 @@ pub fn compute_first_set(first_set: &mut [bool], query: &Query, position: &mut u
 
 /// Recursively computes the set of letters which occur as the last letter
 /// of a word in L(e').
-pub fn compute_last_set(last_set: &mut [bool], query: &Query, position: &mut usize) {
+pub fn compute_last_set(
+    last_set: &mut [bool],
+    query: &Query,
+    position: &mut usize,
+) {
     match query {
         Query::Field(_)
         | Query::Index(_)
@@ -406,14 +423,20 @@ fn count_subquery_positions(query: &Query) -> usize {
         Query::Sequence(queries) | Query::Disjunction(queries) => {
             queries.iter().map(count_subquery_positions).sum()
         }
-        Query::Optional(q) | Query::KleeneStar(q) => count_subquery_positions(q),
+        Query::Optional(q) | Query::KleeneStar(q) => {
+            count_subquery_positions(q)
+        }
         _ => unimplemented!(),
     }
 }
 
 /// Recursively computes the factors set of letter bigrams that can occur in a
 /// word in L(e').
-pub fn compute_follows_set(factors: &mut [Vec<usize>], query: &Query, position: &mut usize) {
+pub fn compute_follows_set(
+    factors: &mut [Vec<usize>],
+    query: &Query,
+    position: &mut usize,
+) {
     match query {
         Query::Field(_)
         | Query::Index(_)
@@ -462,7 +485,8 @@ pub fn compute_follows_set(factors: &mut [Vec<usize>], query: &Query, position: 
                 // can accept empty word, add D(queries[i])P(queries[j])
                 for j in (i + 1)..queries.len() {
                     // Check if all queries between i and j (exclusive) can accept empty word
-                    let can_skip_middle = (i + 1..j).all(|k| contains_empty_word(&queries[k]));
+                    let can_skip_middle =
+                        (i + 1..j).all(|k| contains_empty_word(&queries[k]));
 
                     if can_skip_middle {
                         let right_query = &queries[j];
@@ -471,17 +495,23 @@ pub fn compute_follows_set(factors: &mut [Vec<usize>], query: &Query, position: 
                         // Compute P(right_query)
                         let mut right_first = vec![false; factors.len()];
                         let mut right_pos = right_start;
-                        compute_first_set(&mut right_first, right_query, &mut right_pos);
+                        compute_first_set(
+                            &mut right_first,
+                            right_query,
+                            &mut right_pos,
+                        );
 
                         // Add boundary pairs: for each element in D(left), add all
                         // elements in P(right)
                         for left_idx in left_start..left_end {
                             if left_last[left_idx] {
-                                (right_start..right_end).for_each(|right_idx| {
-                                    if right_first[right_idx] {
-                                        factors[left_idx].push(right_idx);
-                                    }
-                                });
+                                (right_start..right_end).for_each(
+                                    |right_idx| {
+                                        if right_first[right_idx] {
+                                            factors[left_idx].push(right_idx);
+                                        }
+                                    },
+                                );
                             }
                         }
                     }
@@ -537,9 +567,7 @@ mod tests {
 
     /// Compute number of members in a bit set.
     fn number_of_members(bitset: &[bool]) -> usize {
-        bitset
-            .iter()
-            .fold(0, |acc, b| if *b { acc + 1 } else { acc })
+        bitset.iter().fold(0, |acc, b| if *b { acc + 1 } else { acc })
     }
 
     #[test]
@@ -584,11 +612,8 @@ mod tests {
 
     #[test]
     fn test_simple_seq_nfa() {
-        let query = QueryBuilder::new()
-            .field("foo")
-            .field("bar")
-            .field("baz")
-            .build();
+        let query =
+            QueryBuilder::new().field("foo").field("bar").field("baz").build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 1);
@@ -601,15 +626,12 @@ mod tests {
 
     #[test]
     fn test_simple_seq_dis_nfa() {
-        let query1 = QueryBuilder::new()
-            .field("foo")
-            .field("bar")
-            .field("baz")
-            .build();
-        let query2 = QueryBuilder::new().field("x").field("y").field("z").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query1 =
+            QueryBuilder::new().field("foo").field("bar").field("baz").build();
+        let query2 =
+            QueryBuilder::new().field("x").field("y").field("z").build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 2);
@@ -627,9 +649,8 @@ mod tests {
     fn test_simple_disjunction_nfa() {
         let query1 = QueryBuilder::new().field("foo").build();
         let query2 = QueryBuilder::new().field("bar").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 2);
@@ -647,9 +668,8 @@ mod tests {
     fn test_field_branch_disjunction_nfa() {
         let query1 = QueryBuilder::new().field("foo").field("a").build();
         let query2 = QueryBuilder::new().field("foo").field("b").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 2);
@@ -667,9 +687,8 @@ mod tests {
     fn test_foobar_nfa() {
         let query1 = QueryBuilder::new().field("foo").field("a").build();
         let query2 = QueryBuilder::new().field("bar").field("b").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 2);
@@ -708,9 +727,8 @@ mod tests {
     fn test_range_overlap_nfa() {
         let query1 = QueryBuilder::new().field("foo").index(1).build();
         let query2 = QueryBuilder::new().field("foo").array_wildcard().build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 2);
@@ -725,11 +743,8 @@ mod tests {
 
     #[test]
     fn test_kleene_nfa() {
-        let query = QueryBuilder::new()
-            .field("a")
-            .kleene_star()
-            .field("b")
-            .build();
+        let query =
+            QueryBuilder::new().field("a").kleene_star().field("b").build();
         let nfa = QueryNFA::from_query(&query);
 
         assert_eq!(number_of_members(&nfa.is_accepting), 1);

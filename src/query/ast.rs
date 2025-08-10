@@ -27,7 +27,7 @@ assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
 */
 use std::{cmp::PartialEq, fmt::Display, str::FromStr};
 
-use super::{QueryParseError, parse_query};
+use super::{parse_query, QueryParseError};
 
 /// The `Query` enum represents the different types of queries that can be
 /// constructed
@@ -67,8 +67,12 @@ impl Query {
             Query::Disjunction(subqueries) => {
                 1 + subqueries.iter().map(|q| q.depth()).max().unwrap_or(0)
             }
-            Query::Sequence(queries) => queries.iter().map(|q| q.depth()).sum::<usize>(),
-            Query::Optional(inner) | Query::KleeneStar(inner) => 1 + inner.depth(),
+            Query::Sequence(queries) => {
+                queries.iter().map(|q| q.depth()).sum::<usize>()
+            }
+            Query::Optional(inner) | Query::KleeneStar(inner) => {
+                1 + inner.depth()
+            }
             _ => 1,
         }
     }
@@ -124,11 +128,13 @@ impl Display for Query {
                         if let Some(prev_query) = queries.get(i - 1) {
                             /* Handle optional modifiers -> extract inner queries */
                             let inner_query = match query {
-                                Query::Optional(inner) | Query::KleeneStar(inner) => inner,
+                                Query::Optional(inner)
+                                | Query::KleeneStar(inner) => inner,
                                 _ => query,
                             };
                             let prev_inner = match prev_query {
-                                Query::Optional(inner) | Query::KleeneStar(inner) => inner,
+                                Query::Optional(inner)
+                                | Query::KleeneStar(inner) => inner,
                                 _ => prev_query,
                             };
                             /* Handle field accessed followed by a ranged accessed. */
@@ -181,9 +187,7 @@ impl QueryBuilder {
     /// assert!(matches!(builder.build(), Query::Sequence(_)));
     /// ```
     pub fn new() -> Self {
-        QueryBuilder {
-            query: Query::Sequence(vec![]),
-        }
+        QueryBuilder { query: Query::Sequence(vec![]) }
     }
 
     /// Adds a field access to the query.
@@ -244,7 +248,8 @@ impl QueryBuilder {
     /// );
     /// ```
     ///
-    /// If the query is empty, it creates a new sequence with the optional as the only element:
+    /// If the query is empty, it creates a new sequence with the optional as
+    /// the only element:
     /// ```
     /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().optional().build();

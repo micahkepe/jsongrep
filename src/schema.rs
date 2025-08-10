@@ -1,6 +1,4 @@
 /*!
-# JSON Schema
-
 Defines a subset of JSON values and general definition of a JSON Schema
 Object. Additionally, provides validation functions to validate JSON
 instances against a schema AST.
@@ -32,11 +30,13 @@ impl JSONValue {
     pub fn depth(&self) -> usize {
         match self {
             JSONValue::Object(map) => {
-                let inner_depth = map.values().map(|v| v.depth()).max().unwrap_or(0);
+                let inner_depth =
+                    map.values().map(|v| v.depth()).max().unwrap_or(0);
                 1 + inner_depth
             }
             JSONValue::Array(arr) => {
-                let inner_depth = arr.iter().map(|v| v.depth()).max().unwrap_or(0);
+                let inner_depth =
+                    arr.iter().map(|v| v.depth()).max().unwrap_or(0);
                 1 + inner_depth
             }
             JSONValue::Number(_)
@@ -62,11 +62,13 @@ impl From<serde_json::Value> for JSONValue {
         match value {
             serde_json::Value::Null => JSONValue::Null,
             serde_json::Value::Bool(b) => JSONValue::Boolean(b),
-            serde_json::Value::Number(number) => JSONValue::JString(number.to_string()),
-            serde_json::Value::String(str) => JSONValue::JString(str),
-            serde_json::Value::Array(values) => {
-                JSONValue::Array(values.into_iter().map(JSONValue::from).collect())
+            serde_json::Value::Number(number) => {
+                JSONValue::JString(number.to_string())
             }
+            serde_json::Value::String(str) => JSONValue::JString(str),
+            serde_json::Value::Array(values) => JSONValue::Array(
+                values.into_iter().map(JSONValue::from).collect(),
+            ),
             serde_json::Value::Object(map) => {
                 let converted_obj: HashMap<String, JSONValue> = map
                     .into_iter()
@@ -131,10 +133,7 @@ pub struct IndexMap<K, V> {
 impl<K: Eq + std::hash::Hash + Clone, V> IndexMap<K, V> {
     /// Construct a new IndexMap.
     pub fn new() -> Self {
-        Self {
-            keys: Vec::new(),
-            map: HashMap::new(),
-        }
+        Self { keys: Vec::new(), map: HashMap::new() }
     }
 
     /// Constructs an iterator over the index map.
@@ -251,7 +250,9 @@ pub fn validate_offline(data: &JSONValue, schema: &Schema) -> bool {
                 // if the schema for rest is Nothing (Schema::Nothing), the
                 // value will be rejected
                 for (key, val) in obj.iter() {
-                    if !properties.contains_key(key) && !validate_offline(val, rest_sch) {
+                    if !properties.contains_key(key)
+                        && !validate_offline(val, rest_sch)
+                    {
                         return false;
                     }
                 }
@@ -262,9 +263,13 @@ pub fn validate_offline(data: &JSONValue, schema: &Schema) -> bool {
         }
 
         // union -> ensure existence of at least one schema match
-        Schema::Union(schemas) => schemas.iter().any(|sch| validate_offline(data, sch)),
+        Schema::Union(schemas) => {
+            schemas.iter().any(|sch| validate_offline(data, sch))
+        }
 
         // intersection -> ensure input AST matches all schemas
-        Schema::Intersection(schemas) => schemas.iter().all(|sch| validate_offline(data, sch)),
+        Schema::Intersection(schemas) => {
+            schemas.iter().all(|sch| validate_offline(data, sch))
+        }
     }
 }

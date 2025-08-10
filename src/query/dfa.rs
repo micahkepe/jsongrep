@@ -88,9 +88,17 @@ impl Display for QueryDFA {
             writeln!(f, "\tstate {}:", st)?;
             for (col, entry) in row.iter().enumerate() {
                 match entry {
-                    Some(dest) => writeln!(f, "\t\ton [{:?}] -> {}", self.alphabet[col], dest)?,
+                    Some(dest) => writeln!(
+                        f,
+                        "\t\ton [{:?}] -> {}",
+                        self.alphabet[col], dest
+                    )?,
                     // No transition
-                    None => writeln!(f, "\t\ton [{:?}] -> (dead)", self.alphabet[col])?,
+                    None => writeln!(
+                        f,
+                        "\t\ton [{:?}] -> (dead)",
+                        self.alphabet[col]
+                    )?,
                 }
             }
         }
@@ -146,7 +154,12 @@ impl QueryDFA {
     }
 
     /// Check whether a given index satisfies a range bounds.
-    pub fn index_in_range(&self, index: usize, start: usize, end: usize) -> bool {
+    pub fn index_in_range(
+        &self,
+        index: usize,
+        start: usize,
+        end: usize,
+    ) -> bool {
         start <= index && index < end
     }
 }
@@ -186,18 +199,19 @@ impl DFABuilder {
             Query::Field(name) => {
                 // create a new key state if it does not exist
                 let name_rc: Rc<String> = Rc::new(name.clone());
-                self.key_to_key_id
-                    .entry(name_rc.clone())
-                    .or_insert_with(|| {
+                self.key_to_key_id.entry(name_rc.clone()).or_insert_with(
+                    || {
                         // NOTE: `or_insert_with` defers execution until it is
                         // verified that the default function returns empty,
                         // unlike `or_insert`, which would push a duplicate symbol
                         // onto the alphabet regardless of whether the key was
                         // already in the map
                         let symbol_id = self.alphabet.len();
-                        self.alphabet.push(TransitionLabel::Field(name_rc.clone()));
+                        self.alphabet
+                            .push(TransitionLabel::Field(name_rc.clone()));
                         symbol_id
-                    });
+                    },
+                );
             }
             Query::FieldWildcard => {
                 // NOTE: Continue; don't record a symbol as a field wildcard
@@ -270,15 +284,13 @@ impl DFABuilder {
         // Assign symbol IDs to the disjoint ranges
         for range in disjoint_ranges {
             let symbol_id = self.alphabet.len();
-            self.alphabet
-                .push(TransitionLabel::Range(range.start, range.end));
+            self.alphabet.push(TransitionLabel::Range(range.start, range.end));
             self.range_to_range_id.push((range, symbol_id));
         }
 
         // Ensure that `range_to_range_id` is sorted for binary search on each
         // range's start value
-        self.range_to_range_id
-            .sort_by(|a, b| a.0.start.cmp(&b.0.start));
+        self.range_to_range_id.sort_by(|a, b| a.0.start.cmp(&b.0.start));
     }
 
     /// Use subset construction to convert the constructed epsilon-free NFA to a DFA,
@@ -288,7 +300,8 @@ impl DFABuilder {
         // Use a HashMap to map sets of currently reachable NFA states to DFA
         // state indices
         // curr_nfa_states_to_dfa_state[NFA states bitmap] -> DFA state index
-        let mut nfa_states_to_dfa_state: HashMap<Vec<bool>, usize> = HashMap::new();
+        let mut nfa_states_to_dfa_state: HashMap<Vec<bool>, usize> =
+            HashMap::new();
 
         // Queue to store DFA states to process (each is a set of NFA states as
         // a bitmap)
@@ -315,7 +328,8 @@ impl DFABuilder {
 
         // Process each DFA state
         while let Some(current_set) = work_queue.pop_front() {
-            let current_dfa_state = *nfa_states_to_dfa_state.get(&current_set).unwrap();
+            let current_dfa_state =
+                *nfa_states_to_dfa_state.get(&current_set).unwrap();
 
             // For each symbol in the DFA alphabet
             for (symbol_id, dfa_symbol) in self.alphabet.iter().enumerate() {
@@ -326,7 +340,9 @@ impl DFABuilder {
                 (0..nfa.num_states).for_each(|nfa_state| {
                     if current_set[nfa_state] {
                         // Check transitions from this NFA state
-                        for &(label_idx, dest_state) in &nfa.transitions[nfa_state] {
+                        for &(label_idx, dest_state) in
+                            &nfa.transitions[nfa_state]
+                        {
                             let nfa_label = &nfa.pos_to_label[label_idx];
 
                             // Check if the NFA transition label matches or overlaps with the DFA symbol
@@ -341,10 +357,16 @@ impl DFABuilder {
 
                                 // FieldWildcard match: can match on "Other" (keys
                                 // not in query), or a seen Field
-                                (TransitionLabel::FieldWildcard, TransitionLabel::Other) => {
+                                (
+                                    TransitionLabel::FieldWildcard,
+                                    TransitionLabel::Other,
+                                ) => {
                                     next_nfa_states[dest_state] = true;
                                 }
-                                (TransitionLabel::FieldWildcard, TransitionLabel::Field(_)) => {
+                                (
+                                    TransitionLabel::FieldWildcard,
+                                    TransitionLabel::Field(_),
+                                ) => {
                                     next_nfa_states[dest_state] = true;
                                 }
 
@@ -352,7 +374,9 @@ impl DFABuilder {
                                 (
                                     TransitionLabel::Range(nfa_start, nfa_end),
                                     TransitionLabel::Range(dfa_start, dfa_end),
-                                ) if *nfa_start <= *dfa_start && *dfa_end <= *nfa_end => {
+                                ) if *nfa_start <= *dfa_start
+                                    && *dfa_end <= *nfa_end =>
+                                {
                                     next_nfa_states[dest_state] = true;
                                 }
 
@@ -373,7 +397,10 @@ impl DFABuilder {
                                 }
 
                                 // Other symbol match
-                                (TransitionLabel::Other, TransitionLabel::Other) => {
+                                (
+                                    TransitionLabel::Other,
+                                    TransitionLabel::Other,
+                                ) => {
                                     next_nfa_states[dest_state] = true;
                                 }
                                 _ => {}
@@ -385,29 +412,32 @@ impl DFABuilder {
                 // If there are reachable states, create or find the
                 // corresponding DFA state
                 if next_nfa_states.iter().any(|&b| b) {
-                    let next_dfa_state =
-                        if let Some(&dfa_state) = nfa_states_to_dfa_state.get(&next_nfa_states) {
-                            dfa_state
-                        } else {
-                            // New DFA state
-                            let new_dfa_state = dfa_states.len();
-                            nfa_states_to_dfa_state.insert(next_nfa_states.clone(), new_dfa_state);
-                            dfa_states.push(next_nfa_states.clone());
-                            work_queue.push_back(next_nfa_states.clone());
-                            transitions.push(vec![None; self.alphabet.len()]);
+                    let next_dfa_state = if let Some(&dfa_state) =
+                        nfa_states_to_dfa_state.get(&next_nfa_states)
+                    {
+                        dfa_state
+                    } else {
+                        // New DFA state
+                        let new_dfa_state = dfa_states.len();
+                        nfa_states_to_dfa_state
+                            .insert(next_nfa_states.clone(), new_dfa_state);
+                        dfa_states.push(next_nfa_states.clone());
+                        work_queue.push_back(next_nfa_states.clone());
+                        transitions.push(vec![None; self.alphabet.len()]);
 
-                            // Accepting if any NFA state in the set is accepting
-                            is_accepting.push(
-                                next_nfa_states
-                                    .iter()
-                                    .enumerate()
-                                    .any(|(i, &b)| b && nfa.is_accepting[i]),
-                            );
-                            new_dfa_state
-                        };
+                        // Accepting if any NFA state in the set is accepting
+                        is_accepting.push(
+                            next_nfa_states
+                                .iter()
+                                .enumerate()
+                                .any(|(i, &b)| b && nfa.is_accepting[i]),
+                        );
+                        new_dfa_state
+                    };
 
                     // Add transition
-                    transitions[current_dfa_state][symbol_id] = Some(next_dfa_state);
+                    transitions[current_dfa_state][symbol_id] =
+                        Some(next_dfa_state);
                 }
             }
         }
@@ -490,13 +520,17 @@ impl DFAQueryEngine {
                     let symbol_id = dfa.get_field_symbol_id(key);
 
                     // Try to transition on this symbol
-                    if let Some(next_state) = dfa.transition(current_state, symbol_id) {
+                    if let Some(next_state) =
+                        dfa.transition(current_state, symbol_id)
+                    {
                         // extend the current path using reference counter smart pointer
                         let key_rc: Rc<String> = Rc::new(key.clone());
                         path.push(PathType::Field(key_rc));
 
                         // Recurse on the extended path
-                        Self::traverse_json(dfa, next_state, path, val, results);
+                        Self::traverse_json(
+                            dfa, next_state, path, val, results,
+                        );
 
                         // Backtrack by removing what we just added
                         path.pop();
@@ -508,12 +542,16 @@ impl DFAQueryEngine {
                     // Get symbol ID for this index
                     if let Some(symbol_id) = dfa.get_index_symbol_id(idx) {
                         // Try to transition on this symbol
-                        if let Some(next_state) = dfa.transition(current_state, symbol_id) {
+                        if let Some(next_state) =
+                            dfa.transition(current_state, symbol_id)
+                        {
                             // Extend the current path
                             path.push(PathType::Index(idx));
 
                             // Recurse on the extended path
-                            Self::traverse_json(dfa, next_state, path, val, results);
+                            Self::traverse_json(
+                                dfa, next_state, path, val, results,
+                            );
 
                             // Backtrack
                             path.pop();
@@ -529,7 +567,11 @@ impl DFAQueryEngine {
 }
 
 impl QueryEngine for DFAQueryEngine {
-    fn find<'a>(&self, json: &'a JSONValue, query: &'a Query) -> Vec<JSONPointer<'a>> {
+    fn find<'a>(
+        &self,
+        json: &'a JSONValue,
+        query: &'a Query,
+    ) -> Vec<JSONPointer<'a>> {
         // Compile the query into a DFA
         let dfa = QueryDFA::from_query(query);
 
@@ -541,7 +583,13 @@ impl QueryEngine for DFAQueryEngine {
         let mut path = Vec::new();
 
         // Collect matches based on the DFA transitions and acceptance states
-        DFAQueryEngine::traverse_json(&dfa, dfa.start_state, &mut path, json, &mut results);
+        DFAQueryEngine::traverse_json(
+            &dfa,
+            dfa.start_state,
+            &mut path,
+            json,
+            &mut results,
+        );
 
         #[cfg(test)]
         println!("Found matches:\n{:?}", results);
@@ -553,8 +601,8 @@ impl QueryEngine for DFAQueryEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::QueryBuilder;
     use crate::query::common::JSONPointer;
+    use crate::query::QueryBuilder;
     use std::collections::HashMap;
 
     /// Creates the following simple JSON object for testing:
@@ -688,9 +736,8 @@ mod tests {
         // Query: foo | baz
         let query_1 = QueryBuilder::new().field("foo").build();
         let query_2 = QueryBuilder::new().field("baz").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query_1, query_2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query_1, query_2]).build();
         let json = create_simple_test_json();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
@@ -728,9 +775,8 @@ mod tests {
             .field("c")
             .build();
         let query2 = QueryBuilder::new().field("nested").field("d").build();
-        let query = QueryBuilder::new()
-            .disjunction(vec![query1, query2])
-            .build();
+        let query =
+            QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert_eq!(matches.len(), 2);
         let values: Vec<&JSONValue> = matches.iter().map(|m| m.value).collect();
@@ -742,10 +788,8 @@ mod tests {
     fn test_simple_bounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[1:4]`
-        let query: Query = QueryBuilder::new()
-            .field("baz")
-            .range(Some(1), Some(4))
-            .build();
+        let query: Query =
+            QueryBuilder::new().field("baz").range(Some(1), Some(4)).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [2, 3, 4]
@@ -759,7 +803,8 @@ mod tests {
     fn test_simple_unbounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[:]` => equivalent to `baz[*]`
-        let query: Query = QueryBuilder::new().field("baz").range(None, None).build();
+        let query: Query =
+            QueryBuilder::new().field("baz").range(None, None).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [1, 2, 3, 4, 5]
@@ -775,10 +820,8 @@ mod tests {
     fn test_simple_unbounded_start() {
         let json = create_simple_test_json();
         // Query: `baz[:2]`
-        let query: Query = QueryBuilder::new()
-            .field("baz")
-            .range(None, Some(2))
-            .build();
+        let query: Query =
+            QueryBuilder::new().field("baz").range(None, Some(2)).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [0, 1]
@@ -791,10 +834,8 @@ mod tests {
     fn test_simple_unbounded_end() {
         let json = create_simple_test_json();
         // Query: `baz[2:]`
-        let query: Query = QueryBuilder::new()
-            .field("baz")
-            .range(Some(2), None)
-            .build();
+        let query: Query =
+            QueryBuilder::new().field("baz").range(Some(2), None).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [3, 4, 5]
@@ -808,10 +849,8 @@ mod tests {
     fn test_simple_range_bounds_eq() {
         let json = create_simple_test_json();
         // Query: `baz[1:1]`
-        let query: Query = QueryBuilder::new()
-            .field("baz")
-            .range(Some(1), Some(1))
-            .build();
+        let query: Query =
+            QueryBuilder::new().field("baz").range(Some(1), Some(1)).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect empty result set
@@ -852,14 +891,8 @@ mod tests {
     fn test_overlapping_ranges() {
         let json = create_simple_test_json();
         // Query: `baz[0:3] | baz[1:]` = `baz[0:]`
-        let q1 = QueryBuilder::new()
-            .field("baz")
-            .range(None, Some(3))
-            .build();
-        let q2 = QueryBuilder::new()
-            .field("baz")
-            .range(Some(1), None)
-            .build();
+        let q1 = QueryBuilder::new().field("baz").range(None, Some(3)).build();
+        let q2 = QueryBuilder::new().field("baz").range(Some(1), None).build();
         let query = QueryBuilder::new().disjunction(vec![q1, q2]).build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Only expected matches [1, 2, 3, 4, 5]
@@ -1013,11 +1046,8 @@ mod tests {
     fn test_fieldwildcard_nonunique_keys() {
         let json = create_duplicate_key_nested_test_json();
         // Query: `c.*.c`
-        let query = QueryBuilder::new()
-            .field_wildcard()
-            .field("c")
-            .field("c")
-            .build();
+        let query =
+            QueryBuilder::new().field_wildcard().field("c").field("c").build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1)
@@ -1160,7 +1190,8 @@ mod tests {
         #[cfg(test)]
         println!("Input JSONValue:\n\t{:?}\n", json);
 
-        let query: Query = "**.[*]*.[*]".parse().expect("failed to parse query");
+        let query: Query =
+            "**.[*]*.[*]".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
@@ -1177,7 +1208,8 @@ mod tests {
         #[cfg(test)]
         println!("Input JSONValue:\n\t{:?}\n", json);
 
-        let query: Query = "x.(y | z.t)".parse().expect("failed to parse query");
+        let query: Query =
+            "x.(y | z.t)".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 2);
@@ -1209,7 +1241,8 @@ mod tests {
         #[cfg(test)]
         println!("Input JSONValue:\n\t{:?}\n", json);
 
-        let query: Query = "**.[*]*.[*]".parse().expect("failed to parse query");
+        let query: Query =
+            "**.[*]*.[*]".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
@@ -1242,7 +1275,8 @@ mod tests {
         #[cfg(test)]
         println!("Input JSONValue:\n\t{:?}\n", json);
 
-        let query: Query = "(* | [*])*.[*]".parse().expect("failed to parse query");
+        let query: Query =
+            "(* | [*])*.[*]".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());

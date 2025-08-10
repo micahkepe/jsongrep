@@ -1,11 +1,7 @@
-//! # JSON Query DSL
-//!
-//! A JSONPath-inspired query language for JSON documents with support for:
-//! - Field access, array indexing, ranges
-//! - Wildcards, optional matching, Kleene star
-//! - Disjunction and regular expressions
-//! - Streaming-friendly design returning pointers to matched values
-
+/*!
+This module provides the main query engine implementation, as well as the parser for the query
+language and the intermediary AST representations of queries.
+*/
 pub mod ast;
 pub(crate) mod common;
 pub mod dfa;
@@ -22,7 +18,11 @@ pub trait QueryEngine {
     ///
     /// Follows the semantics of JSONPath, returning the matched values as an
     /// array of `JSONPointer` instances.
-    fn find<'a>(&self, json: &'a JSONValue, query: &'a Query) -> Vec<JSONPointer<'a>>;
+    fn find<'a>(
+        &self,
+        json: &'a JSONValue,
+        query: &'a Query,
+    ) -> Vec<JSONPointer<'a>>;
 }
 
 // Re-exports

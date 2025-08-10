@@ -39,17 +39,15 @@ fn test_invalid_query() {
 #[test]
 fn test_simple_query() {
     // Test a simple query "age" on simple.json, expecting ["32"]
-    let assert = run_main(&["age", "tests/data/simple.json"])
-        .success()
-        .code(0); // Ensure the command exits successfully
-    let output_str =
-        String::from_utf8(assert.get_output().stdout.clone()).expect("Invalid UTF-8 output");
+    let assert = run_main(&["age", "tests/data/simple.json"]).success().code(0); // Ensure the command exits successfully
+    let output_str = String::from_utf8(assert.get_output().stdout.clone())
+        .expect("Invalid UTF-8 output");
 
     // Parse the output JSON
     let output_json: Value =
         serde_json::from_str(&output_str).expect("Failed to parse output JSON");
-    let expected_json: Value =
-        serde_json::from_str(r#"["32"]"#).expect("Failed to parse expected JSON");
+    let expected_json: Value = serde_json::from_str(r#"["32"]"#)
+        .expect("Failed to parse expected JSON");
 
     assert_eq!(output_json, expected_json);
 }

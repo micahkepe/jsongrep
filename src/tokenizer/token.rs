@@ -1,7 +1,6 @@
 //! # JSON Token
 //!
 //! Defines possible tokens from parsing a JSON document byte sequence.
-
 use std::fmt::Display;
 
 /// Represents a token value from a JSON document.

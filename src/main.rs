@@ -1,34 +1,5 @@
 /*!
-# Main Query Binary
-
-Query an input JSON document against a rq query.
-
-To run:
-
-```bash
-cargo run --release --bin main
-target/release/main
-```
-
-## Examples
-
-From file input:
-
-```bash
-cargo run --release -- "**.[*]" ../path/to/file.json
-```
-
-Piping in JSON content:
-
-```bash
-echo '{"foo": "bar"}' | cargo run --release "foo"
-```
-
-View help:
-
-```bash
-cargo run --release -- --help
-```
+Main binary for jsongrep.
 */
 
 use anyhow::{Context, Result};
@@ -67,18 +38,21 @@ struct Args {
 }
 
 /// Entry point for main binary.
+///
+/// This parses the command line arguments and executes the query. If the input
+/// is piped in, it reads from STDIN. The output is printed to STDOUT, with
+/// formatting determined by the command line arguments.
 fn main() -> Result<()> {
     let args = Args::parse();
 
     // Parse query
-    let query: Query = args
-        .query
-        .parse()
-        .with_context(|| "Failed to parse query")?;
+    let query: Query =
+        args.query.parse().with_context(|| "Failed to parse query")?;
 
     // Parse input content
     let input_content = if let Some(path) = args.input {
-        fs::read_to_string(&path).with_context(|| format!("Failed to read file {:?}", path))?
+        fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read file {:?}", path))?
     } else {
         if io::stdin().is_terminal() {
             // No piped input and no file specified
@@ -89,8 +63,8 @@ fn main() -> Result<()> {
         io::stdin().read_to_string(&mut buffer)?;
         buffer
     };
-    let json =
-        JSONValue::try_from(input_content.as_str()).with_context(|| "Failed to parse JSON")?;
+    let json = JSONValue::try_from(input_content.as_str())
+        .with_context(|| "Failed to parse JSON")?;
 
     // Execute query
     let results = DFAQueryEngine.find(&json, &query);
@@ -108,13 +82,17 @@ fn main() -> Result<()> {
     if !args.no_display {
         if !args.compact {
             // Pretty-printed output
-            let json_values: Vec<&JSONValue> = results.iter().map(|p| p.value).collect();
+            let json_values: Vec<&JSONValue> =
+                results.iter().map(|p| p.value).collect();
             println!("{}", serde_json::to_string_pretty(&json_values)?);
         } else {
             // Compact output
             let json_output: Vec<String> = results
                 .iter()
-                .map(|p| serde_json::to_string(p.value).unwrap_or_else(|_| "".to_string()))
+                .map(|p| {
+                    serde_json::to_string(p.value)
+                        .unwrap_or_else(|_| "".to_string())
+                })
                 .collect();
             println!("{}", serde_json::to_string(&json_output)?);
         }
