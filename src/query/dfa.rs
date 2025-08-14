@@ -463,18 +463,18 @@ impl DFABuilder {
     /// determinized to obtain the final DFA.
     fn build_dfa(&mut self, query: &Query) -> QueryDFA {
         // Handle empty query case: match root (identity)
-        if let Query::Sequence(steps) = query {
-            if steps.is_empty() {
-                return QueryDFA {
-                    num_states: 1,
-                    start_state: 0,
-                    is_accepting: vec![true],
-                    transitions: vec![],
-                    alphabet: vec![],
-                    key_to_key_id: HashMap::new(),
-                    range_to_range_id: vec![],
-                };
-            }
+        if let Query::Sequence(steps) = query
+            && steps.is_empty()
+        {
+            return QueryDFA {
+                num_states: 1,
+                start_state: 0,
+                is_accepting: vec![true],
+                transitions: vec![],
+                alphabet: vec![],
+                key_to_key_id: HashMap::new(),
+                range_to_range_id: vec![],
+            };
         }
 
         // Extract symbols to obtain finite alphabet
@@ -601,8 +601,8 @@ impl QueryEngine for DFAQueryEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::common::JSONPointer;
     use crate::query::QueryBuilder;
+    use crate::query::common::JSONPointer;
     use std::collections::HashMap;
 
     /// Creates the following simple JSON object for testing:
@@ -761,10 +761,10 @@ mod tests {
         let mut json = create_nested_test_json();
 
         // add another field in "nested"
-        if let JSONValue::Object(ref mut root) = json {
-            if let Some(JSONValue::Object(nested)) = root.get_mut("nested") {
-                nested.insert("d".to_string(), JSONValue::Null);
-            }
+        if let JSONValue::Object(ref mut root) = json
+            && let Some(JSONValue::Object(nested)) = root.get_mut("nested")
+        {
+            nested.insert("d".to_string(), JSONValue::Null);
         }
 
         // Query: nested.a.b.c | nested.d

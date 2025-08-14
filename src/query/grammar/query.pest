@@ -1,4 +1,4 @@
-//! Pest grammar for rq
+//! Pest grammar for jsonquery
 //!
 //! For more information on Pest:
 //!   - [Documentation](https://docs.rs/pest/latest/pest/)
@@ -10,90 +10,89 @@
 //!   - [JSON Pest grammar](https://github.com/pest-parser/zed-pest/blob/main/test/json.pest)
 
 /// Whitespace characters
-WHITESPACE    = _{ " " | "\t" | "\n" | "\r" }
+WHITESPACE      = _{ " " | "\t" | "\n" | "\r" }
 
 /// Reserved characters for the query language that cannot appear in unquoted
 /// field names
-reserved      = { "." | "|" | "*" | "?" | "[" | "]" | "(" | ")" | "/" }
+reserved        = { "." | "|" | "*" | "?" | "[" | "]" | "(" | ")" | "/" }
 
 /// Top-level query rule; SOI = "start of input", EOI = "end of input".
 /// Empty queries act as a identity operator on the input JSON document.
-query         = { SOI ~ disjunction? ~ EOI }
+query           = { SOI ~ disjunction? ~ EOI }
 
 /// Disjunction of queries
-disjunction   = { sequence ~ ( "|" ~ sequence )* }
+disjunction     = { sequence ~ ( "|" ~ sequence )* }
 
 /// Groups, which are a parentheses-surrounded disjunction (and therefore also
 /// sequences), e.g. "(* | [*])*" or "(foo.bar)"
-group = { "(" ~ disjunction ~ ")"}
+group           = { "(" ~ disjunction ~ ")" }
 
 /// Sequence of queries
-sequence      = { step ~ ("." ~ step)* }
+sequence        = { step ~ ("." ~ step)* }
 
 /// Step in a sequence - can be an atom with modifiers, or a field with array
 /// accesses
-step          = {
-                  (field ~ (index | range | array_wildcard)?) ~ modifier?
-                  | atom ~ modifier?
-                  | group ~ modifier?
-                }
+step            = {
+                    (field ~ (index | range | array_wildcard)?) ~ modifier?
+                    | atom ~ modifier?
+                    | group ~ modifier?
+                  }
 
 /// Postfix unary operators
-modifier      = { "*" | "?" }
+modifier        = { "*" | "?" }
 
 /// Atoms themselves are hidden (don't appear in parse pairs)
-atom          = _{
-                  index
-                | range
-                | array_wildcard
-                | field_wildcard
-                | regex
-              }
+atom            = _{
+                      index
+                    | range
+                    | array_wildcard
+                    | field_wildcard
+                    | regex
+                  }
 
-  /// JSON key value (unquoted string allowing most Unicode characters except
-  /// reserved ones)
-  field         = @{
+/// JSON key value (unquoted string allowing most Unicode characters except
+/// reserved ones)
+field           = @{
                   quoted_field
                   | unquoted_field
                 }
 
-  /// Single array index access
-  index          = { "[" ~ number ~ "]" }
+/// Single array index access
+index           = { "[" ~ number ~ "]" }
 
-  /// Range access from [start:end)
-  range          = { "[" ~ (number)? ~ ":" ~ (number)? ~ "]" }
+/// Range access from [start:end)
+range           = { "[" ~ (number)? ~ ":" ~ (number)? ~ "]" }
 
-  /// Access on all members of a JSON array
-  array_wildcard = { "[" ~ "*" ~ "]" }
+/// Access on all members of a JSON array
+array_wildcard  = { "[" ~ "*" ~ "]" }
 
-  /// A match on any subsequent key value.
-  field_wildcard = { "*" }
+/// A match on any subsequent key value.
+field_wildcard  = { "*" }
 
-  /// A regular expression to match against key values.
-  regex          = @{ "/" ~ (regex_char)* ~ "/" }
-
+/// A regular expression to match against key values.
+regex           = @{ "/" ~ (regex_char)* ~ "/" }
 
 /// Unquoted field access, one or more unreserved or non-whitespace Unicode
 /// character(s)
-unquoted_field = @{ (!(reserved | WHITESPACE | "\"") ~ ANY)+ }
+unquoted_field  = @{ (!(reserved | WHITESPACE | "\"") ~ ANY)+ }
 
 /// Quoted field access
-quoted_field = @{ "\"" ~ string_inner ~ "\""}
+quoted_field    = @{ "\"" ~ string_inner ~ "\""}
 
 /// Inner content of JSON string
-string_inner = @{ char* }
+string_inner    = @{ char* }
 
 /// JSON string character, taken from:
 ///   https://pest.rs/book/examples/json.html#writing-the-grammar
-char = {
-    !("\"" | "\\") ~ ANY
-    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
-}
+char            = {
+                    !("\"" | "\\") ~ ANY
+                    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+                    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+                  }
 
 /// Regex characters (any character except unescaped `/`, supports escaped `/`)
-regex_char = { (!"/" ~ ANY) | "\\/" }
+regex_char      = { (!"/" ~ ANY) | "\\/" }
 
 /// Non-negative number composed only of ASCII digits.
-number     = @{ ASCII_DIGIT+ }
+number          = @{ ASCII_DIGIT+ }
 

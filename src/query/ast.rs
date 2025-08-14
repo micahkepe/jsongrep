@@ -27,7 +27,7 @@ assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
 */
 use std::{cmp::PartialEq, fmt::Display, str::FromStr};
 
-use super::{parse_query, QueryParseError};
+use super::{QueryParseError, parse_query};
 
 /// The `Query` enum represents the different types of queries that can be
 /// constructed
@@ -124,30 +124,30 @@ impl Display for Query {
                  * "foo.bar.[0]?.baz"
                  */
                 for (i, query) in queries.iter().enumerate() {
-                    if i > 0 {
-                        if let Some(prev_query) = queries.get(i - 1) {
-                            /* Handle optional modifiers -> extract inner queries */
-                            let inner_query = match query {
-                                Query::Optional(inner)
-                                | Query::KleeneStar(inner) => inner,
-                                _ => query,
-                            };
-                            let prev_inner = match prev_query {
-                                Query::Optional(inner)
-                                | Query::KleeneStar(inner) => inner,
-                                _ => prev_query,
-                            };
-                            /* Handle field accessed followed by a ranged accessed. */
-                            match (prev_inner, inner_query) {
-                                (Query::Field(_), Query::Index(_))
-                                | (Query::Field(_), Query::Range(_, _))
-                                | (Query::Field(_), Query::RangeFrom(_))
-                                | (Query::Field(_), Query::FieldWildcard)
-                                | (Query::Field(_), Query::ArrayWildcard) => {
-                                    // continue; no '.' separator
-                                }
-                                _ => write!(f, ".")?,
+                    if i > 0
+                        && let Some(prev_query) = queries.get(i - 1)
+                    {
+                        /* Handle optional modifiers -> extract inner queries */
+                        let inner_query = match query {
+                            Query::Optional(inner)
+                            | Query::KleeneStar(inner) => inner,
+                            _ => query,
+                        };
+                        let prev_inner = match prev_query {
+                            Query::Optional(inner)
+                            | Query::KleeneStar(inner) => inner,
+                            _ => prev_query,
+                        };
+                        /* Handle field accessed followed by a ranged accessed. */
+                        match (prev_inner, inner_query) {
+                            (Query::Field(_), Query::Index(_))
+                            | (Query::Field(_), Query::Range(_, _))
+                            | (Query::Field(_), Query::RangeFrom(_))
+                            | (Query::Field(_), Query::FieldWildcard)
+                            | (Query::Field(_), Query::ArrayWildcard) => {
+                                // continue; no '.' separator
                             }
+                            _ => write!(f, ".")?,
                         }
                     }
 
