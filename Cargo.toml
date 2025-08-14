@@ -8,6 +8,11 @@ license = "MIT"
 repository = "https://github.com/micahkepe/jsongrep"
 homepage = "https://github.com/micahkepe/jsongrep"
 description = "A JSONPath-inspired query language for JSON documents"
+categories = ["command-line-utilities", "text-processing"]
+exclude = [
+  ".github/",
+  "examples/"
+]
 
 [dependencies]
 anyhow = "1.0.98"
