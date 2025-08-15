@@ -180,7 +180,7 @@ be redirected to your shell's expected completion location:
   echo 'source /path/to/jg.bash' >> ~/.bashrc
 
   # Or copy to the system-wide bash completion directory
-  jg generate shell bash > jg.fish && sudo mv jg.fish /etc/bash_completion.d/
+  jg generate shell bash > jg.bash && sudo mv jg.bash /etc/bash_completion.d/
   ```
 
 - Zsh
