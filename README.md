@@ -8,6 +8,8 @@
 - [Usage](#usage)
   - [Query Syntax](#query-syntax)
 - [Examples](#examples)
+- [Shell Completions](#shell-completions)
+- [Man Page](#man-page)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -24,12 +26,16 @@ The `jg` binary will be installed to `~/.cargo/bin`.
 ## Usage
 
 ```
-Query an input JSON document against a jsongrep query
+A JSONPath-inspired query language for JSON documents
 
-Usage: jg [OPTIONS] <QUERY> [FILE]
+Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
+
+Commands:
+  generate  Generate additional documentation and/or completions
+  help      Print this message or the help of the given subcommand(s)
 
 Arguments:
-  <QUERY>  Query string (e.g., "**.name")
+  [QUERY]  Query string (e.g., "**.name")
   [FILE]   Optional path to JSON file. If omitted, reads from STDIN
 
 Options:
@@ -46,13 +52,22 @@ Options:
 The query engine allows you to query JSON data using a simple DSL. It supports
 the following operators:
 
-- Field accesses: `"foo"`
-- Array accesses (0-indexed): `"[0]" | "[start: end]"`
-- Field and array wild cards: `"foo.*", "foo[*]"`
-- Optional chaining: `"foo?.bar"`
-- Kleene star: `"foo*"`
-- Disjunction: `"foo | bar"`
-- Sequence: `"foo.bar.baz"`
+- Field accesses: `foo`
+- Array accesses (0-indexed): `[0] | [start: end]`
+- Field and array wild cards: `foo.*`, `foo[*]`
+- Optional chaining: `foo?.bar`
+- Kleene star: `foo*`
+- Disjunction: `foo | bar`
+- Sequence: `foo.bar.baz`
+
+**Notes**:
+
+- Sequences use `.` to chain steps: `foo.bar.baz`
+
+- Fields can be unquoted (`foo`) or quoted (`"foo bar"`)
+
+- The `*` modifier after a step is different from the `*` field wildcard — the
+  modifier repeats **the preceding step**.
 
 The complete grammar for the query language can be found in the
 [grammar](./src/query/grammar) directory.
@@ -126,7 +141,7 @@ Found matches: 2
 ---
 
 <details>
-<summary>QueryBuilder API</summary>
+<summary>Rust API: QueryBuilder</summary>
 
 The `jsongrep::query::ast` module defines the `QueryBuilder` fluent API for
 building queries. It allows you to construct queries using a builder pattern.
@@ -151,6 +166,50 @@ let query = QueryBuilder::new()
 
 Examples of using the `jsongrep` crate can be found in the
 [examples](./examples) directory.
+
+## Shell Completions
+
+To generate completions for your shell, you can use the `jg generate shell`
+subcommand. By default, the completions will be printed to `/dev/stdout` and can
+be redirected to your shell's expected completion location:
+
+- Bash
+
+  ```bash
+  # Source the completion script in your .bashrc
+  echo 'source /path/to/jg.bash' >> ~/.bashrc
+
+  # Or copy to the system-wide bash completion directory
+  jg generate shell bash > jg.fish && sudo mv jg.fish /etc/bash_completion.d/
+  ```
+
+- Zsh
+
+  ```bash
+  mkdir -p ~/.zsh/completions
+  jg generate shell zsh > ~/.zsh/completions/_jg
+
+  # Add the directory to fpath in your .zshrc before compinit
+  echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+  echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+  ```
+
+- Fish
+
+  ```bash
+  jg generate shell fish > ~/.config/fish/completions/jg.fish
+  ```
+
+## Man Page
+
+To generate a Man page for `jg`, you can use the `jg generate man`
+subcommand. By default, the Man page will be printed to `/dev/stdout` and can
+be redirected to your local Man folder:
+
+```bash
+mkdir -p ~/.local/share/man/man1/
+jg generate man > ~/.local/share/man/man1/jg.1
+```
 
 ## Contributing
 
