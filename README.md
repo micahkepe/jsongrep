@@ -202,14 +202,16 @@ be redirected to your shell's expected completion location:
 
 ## Man Page
 
-To generate a Man page for `jg`, you can use the `jg generate man`
-subcommand. By default, the Man page will be printed to `/dev/stdout` and can
-be redirected to your local Man folder:
+To generate a Man page for `jg`, you can use the `jg generate man` subcommand to
+generate to a specified output directory with the `-o`/`--output-dir` options
+(defaults to current directory):
 
 ```bash
 mkdir -p ~/.local/share/man/man1/
-jg generate man > ~/.local/share/man/man1/jg.1
+jg generate man -o ~/.local/share/man/man1/
 ```
+
+Browse the generated Man pages with `man jg`.
 
 ## Contributing
 

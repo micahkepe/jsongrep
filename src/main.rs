@@ -3,10 +3,12 @@ Main binary for jsongrep.
 */
 
 use anyhow::{Context, Result};
-use clap::CommandFactory;
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
-use std::io::{self, Write, stdout};
+use std::fs::File;
+use std::io::stdout;
+use std::io::{self};
+use std::path::Path;
 use std::{
     fs,
     io::{IsTerminal, Read},
@@ -17,7 +19,7 @@ use jsongrep::{query::*, schema::JSONValue};
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
-#[command(version, about, arg_required_else_help = true, long_about = None)]
+#[command(name = "jg", version, about, arg_required_else_help = true, long_about = None)]
 struct Args {
     /// Optional subcommands
     #[command(subcommand)]
@@ -54,8 +56,65 @@ enum Commands {
 enum GenerateCommand {
     /// Generate shell completions for the given shell to stdout.
     Shell { shell: clap_complete::Shell },
-    /// Generate a man page for jg to stdout.
-    Man,
+    /// Generate a man page for jg to output directory if specified, else
+    /// the current directory.
+    Man {
+        /// The output directory to write the man pages.
+        #[clap(short, long)]
+        output_dir: Option<PathBuf>,
+    },
+}
+
+/// Utility function to generate all Man pages for the main [`Args`] structure and all dependent
+/// recursive subcommand pages to the output directory if specified, else the current directory.
+fn generate_man_pages(output_dir: Option<PathBuf>) -> Result<()> {
+    let output_dir: PathBuf = output_dir.unwrap_or(
+        std::env::current_dir().context("Opening current directory")?,
+    );
+
+    std::fs::create_dir_all(&output_dir)
+        .context("create output Man directories")?;
+
+    let cmd = Args::command();
+    let main_man = clap_mangen::Man::new(cmd.clone());
+    let main_man_path = output_dir.join(format!("{}.1", cmd.get_name()));
+    let mut man_man_file = File::create(&main_man_path).with_context(|| {
+        format!("failed to create {}", main_man_path.display())
+    })?;
+    main_man.render(&mut man_man_file)?;
+    println!("Generated: {}", main_man_path.display());
+
+    // Recurse over subcommands
+    generate_subcommand_man_pages(&cmd, &output_dir, cmd.get_name())?;
+
+    Ok(())
+}
+
+/// Generate subcommand Man pages recursively.
+fn generate_subcommand_man_pages(
+    cmd: &clap::Command,
+    output_dir: &Path,
+    prefix: &str,
+) -> Result<()> {
+    for subcmd in cmd.get_subcommands() {
+        let subcmd_man = clap_mangen::Man::new(subcmd.clone());
+        let file_name = format!("{}-{}", prefix, subcmd_man.get_filename());
+        let man_path = output_dir.join(&file_name);
+        let mut subcmd_file = File::create(&man_path).with_context(|| {
+            format!("failed to create {}", man_path.display())
+        })?;
+        subcmd_man.render(&mut subcmd_file)?;
+        println!("Generated: {}", man_path.display());
+        if subcmd.has_subcommands() {
+            generate_subcommand_man_pages(
+                subcmd,
+                output_dir,
+                subcmd.get_name(),
+            )?
+        }
+    }
+
+    Ok(())
 }
 
 /// Entry point for main binary.
@@ -72,12 +131,8 @@ fn main() -> Result<()> {
                 let mut cmd = Args::command();
                 generate(shell, &mut cmd, "jg", &mut stdout().lock())
             }
-            GenerateCommand::Man => {
-                let cmd = Args::command();
-                let man = clap_mangen::Man::new(cmd.clone());
-                let mut buffer: Vec<u8> = Vec::new();
-                man.render(&mut buffer)?;
-                stdout().lock().write_all(&buffer)?;
+            GenerateCommand::Man { output_dir } => {
+                generate_man_pages(output_dir)?
             }
         },
         None => {
