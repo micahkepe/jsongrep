@@ -11,7 +11,8 @@ description = "A JSONPath-inspired query language for JSON documents"
 categories = ["command-line-utilities", "text-processing"]
 exclude = [
   ".github/",
-  "examples/"
+  "examples/",
+  "images/"
 ]
 
 [dependencies]

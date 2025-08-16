@@ -1,6 +1,16 @@
-# jsongrep (`jg`)
+<div align="center">
+ <img src="./images/logo.svg" alt"jsongrep SVG logo"/>
+</div>
 
-`jsongrep` is a JSONPath-inspired query language over JSON documents.
+<p align="center">
+<a href="https://github.com/micahkepe/jsongrep/releases"><img alt="Crates.io Version" src="https://img.shields.io/crates/v/jsongrep"></a>
+<a href="https://github.com/micahkepe/jsongrep/blob/main/LICENSE"><img alt="GitHub License" src="https://img.shields.io/github/license/micahkepe/jsongrep"></a>
+<a href="https://github.com/micahkepe/jsongrep/actions"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/micahkepe/jsongrep/rust.yml"> </a>
+</p>
+
+<p align="center">
+<code>jsongrep</code> is a JSONPath-inspired query language over JSON documents.
+</p>
 
 ## Table of Contents
 
