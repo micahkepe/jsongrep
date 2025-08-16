@@ -5,12 +5,11 @@ Main binary for jsongrep.
 use anyhow::{Context, Result};
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
-use std::fs::File;
 use std::io::stdout;
 use std::io::{self};
 use std::path::Path;
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::{IsTerminal, Read},
     path::PathBuf,
 };
@@ -19,7 +18,7 @@ use jsongrep::{query::*, schema::JSONValue};
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
-#[command(name = "jg", version, about, arg_required_else_help = true, long_about = None)]
+#[command(name = "jg", version, about, arg_required_else_help = true, long_about = None, disable_help_subcommand = true)]
 struct Args {
     /// Optional subcommands
     #[command(subcommand)]
@@ -78,9 +77,13 @@ fn generate_man_pages(output_dir: Option<PathBuf>) -> Result<()> {
     let cmd = Args::command();
     let main_man = clap_mangen::Man::new(cmd.clone());
     let main_man_path = output_dir.join(format!("{}.1", cmd.get_name()));
-    let mut man_man_file = File::create(&main_man_path).with_context(|| {
-        format!("failed to create {}", main_man_path.display())
-    })?;
+    let mut man_man_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&main_man_path)
+        .with_context(|| {
+            format!("failed to create {}", main_man_path.display())
+        })?;
     main_man.render(&mut man_man_file)?;
     println!("Generated: {}", main_man_path.display());
 
@@ -100,9 +103,14 @@ fn generate_subcommand_man_pages(
         let subcmd_man = clap_mangen::Man::new(subcmd.clone());
         let file_name = format!("{}-{}", prefix, subcmd_man.get_filename());
         let man_path = output_dir.join(&file_name);
-        let mut subcmd_file = File::create(&man_path).with_context(|| {
-            format!("failed to create {}", man_path.display())
-        })?;
+        let mut subcmd_file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&man_path)
+            .with_context(|| {
+                format!("failed to create {}", man_path.display())
+            })?;
+
         subcmd_man.render(&mut subcmd_file)?;
         println!("Generated: {}", man_path.display());
         if subcmd.has_subcommands() {

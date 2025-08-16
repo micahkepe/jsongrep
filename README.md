@@ -32,7 +32,6 @@ Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
 
 Commands:
   generate  Generate additional documentation and/or completions
-  help      Print this message or the help of the given subcommand(s)
 
 Arguments:
   [QUERY]  Query string (e.g., "**.name")
