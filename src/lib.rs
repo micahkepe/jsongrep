@@ -74,6 +74,7 @@ Finally, we can use wildcards to match any field or index:
 - `([*] | *)*`: Matches any filed or index at any level of the JSON tree.
 */
 
+pub mod commands;
 pub mod query;
 pub mod schema;
 pub mod tokenizer;
