@@ -8,7 +8,8 @@ pub mod dfa;
 pub(crate) mod nfa;
 pub mod parser;
 
-use crate::schema::JSONValue;
+use serde_json::Value;
+
 use common::JSONPointer;
 
 /// Interface for query engine implementations.
@@ -20,7 +21,7 @@ pub trait QueryEngine {
     /// array of `JSONPointer` instances.
     fn find<'a>(
         &self,
-        json: &'a JSONValue,
+        json: &'a Value,
         query: &'a Query,
     ) -> Vec<JSONPointer<'a>>;
 }

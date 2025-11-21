@@ -74,7 +74,25 @@ Finally, we can use wildcards to match any field or index:
 - `([*] | *)*`: Matches any filed or index at any level of the JSON tree.
 */
 
+use serde_json::Value;
+
 pub mod commands;
 pub mod query;
-pub mod schema;
 pub mod tokenizer;
+
+/// Returns the depth of the JSON value.
+pub fn depth(json: &Value) -> usize {
+    match json {
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => 1,
+        Value::Array(arr) => {
+            let inner_depth =
+                arr.iter().map(|item| depth(item)).max().unwrap_or(0);
+            1 + inner_depth
+        }
+        Value::Object(map) => {
+            let inner_depth =
+                map.values().map(|val| depth(val)).max().unwrap_or(0);
+            1 + inner_depth
+        }
+    }
+}

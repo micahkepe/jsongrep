@@ -46,8 +46,8 @@ fn test_simple_query() {
     // Parse the output JSON
     let output_json: Value =
         serde_json::from_str(&output_str).expect("Failed to parse output JSON");
-    let expected_json: Value = serde_json::from_str(r#"["32"]"#)
-        .expect("Failed to parse expected JSON");
+    let expected_json: Value =
+        serde_json::from_str(r#"[32]"#).expect("Failed to parse expected JSON");
 
     assert_eq!(output_json, expected_json);
 }

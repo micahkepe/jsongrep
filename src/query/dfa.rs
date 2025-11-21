@@ -15,6 +15,7 @@ For an example of production-ready implementation, the
 crate provides NFA and DFA implementations for regular expressions using
 Thompson's construction and other techniques such as a Pike VM.
 */
+use serde_json::Value;
 use std::{
     cmp::Ordering,
     collections::{HashMap, VecDeque},
@@ -25,7 +26,6 @@ use std::{
 use crate::query::ast::Query;
 use crate::query::common::{JSONPointer, PathType, TransitionLabel};
 use crate::query::{QueryEngine, QueryNFA};
-use crate::schema::JSONValue;
 
 /// Represents a Deterministic Finite Automaton (DFA) for JSON queries. An
 /// important thing to note is that the alphabet depends on the query.
@@ -502,7 +502,7 @@ impl DFAQueryEngine {
         dfa: &QueryDFA,
         current_state: usize,
         path: &mut Vec<PathType>,
-        value: &'a JSONValue,
+        value: &'a Value,
         results: &mut Vec<JSONPointer<'a>>,
     ) {
         // Check if current state is accepting
@@ -514,7 +514,7 @@ impl DFAQueryEngine {
         }
 
         match value {
-            JSONValue::Object(map) => {
+            Value::Object(map) => {
                 for (key, val) in map.iter() {
                     // Get symbol ID for this field
                     let symbol_id = dfa.get_field_symbol_id(key);
@@ -537,7 +537,7 @@ impl DFAQueryEngine {
                     }
                 }
             }
-            JSONValue::Array(vals) => {
+            Value::Array(vals) => {
                 for (idx, val) in vals.iter().enumerate() {
                     // Get symbol ID for this index
                     if let Some(symbol_id) = dfa.get_index_symbol_id(idx) {
@@ -569,7 +569,7 @@ impl DFAQueryEngine {
 impl QueryEngine for DFAQueryEngine {
     fn find<'a>(
         &self,
-        json: &'a JSONValue,
+        json: &'a Value,
         query: &'a Query,
     ) -> Vec<JSONPointer<'a>> {
         // Compile the query into a DFA
@@ -600,10 +600,12 @@ impl QueryEngine for DFAQueryEngine {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
+    use serde_json::Map;
+
     use super::*;
     use crate::query::QueryBuilder;
     use crate::query::common::JSONPointer;
-    use std::collections::HashMap;
 
     /// Creates the following simple JSON object for testing:
     /// ````
@@ -615,25 +617,25 @@ mod tests {
     ///   "other": 42
     /// }
     /// ```
-    fn create_simple_test_json() -> JSONValue {
-        let mut inner = HashMap::new();
-        inner.insert("bar".to_string(), JSONValue::JString("val".to_string()));
+    fn create_simple_test_json() -> Value {
+        let mut inner = Map::new();
+        inner.insert("bar".to_string(), Value::String("val".to_string()));
 
-        let mut root = HashMap::new();
-        root.insert("foo".to_string(), JSONValue::Object(Box::new(inner)));
+        let mut root = Map::new();
+        root.insert("foo".to_string(), Value::Object(inner));
         root.insert(
             "baz".to_string(),
-            JSONValue::Array(vec![
-                JSONValue::Number("1".to_string()),
-                JSONValue::Number("2".to_string()),
-                JSONValue::Number("3".to_string()),
-                JSONValue::Number("4".to_string()),
-                JSONValue::Number("5".to_string()),
+            Value::Array(vec![
+                Value::Number(1.into()),
+                Value::Number(2.into()),
+                Value::Number(3.into()),
+                Value::Number(4.into()),
+                Value::Number(5.into()),
             ]),
         );
-        root.insert("other".to_string(), JSONValue::Number("42".to_string()));
+        root.insert("other".to_string(), Value::Number(42.into()));
 
-        JSONValue::Object(Box::new(root))
+        Value::Object(root)
     }
 
     /// Creates a nested test JSON object for unit tests.
@@ -649,17 +651,17 @@ mod tests {
     ///   }
     /// }
     /// ```
-    fn create_nested_test_json() -> JSONValue {
-        let mut root = HashMap::new();
-        let mut nested = HashMap::new();
-        let mut a = HashMap::new();
-        let mut b = HashMap::new();
-        b.insert("c".to_string(), JSONValue::JString("target".to_string()));
-        a.insert("b".to_string(), JSONValue::Object(Box::new(b)));
-        nested.insert("a".to_string(), JSONValue::Object(Box::new(a)));
-        root.insert("nested".to_string(), JSONValue::Object(Box::new(nested)));
+    fn create_nested_test_json() -> Value {
+        let mut root = Map::new();
+        let mut nested = Map::new();
+        let mut a = Map::new();
+        let mut b = Map::new();
+        b.insert("c".to_string(), Value::String("target".to_string()));
+        a.insert("b".to_string(), Value::Object(b));
+        nested.insert("a".to_string(), Value::Object(a));
+        root.insert("nested".to_string(), Value::Object(nested));
 
-        JSONValue::Object(Box::new(root))
+        Value::Object(root)
     }
 
     /// Creates a nested test JSON object with duplicate keys for unit tests.
@@ -671,15 +673,15 @@ mod tests {
     //     }
     //   }
     // }
-    fn create_duplicate_key_nested_test_json() -> JSONValue {
-        let mut root = HashMap::new();
-        let mut c1 = HashMap::new();
-        let mut c2 = HashMap::new();
-        c2.insert("c".to_string(), JSONValue::JString("target".to_string()));
-        c1.insert("c".to_string(), JSONValue::Object(Box::new(c2)));
-        root.insert("c".to_string(), JSONValue::Object(Box::new(c1)));
+    fn create_duplicate_key_nested_test_json() -> Value {
+        let mut root = Map::new();
+        let mut c1 = Map::new();
+        let mut c2 = Map::new();
+        c2.insert("c".to_string(), Value::String("target".to_string()));
+        c1.insert("c".to_string(), Value::Object(c2));
+        root.insert("c".to_string(), Value::Object(c1));
 
-        JSONValue::Object(Box::new(root))
+        Value::Object(root)
     }
 
     /// Checks that a constructed `QueryDFA` does not contain any overlapping
@@ -708,7 +710,7 @@ mod tests {
                 PathType::Field(Rc::new("bar".to_string())),
             ]
         );
-        assert_eq!(matches[0].value, &JSONValue::JString("val".to_string()));
+        assert_eq!(matches[0].value, &Value::String("val".to_string()));
     }
 
     #[test]
@@ -753,7 +755,7 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Should have 1 match
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].value, &JSONValue::Number("2".to_string()))
+        assert_eq!(matches[0].value, &Value::Number(2.into()))
     }
 
     #[test]
@@ -761,10 +763,10 @@ mod tests {
         let mut json = create_nested_test_json();
 
         // add another field in "nested"
-        if let JSONValue::Object(ref mut root) = json
-            && let Some(JSONValue::Object(nested)) = root.get_mut("nested")
+        if let Value::Object(ref mut root) = json
+            && let Some(Value::Object(nested)) = root.get_mut("nested")
         {
-            nested.insert("d".to_string(), JSONValue::Null);
+            nested.insert("d".to_string(), Value::Null);
         }
 
         // Query: nested.a.b.c | nested.d
@@ -779,9 +781,9 @@ mod tests {
             QueryBuilder::new().disjunction(vec![query1, query2]).build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert_eq!(matches.len(), 2);
-        let values: Vec<&JSONValue> = matches.iter().map(|m| m.value).collect();
-        assert!(values.contains(&&JSONValue::Null));
-        assert!(values.contains(&&JSONValue::JString("target".to_string())))
+        let values: Vec<&Value> = matches.iter().map(|m| m.value).collect();
+        assert!(values.contains(&&Value::Null));
+        assert!(values.contains(&&Value::String("target".to_string())))
     }
 
     #[test]
@@ -794,9 +796,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [2, 3, 4]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &JSONValue::Number("2".to_string()));
-        assert_eq!(matches[1].value, &JSONValue::Number("3".to_string()));
-        assert_eq!(matches[2].value, &JSONValue::Number("4".to_string()));
+        assert_eq!(matches[0].value, &Value::Number(2.into()));
+        assert_eq!(matches[1].value, &Value::Number(3.into()));
+        assert_eq!(matches[2].value, &Value::Number(4.into()));
     }
 
     #[test]
@@ -809,11 +811,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &JSONValue::Number("1".to_string()));
-        assert_eq!(matches[1].value, &JSONValue::Number("2".to_string()));
-        assert_eq!(matches[2].value, &JSONValue::Number("3".to_string()));
-        assert_eq!(matches[3].value, &JSONValue::Number("4".to_string()));
-        assert_eq!(matches[4].value, &JSONValue::Number("5".to_string()));
+        assert_eq!(matches[0].value, &Value::Number(1.into()));
+        assert_eq!(matches[1].value, &Value::Number(2.into()));
+        assert_eq!(matches[2].value, &Value::Number(3.into()));
+        assert_eq!(matches[3].value, &Value::Number(4.into()));
+        assert_eq!(matches[4].value, &Value::Number(5.into()));
     }
 
     #[test]
@@ -826,8 +828,8 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [0, 1]
         assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0].value, &JSONValue::Number("1".to_string()));
-        assert_eq!(matches[1].value, &JSONValue::Number("2".to_string()));
+        assert_eq!(matches[0].value, &Value::Number(1.into()));
+        assert_eq!(matches[1].value, &Value::Number(2.into()));
     }
 
     #[test]
@@ -840,9 +842,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [3, 4, 5]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &JSONValue::Number("3".to_string()));
-        assert_eq!(matches[1].value, &JSONValue::Number("4".to_string()));
-        assert_eq!(matches[2].value, &JSONValue::Number("5".to_string()));
+        assert_eq!(matches[0].value, &Value::Number(3.into()));
+        assert_eq!(matches[1].value, &Value::Number(4.into()));
+        assert_eq!(matches[2].value, &Value::Number(5.into()));
     }
 
     #[test]
@@ -867,11 +869,11 @@ mod tests {
 
         // Expected [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &JSONValue::Number("1".to_string()));
-        assert_eq!(matches[1].value, &JSONValue::Number("2".to_string()));
-        assert_eq!(matches[2].value, &JSONValue::Number("3".to_string()));
-        assert_eq!(matches[3].value, &JSONValue::Number("4".to_string()));
-        assert_eq!(matches[4].value, &JSONValue::Number("5".to_string()));
+        assert_eq!(matches[0].value, &Value::Number(1.into()));
+        assert_eq!(matches[1].value, &Value::Number(2.into()));
+        assert_eq!(matches[2].value, &Value::Number(3.into()));
+        assert_eq!(matches[3].value, &Value::Number(4.into()));
+        assert_eq!(matches[4].value, &Value::Number(5.into()));
     }
 
     #[test]
@@ -884,7 +886,7 @@ mod tests {
         // Expected [(root object), 42]
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].value, &json); // the root object
-        assert_eq!(matches[1].value, &JSONValue::Number("42".to_string()));
+        assert_eq!(matches[1].value, &Value::Number(42.into()));
     }
 
     #[test]
@@ -1004,14 +1006,15 @@ mod tests {
         //     }
         //   }
         // }
-        let mut root = HashMap::new();
-        let mut c1 = HashMap::new();
-        let mut c2 = HashMap::new();
-        c2.insert("c".to_string(), JSONValue::JString("target".to_string()));
-        c1.insert("c".to_string(), JSONValue::Object(Box::new(c2)));
-        root.insert("c".to_string(), JSONValue::Object(Box::new(c1)));
+        let mut root = Map::new();
+        let mut c1 = Map::new();
+        let mut c2 = Map::new();
+        c2.insert("c".to_string(), Value::String("target".to_string()));
+        c1.insert("c".to_string(), Value::Object(c2));
+        root.insert("c".to_string(), Value::Object(c1));
 
-        let json = JSONValue::Object(Box::new(root));
+        let json = Value::Object(root);
+
         // Query: `c*`
         let query = QueryBuilder::new().field("c").kleene_star().build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1091,7 +1094,9 @@ mod tests {
               }
             }
             "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         // Query: `**.type`
         let query = QueryBuilder::new()
@@ -1111,7 +1116,9 @@ mod tests {
           "root": [["1", "2"], ["3"]]
         }
         "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
         let query: Query = "**.[*]".parse().expect("failed to parse query");
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1129,7 +1136,9 @@ mod tests {
           }
         }
         "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
         let query: Query = "*.*".parse().expect("failed to parse query");
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1147,10 +1156,12 @@ mod tests {
           }
         }]
         "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query = "*.*".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1161,10 +1172,12 @@ mod tests {
     #[test]
     fn test_dfa_recursive_array_indexing() {
         let input = r#"[[1], [2, 3]]"#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query = "[*]*".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1185,10 +1198,12 @@ mod tests {
     #[test]
     fn test_dfa_recursive_array_indexing_any_level() {
         let input = r#"[[1], [2, 3]]"#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
@@ -1203,10 +1218,12 @@ mod tests {
     #[test]
     fn test_dfa_simple_disjunction_group_query() {
         let input = r#"{"x": {"y": 5, "z": { "t": 2}}}"#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query =
             "x.(y | z.t)".parse().expect("failed to parse query");
@@ -1236,10 +1253,12 @@ mod tests {
            ]
         }
         "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
@@ -1270,10 +1289,12 @@ mod tests {
            ]
         }
         "#;
-        let json = JSONValue::try_from(input).expect("failed to parse JSON");
+        let json = serde_json::from_str(&input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
 
         #[cfg(test)]
-        println!("Input JSONValue:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{:?}\n", json);
 
         let query: Query =
             "(* | [*])*.[*]".parse().expect("failed to parse query");

@@ -5,7 +5,7 @@ Main binary for jsongrep.
 use anyhow::{Context, Result};
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
-use jsongrep::commands;
+use serde_json::Value;
 use std::io::stdout;
 use std::io::{self};
 use std::{
@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-use jsongrep::{query::*, schema::JSONValue};
+use jsongrep::{commands, query::*};
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
                 io::stdin().read_to_string(&mut buffer)?;
                 buffer
             };
-            let json = JSONValue::try_from(input_content.as_str())
+            let json: Value = serde_json::from_str(&input_content)
                 .with_context(|| "Failed to parse JSON")?;
 
             // Execute query
@@ -125,13 +125,13 @@ fn main() -> Result<()> {
 
             // Display depth
             if args.depth {
-                println!("Document depth: {}", json.depth())
+                println!("Depth: {}", jsongrep::depth(&json));
             }
 
             if !args.no_display {
                 if !args.compact {
                     // Pretty-printed output
-                    let json_values: Vec<&JSONValue> =
+                    let json_values: Vec<&Value> =
                         results.iter().map(|p| p.value).collect();
                     println!("{}", serde_json::to_string_pretty(&json_values)?);
                 } else {
