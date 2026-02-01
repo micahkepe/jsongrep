@@ -17,7 +17,7 @@ pub trait QueryEngine {
     /// Finds all JSON pointers in the given JSON document that match the
     /// specified query.
     ///
-    /// Follows the semantics of JSONPath, returning the matched values as an
+    /// Follows the semantics of `JSONPath`, returning the matched values as an
     /// array of `JSONPointer` instances.
     fn find<'a>(
         &self,

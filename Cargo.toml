@@ -29,6 +29,12 @@ clap_mangen = "0.2.29"
 clap_complete = "4.5.57"
 regex = "1.12.2"
 
+[lints.clippy]
+# See: <https://rust-lang.github.io/rust-clippy/master/index.html.
+all = { level = "warn" }
+pedantic = { level = "warn" }
+nursery = { level = "warn" }
+
 [dev-dependencies]
 assert_cmd = "2.0"
 

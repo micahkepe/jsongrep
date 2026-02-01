@@ -28,11 +28,11 @@ pub struct QueryNFA {
     /// Transition function for the NFA, which is an adjacency list of labeled
     /// graph, where:
     ///
-    /// transitions\[state\] -> <Vec<(label_idx, destination next state>>
+    /// transitions\[state\] -> <Vec<(`label_idx`, destination next state>>
     pub transitions: Vec<Vec<(usize, usize)>>,
 
     /// Index in linearized query to atom/ predicate
-    /// pos_to_label\[idx\] = TransitionLabel
+    /// `pos_to_label`\[idx\] = `TransitionLabel`
     pub pos_to_label: Vec<TransitionLabel>,
 
     /// The starting state for the NFA; `0`
@@ -114,7 +114,7 @@ impl Display for QueryNFA {
         }
         writeln!(f, "Transitions:")?;
         for (st, row) in self.transitions.iter().enumerate() {
-            writeln!(f, "\tstate {}:", st)?;
+            writeln!(f, "\tstate {st}:")?;
             for (label_idx, dest) in row {
                 writeln!(
                     f,
@@ -129,8 +129,9 @@ impl Display for QueryNFA {
 
 impl QueryNFA {
     /// Construct an NFA recognizing the language defined by a query.
-    pub fn from_query(query: &Query) -> QueryNFA {
-        let mut temp_nfa = QueryNFA {
+    #[must_use]
+    pub fn from_query(query: &Query) -> Self {
+        let mut temp_nfa = Self {
             num_states: 1, // start state
             transitions: Vec::new(),
             pos_to_label: Vec::new(),
@@ -149,7 +150,7 @@ impl QueryNFA {
 
         // Handle empty query case
         if alphabet_size == 0 {
-            let empty_nfa = QueryNFA {
+            let empty_nfa = Self {
                 num_states: 1, // start state
                 transitions: Vec::new(),
                 pos_to_label: Vec::new(),
@@ -162,7 +163,7 @@ impl QueryNFA {
             };
 
             #[cfg(test)]
-            println!("Constructed NFA for `{}`:\n{}", query, empty_nfa);
+            println!("Constructed NFA for `{query}`:\n{empty_nfa}");
 
             return empty_nfa;
         }
@@ -198,7 +199,7 @@ impl QueryNFA {
         let nfa = temp_nfa.construct_nfa();
 
         #[cfg(test)]
-        println!("Constructed NFA for `{}`:\n{}", query, nfa);
+        println!("Constructed NFA for `{query}`:\n{nfa}");
 
         nfa
     }
@@ -210,7 +211,7 @@ impl QueryNFA {
             Query::Field(name) => {
                 // create a new key state if it does not exist
                 let name_rc: Rc<String> = Rc::new(name.clone());
-                self.pos_to_label.push(TransitionLabel::Field(name_rc.clone()));
+                self.pos_to_label.push(TransitionLabel::Field(name_rc));
             }
             Query::FieldWildcard => {
                 let field_wildcard = TransitionLabel::FieldWildcard;
@@ -227,7 +228,7 @@ impl QueryNFA {
                 self.pos_to_label.push(range);
             }
             Query::RangeFrom(s) => {
-                self.pos_to_label.push(TransitionLabel::RangeFrom(*s))
+                self.pos_to_label.push(TransitionLabel::RangeFrom(*s));
             }
             Query::ArrayWildcard => {
                 // Treat array wildcard as unbounded range query, as they are
@@ -243,12 +244,13 @@ impl QueryNFA {
             Query::KleeneStar(q) | Query::Optional(q) => {
                 self.linearize_query(q);
             }
-            _ => unimplemented!(),
+            Query::Regex(_) => unimplemented!(),
         }
     }
 
     /// Construct the automaton recognizing the language defined by the query.
-    pub fn construct_nfa(&mut self) -> QueryNFA {
+    #[must_use]
+    pub fn construct_nfa(&mut self) -> Self {
         // Mark start state as accepting if empty word is in language
         if self.contains_empty_word {
             self.is_accepting[0] = true;
@@ -278,7 +280,7 @@ impl QueryNFA {
             }
         }
 
-        QueryNFA {
+        Self {
             num_states: self.num_states,
             transitions: std::mem::take(&mut self.transitions),
             pos_to_label: std::mem::take(&mut self.pos_to_label),
@@ -303,9 +305,8 @@ pub fn contains_empty_word(query: &Query) -> bool {
         | Query::FieldWildcard => false,
         Query::Sequence(queries) => queries.iter().all(contains_empty_word),
         Query::Disjunction(queries) => queries.iter().any(contains_empty_word),
-        Query::Optional(_) => true,
-        Query::KleeneStar(_) => true,
-        _ => unimplemented!(),
+        Query::Optional(_) | Query::KleeneStar(_) => true,
+        Query::Regex(_) => unimplemented!(),
     }
 }
 
@@ -345,10 +346,7 @@ pub fn compute_first_set(
                 }
             }
         }
-        Query::KleeneStar(q) => {
-            compute_first_set(first_set, q, position);
-        }
-        Query::Optional(q) => {
+        Query::KleeneStar(q) | Query::Optional(q) => {
             compute_first_set(first_set, q, position);
         }
     }
@@ -426,7 +424,7 @@ fn count_subquery_positions(query: &Query) -> usize {
         Query::Optional(q) | Query::KleeneStar(q) => {
             count_subquery_positions(q)
         }
-        _ => unimplemented!(),
+        Query::Regex(_) => unimplemented!(),
     }
 }
 
@@ -571,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_query_nfa() {
+    fn empty_query_nfa() {
         let query = QueryBuilder::new().build();
         let nfa = QueryNFA::from_query(&query);
         assert_eq!(nfa.num_states, 1);
@@ -579,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_field_nfa() {
+    fn simple_field_nfa() {
         let query = QueryBuilder::new().field("foo").build();
         let nfa = QueryNFA::from_query(&query);
 
@@ -594,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_optional_field_nfa() {
+    fn simple_optional_field_nfa() {
         let query = QueryBuilder::new().field("foo").optional().build();
         let nfa = QueryNFA::from_query(&query);
 
@@ -611,7 +609,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_seq_nfa() {
+    fn simple_seq_nfa() {
         let query =
             QueryBuilder::new().field("foo").field("bar").field("baz").build();
         let nfa = QueryNFA::from_query(&query);
@@ -625,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_seq_dis_nfa() {
+    fn simple_seq_dis_nfa() {
         let query1 =
             QueryBuilder::new().field("foo").field("bar").field("baz").build();
         let query2 =
@@ -646,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_disjunction_nfa() {
+    fn simple_disjunction_nfa() {
         let query1 = QueryBuilder::new().field("foo").build();
         let query2 = QueryBuilder::new().field("bar").build();
         let query =
@@ -665,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_field_branch_disjunction_nfa() {
+    fn field_branch_disjunction_nfa() {
         let query1 = QueryBuilder::new().field("foo").field("a").build();
         let query2 = QueryBuilder::new().field("foo").field("b").build();
         let query =
@@ -684,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn test_foobar_nfa() {
+    fn foobar_nfa() {
         let query1 = QueryBuilder::new().field("foo").field("a").build();
         let query2 = QueryBuilder::new().field("bar").field("b").build();
         let query =
@@ -702,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complex_disjunction_nfa() {
+    fn complex_disjunction_nfa() {
         let query1 = QueryBuilder::new().field("foo").field("bar").build();
         let query2 = QueryBuilder::new().field("bar").optional().build();
         let query3 = QueryBuilder::new().field("baz").kleene_star().build();
@@ -724,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    fn test_range_overlap_nfa() {
+    fn range_overlap_nfa() {
         let query1 = QueryBuilder::new().field("foo").index(1).build();
         let query2 = QueryBuilder::new().field("foo").array_wildcard().build();
         let query =
@@ -742,7 +740,7 @@ mod tests {
     }
 
     #[test]
-    fn test_kleene_nfa() {
+    fn kleene_nfa() {
         let query =
             QueryBuilder::new().field("a").kleene_star().field("b").build();
         let nfa = QueryNFA::from_query(&query);
@@ -757,7 +755,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_optional_nfa() {
+    fn multiple_optional_nfa() {
         // Query: `a*.b?.c?`
         let query = QueryBuilder::new()
             .field("a")
@@ -783,7 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn test_kleene_sequence_nfa() {
+    fn kleene_sequence_nfa() {
         let query = QueryBuilder::new()
             .field_wildcard()
             .kleene_star()

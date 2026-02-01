@@ -71,10 +71,10 @@ impl Error for QueryParseError {}
 impl fmt::Display for QueryParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            QueryParseError::UnexpectedToken(token) => {
-                write!(f, "Unexpected token: {}", token)
+            Self::UnexpectedToken(token) => {
+                write!(f, "Unexpected token: {token}")
             }
-            QueryParseError::UnexpectedEndOfInput => {
+            Self::UnexpectedEndOfInput => {
                 write!(f, "Unexpected end of input")
             }
         }
@@ -82,12 +82,20 @@ impl fmt::Display for QueryParseError {
 }
 
 /// Parse an input query string into a [`Query`]
+///
+/// # Panics
+///
+/// Panics if the input query string is invalid.
+///
+/// # Errors
+///
+/// Returns a [`QueryParseError`] describing how the parsing failed.
 pub fn parse_query(input: &str) -> Result<Query, QueryParseError> {
     let mut pairs = QueryDSLParser::parse(Rule::query, input)
         .map_err(|e| QueryParseError::UnexpectedToken(e.to_string()))?;
 
     // Get and unwrap the `query` rule
-    let query = pairs.next().unwrap();
+    let query = pairs.next().expect("Empty query string");
 
     // Query rule contains disjunction
     let mut inner = query.into_inner();
@@ -107,7 +115,7 @@ pub fn parse_query(input: &str) -> Result<Query, QueryParseError> {
     }
 
     #[cfg(test)]
-    println!("Constructed query AST:\n{:?}", constructed_query);
+    println!("Constructed query AST:\n{constructed_query:?}");
 
     Ok(constructed_query)
 }
@@ -178,7 +186,7 @@ fn parse_step(
         inner.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
     match first_pair.as_rule() {
         Rule::field => {
-            let field = parse_field(first_pair)?;
+            let field = parse_field(&first_pair)?;
             queries.push(field);
         }
         Rule::index => {
@@ -194,7 +202,7 @@ fn parse_step(
             queries.push(Query::FieldWildcard);
         }
         Rule::regex => {
-            let regex = parse_regex(first_pair)?;
+            let regex = parse_regex(&first_pair)?;
             queries.push(regex);
         }
         Rule::group => {
@@ -273,7 +281,7 @@ fn parse_step(
 /// Parse a field rule into a [`Query::Field`]. This handles both cases of quoted and unquoted
 /// field accesses, e.g. `\"\"foo\"\"` and `\"foo\"`
 fn parse_field(
-    pair: pest::iterators::Pair<Rule>,
+    pair: &pest::iterators::Pair<Rule>,
 ) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::field {
         return Err(QueryParseError::UnexpectedToken(format!(
@@ -322,8 +330,8 @@ fn parse_index(
     Ok(Query::Index(idx))
 }
 
-/// Parse a range rule into a range (Query::Range, Query::RangeFrom, or
-/// Query::ArrayWildcard).
+/// Parse a range rule into a range (`Query::Range`, `Query::RangeFrom`, or
+/// `Query::ArrayWildcard`).
 fn parse_range(
     pair: pest::iterators::Pair<Rule>,
 ) -> Result<Query, QueryParseError> {
@@ -367,9 +375,9 @@ fn parse_range(
     }
 }
 
-/// Parse a regex rule into a Query::Regex.
+/// Parse a regex rule into a `Query::Regex`.
 fn parse_regex(
-    pair: pest::iterators::Pair<Rule>,
+    pair: &pest::iterators::Pair<Rule>,
 ) -> Result<Query, QueryParseError> {
     if pair.as_rule() != Rule::regex {
         return Err(QueryParseError::UnexpectedToken(format!(
@@ -396,84 +404,84 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_field() {
+    fn parse_field() {
         let query = "foo";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_field_and_number() {
+    fn parse_field_and_number() {
         let query = "foo123[42]";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_single_regex() {
+    fn parse_single_regex() {
         let query = "/foo.bar/";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_disjunction() {
+    fn parse_disjunction() {
         let query = "foo | bar";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_kleene_star() {
+    fn parse_kleene_star() {
         let query = "a*";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_optional() {
+    fn parse_optional() {
         let query = "b?";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_complex_query() {
+    fn parse_complex_query() {
         let query = "foo.bar[0]?.baz*";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_multiple_optional() {
+    fn parse_multiple_optional() {
         let query = "c*.c?.c?";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_simple_disjunction_group() {
+    fn parse_simple_disjunction_group() {
         let query = "(foo | bar).baz";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_any_path_group() {
+    fn parse_any_path_group() {
         let query = "(* | [*])*";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_any_path_group_in_query() {
+    fn parse_any_path_group_in_query() {
         let query = "a.(* | [*])*.b?";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_nested_groups_trivial() {
+    fn parse_nested_groups_trivial() {
         let query = "((foo))";
         let result = parse_query(query).unwrap();
         // NOTE: drops context of the nested parentheses and simplifies
@@ -481,79 +489,78 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_nested_groups() {
+    fn parse_nested_groups() {
         let query = "((foo.bar)* | bar)";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_group_sequence() {
+    fn parse_group_sequence() {
         let query = "(foo.bar.baz)?";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_invalid_number() {
+    fn parse_invalid_number() {
         let result = parse_query("foo[abc]");
         assert!(
             matches!(result, Err(QueryParseError::UnexpectedToken(_))),
-            "Actual result: {:?}",
-            result
+            "Actual result: {result:?}"
         );
     }
 
     #[test]
-    fn test_parse_invalid_regex() {
+    fn parse_invalid_regex() {
         let result = parse_query("/unclosed");
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
     }
 
     #[test]
-    fn test_parse_empty() {
+    fn parse_empty() {
         let query = "";
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_reserved_chars_in_double_quotes() {
+    fn reserved_chars_in_double_quotes() {
         let query = r#"".|*?[]()/""#;
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_group_any_reserved_chars_in_double_quotes() {
+    fn group_any_reserved_chars_in_double_quotes() {
         let query = r#"("." | "|" | "*" | "?" | "[" | "]" | "(" | ")" | "/")*"#;
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_unclosed_double_quotes() {
+    fn parse_unclosed_double_quotes() {
         let query = r#"""#;
         let result = parse_query(query);
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
     }
 
     #[test]
-    fn test_parse_valid_key_with_spaces() {
+    fn parse_valid_key_with_spaces() {
         let query = r#""key space".foo"#;
         let result = parse_query(query).unwrap();
         assert_eq!(query, result.to_string());
     }
 
     #[test]
-    fn test_parse_invalid_key_with_spaces() {
+    fn parse_invalid_key_with_spaces() {
         let query = r"spaces not allowed without double quotes";
         let result = parse_query(query);
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
     }
 
     #[test]
-    fn test_parse_invalid_key_with_reserved_chars() {
+    fn parse_invalid_key_with_reserved_chars() {
         let result = parse_query(r"][");
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
     }

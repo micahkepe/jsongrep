@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::rc::Rc;
 
 /// A JSON poenter that points to a value in a JSON document.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct JSONPointer<'a> {
     /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\]
     pub path: Vec<PathType>,
@@ -35,7 +35,7 @@ pub enum PathType {
 
 /// Represents the condition for a transition in an automaton from walking a
 /// JSON document.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransitionLabel {
     /// Matches a specific field name, e.g., "foo"
     /// Any field that doesn't match will be lumped together in the catch-all
@@ -54,11 +54,11 @@ pub enum TransitionLabel {
 impl std::fmt::Display for TransitionLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TransitionLabel::Field(str) => write!(f, "Field({})", str),
-            TransitionLabel::FieldWildcard => write!(f, "FieldWildcard"),
-            TransitionLabel::Range(s, e) => write!(f, "Range({}, {})", s, e),
-            TransitionLabel::RangeFrom(s) => write!(f, "RangeFrom({})", s),
-            TransitionLabel::Other => write!(f, "Other"),
+            Self::Field(str) => write!(f, "Field({str})"),
+            Self::FieldWildcard => write!(f, "FieldWildcard"),
+            Self::Range(s, e) => write!(f, "Range({s}, {e})"),
+            Self::RangeFrom(s) => write!(f, "RangeFrom({s})"),
+            Self::Other => write!(f, "Other"),
         }
     }
 }

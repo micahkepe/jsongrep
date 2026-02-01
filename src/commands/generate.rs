@@ -4,8 +4,12 @@ use std::path::{Path, PathBuf};
 
 /// Utility function to generate all Man pages for the main [`Args`] structure and all dependent
 /// recursive subcommand pages to the output directory if specified, else the current directory.
+///
+/// # Errors
+///
+/// Returns a [`Result`] with an [`anyhow::Error`] if the output directory could not be created.
 pub fn generate_man_pages(
-    cmd: clap::Command,
+    cmd: &clap::Command,
     output_dir: Option<PathBuf>,
 ) -> Result<()> {
     let output_dir: PathBuf = output_dir.unwrap_or(
@@ -28,7 +32,7 @@ pub fn generate_man_pages(
     println!("Generated: {}", main_man_path.display());
 
     // Recurse over subcommands
-    generate_subcommand_man_pages(&cmd, &output_dir, cmd.get_name())?;
+    generate_subcommand_man_pages(cmd, &output_dir, cmd.get_name())?;
 
     Ok(())
 }
@@ -58,7 +62,7 @@ fn generate_subcommand_man_pages(
                 subcmd,
                 output_dir,
                 subcmd.get_name(),
-            )?
+            )?;
         }
     }
 

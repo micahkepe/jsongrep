@@ -15,9 +15,9 @@ For an example of production-ready implementation, the
 crate provides NFA and DFA implementations for regular expressions using
 Thompson's construction and other techniques such as a Pike VM.
 */
+use core::cmp::Ordering;
 use serde_json::Value;
 use std::{
-    cmp::Ordering,
     collections::{HashMap, VecDeque},
     fmt::Display,
     rc::Rc,
@@ -29,6 +29,7 @@ use crate::query::{QueryEngine, QueryNFA};
 
 /// Represents a Deterministic Finite Automaton (DFA) for JSON queries. An
 /// important thing to note is that the alphabet depends on the query.
+#[non_exhaustive]
 pub struct QueryDFA {
     /// The number of states in the DFA
     pub num_states: usize,
@@ -39,7 +40,7 @@ pub struct QueryDFA {
     /// Bitmap of accepting states
     pub is_accepting: Vec<bool>,
 
-    /// Transition table: transitions\[state\]\[symbol_index\] -> Option<next_state>
+    /// Transition table: transitions\[state\]\[`symbol_index`\] -> Option<`next_state`>
     pub transitions: Vec<Vec<Option<usize>>>,
 
     /// Alphabet symbols for this DFA. The alphabet is necessarily finite and
@@ -81,11 +82,11 @@ impl Display for QueryDFA {
         })?;
         writeln!(f, "Alphabet ({} symbols):", self.alphabet.len())?;
         for (i, sym) in self.alphabet.iter().enumerate() {
-            writeln!(f, "\t{}: {:?}", i, sym)?;
+            writeln!(f, "\t{i}: {sym:?}")?;
         }
         writeln!(f, "Transitions:")?;
         for (st, row) in self.transitions.iter().enumerate() {
-            writeln!(f, "\tstate {}:", st)?;
+            writeln!(f, "\tstate {st}:")?;
             for (col, entry) in row.iter().enumerate() {
                 match entry {
                     Some(dest) => writeln!(
@@ -108,17 +109,20 @@ impl Display for QueryDFA {
 
 impl QueryDFA {
     /// Constructs a new `QueryDFA` from a query
+    #[must_use]
     pub fn from_query(query: &Query) -> Self {
         let mut builder = DFABuilder::new();
         builder.build_dfa(query)
     }
 
     /// Check if a given state is accepting/final
+    #[must_use]
     pub fn is_accepting_state(&self, state: usize) -> bool {
         state < self.num_states && self.is_accepting[state]
     }
 
     /// Get the key id for a key
+    #[must_use]
     pub fn get_field_symbol_id(&self, field: &str) -> usize {
         let field_rc = Rc::new(field.to_string());
         self.key_to_key_id.get(&field_rc).copied().unwrap_or(0) // default to "other"
@@ -126,25 +130,25 @@ impl QueryDFA {
 
     /// Get the symbol index for an array index by performing a binary search
     /// over the sorted vector of all range entries.
+    #[must_use]
     pub fn get_index_symbol_id(&self, index: usize) -> Option<usize> {
         // Perform a binary search to find the range that contains the index,
         // if any. If the index is not found, return the "other" symbol.
-        match self.range_to_range_id.binary_search_by(|(range, _)| {
-            if index < range.start {
-                Ordering::Greater
-            } else if index >= range.end {
-                Ordering::Less
-            } else {
-                Ordering::Equal
-            }
-        }) {
-            Ok(i) => Some(self.range_to_range_id[i].1),
-            // No transition (no ranges defined)
-            Err(_) => None,
-        }
+        self.range_to_range_id
+            .binary_search_by(|(range, _)| {
+                if index < range.start {
+                    Ordering::Greater
+                } else if index >= range.end {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .map_or(None, |i| Some(self.range_to_range_id[i].1))
     }
 
     /// Get the next state given current state and symbol
+    #[must_use]
     pub fn transition(&self, state: usize, symbol_id: usize) -> Option<usize> {
         if state < self.num_states && symbol_id < self.alphabet.len() {
             self.transitions[state][symbol_id]
@@ -154,7 +158,8 @@ impl QueryDFA {
     }
 
     /// Check whether a given index satisfies a range bounds.
-    pub fn index_in_range(
+    #[must_use]
+    pub const fn index_in_range(
         &self,
         index: usize,
         start: usize,
@@ -184,7 +189,7 @@ struct DFABuilder {
 
 impl DFABuilder {
     fn new() -> Self {
-        DFABuilder {
+        Self {
             // start with only the "other" symbol
             alphabet: vec![TransitionLabel::Other],
             key_to_key_id: HashMap::new(),
@@ -231,7 +236,7 @@ impl DFABuilder {
             Query::ArrayWildcard => {
                 // Treat array wildcard as unbounded range query, as they are
                 // equivalent
-                self.collected_ranges.push((0, usize::MAX))
+                self.collected_ranges.push((0, usize::MAX));
             }
             Query::Disjunction(queries) | Query::Sequence(queries) => {
                 for q in queries {
@@ -242,7 +247,7 @@ impl DFABuilder {
                 self.extract_symbols(q);
             }
             // Any unsupported operators
-            _ => unimplemented!(),
+            Query::Regex(_) => unimplemented!(),
         }
     }
 
@@ -260,7 +265,7 @@ impl DFABuilder {
         }
 
         // Sort and de-duplicate endpoints
-        points.sort();
+        points.sort_unstable();
         points.dedup();
 
         // Create disjoint ranges from consecutive endpoints
@@ -296,6 +301,7 @@ impl DFABuilder {
     /// Use subset construction to convert the constructed epsilon-free NFA to a DFA,
     /// producing a `QueryDFA`. For each DFA state, we map it to a set of NFA
     /// states.
+    #[allow(clippy::too_many_lines)]
     fn determinize_nfa(&mut self, nfa: &QueryNFA) -> QueryDFA {
         // Use a HashMap to map sets of currently reachable NFA states to DFA
         // state indices
@@ -358,18 +364,20 @@ impl DFABuilder {
                                 // FieldWildcard match: can match on "Other" (keys
                                 // not in query), or a seen Field
                                 (
-                                    TransitionLabel::FieldWildcard,
+                                    TransitionLabel::FieldWildcard
+                                    | TransitionLabel::Other,
                                     TransitionLabel::Other,
-                                ) => {
-                                    next_nfa_states[dest_state] = true;
-                                }
-                                (
+                                )
+                                | (
                                     TransitionLabel::FieldWildcard,
                                     TransitionLabel::Field(_),
+                                )
+                                | (
+                                    TransitionLabel::Range(0, usize::MAX),
+                                    TransitionLabel::Range(_, _),
                                 ) => {
                                     next_nfa_states[dest_state] = true;
                                 }
-
                                 // Range match: NFA range includes DFA range
                                 (
                                     TransitionLabel::Range(nfa_start, nfa_end),
@@ -389,20 +397,7 @@ impl DFABuilder {
                                 }
 
                                 // ArrayWildcard match: matches any range
-                                (
-                                    TransitionLabel::Range(0, usize::MAX),
-                                    TransitionLabel::Range(_, _),
-                                ) => {
-                                    next_nfa_states[dest_state] = true;
-                                }
-
                                 // Other symbol match
-                                (
-                                    TransitionLabel::Other,
-                                    TransitionLabel::Other,
-                                ) => {
-                                    next_nfa_states[dest_state] = true;
-                                }
                                 _ => {}
                             }
                         }
@@ -515,7 +510,7 @@ impl DFAQueryEngine {
 
         match value {
             Value::Object(map) => {
-                for (key, val) in map.iter() {
+                for (key, val) in map {
                     // Get symbol ID for this field
                     let symbol_id = dfa.get_field_symbol_id(key);
 
@@ -561,29 +556,35 @@ impl DFAQueryEngine {
                 }
             }
             // Leaf JSON nodes - no further traversal needed
-            _ => {}
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_) => {}
         }
     }
 }
 
 impl QueryEngine for DFAQueryEngine {
-    fn find<'a>(
+    fn find<'haystack>(
         &self,
-        json: &'a Value,
-        query: &'a Query,
-    ) -> Vec<JSONPointer<'a>> {
+        json: &'haystack Value,
+        query: &'haystack Query,
+    ) -> Vec<JSONPointer<'haystack>> {
         // Compile the query into a DFA
         let dfa = QueryDFA::from_query(query);
 
+        #[allow(clippy::print_stdout)]
         #[cfg(test)]
-        println!("Constructed DFA for query: `{}`\n{}\n", query, dfa);
+        {
+            println!("Constructed DFA for query: `{query}`\n{dfa}\n");
+        };
 
         // Traverse the JSON document tree via depth-first search
         let mut results: Vec<JSONPointer> = Vec::new();
         let mut path = Vec::new();
 
         // Collect matches based on the DFA transitions and acceptance states
-        DFAQueryEngine::traverse_json(
+        Self::traverse_json(
             &dfa,
             dfa.start_state,
             &mut path,
@@ -592,13 +593,14 @@ impl QueryEngine for DFAQueryEngine {
         );
 
         #[cfg(test)]
-        println!("Found matches:\n{:?}", results);
+        println!("Found matches:\n{results:?}");
 
         results
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use anyhow::Context;
     use serde_json::Map;
@@ -626,14 +628,17 @@ mod tests {
         root.insert(
             "baz".to_string(),
             Value::Array(vec![
-                Value::Number(1.into()),
-                Value::Number(2.into()),
+                Value::Number(1_i32.into()),
+                Value::Number(2_i32.into()),
                 Value::Number(3.into()),
                 Value::Number(4.into()),
                 Value::Number(5.into()),
             ]),
         );
-        root.insert("other".to_string(), Value::Number(42.into()));
+        root.insert(
+            "other".to_owned(),
+            Value::Number(<serde_json::Number>::from(42i32)),
+        );
 
         Value::Object(root)
     }
@@ -690,12 +695,12 @@ mod tests {
         let mut prev_end = 0;
         for (range, _) in &dfa.range_to_range_id {
             assert!(range.start >= prev_end, "Encounter overlapping range");
-            prev_end = range.end
+            prev_end = range.end;
         }
     }
 
     #[test]
-    fn test_simple_field_sequence() {
+    fn simple_field_sequence() {
         // Query: foo.bar
         let query = QueryBuilder::new().field("foo").field("bar").build();
         let json = create_simple_test_json();
@@ -714,12 +719,12 @@ mod tests {
     }
 
     #[test]
-    fn test_dfa_construction() {
+    fn dfa_construction() {
         let query = QueryBuilder::new().field("foo").field("bar").build();
         let dfa = QueryDFA::from_query(&query);
 
         #[cfg(test)]
-        println!("Constructed DFA for `{}`:\n{}", query, dfa);
+        println!("Constructed DFA for `{query}`:\n{dfa}");
 
         // Should have 3 states: start, after "foo", after "bar" (accepting)
         assert_eq!(dfa.num_states, 3);
@@ -734,7 +739,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_field_disjunction() {
+    fn simple_field_disjunction() {
         // Query: foo | baz
         let query_1 = QueryBuilder::new().field("foo").build();
         let query_2 = QueryBuilder::new().field("baz").build();
@@ -748,18 +753,18 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_index_access() {
+    fn simple_index_access() {
         // Query: baz[1]
         let query = QueryBuilder::new().field("baz").index(1).build();
         let json = create_simple_test_json();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Should have 1 match
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].value, &Value::Number(2.into()))
+        assert_eq!(matches[0].value, &Value::Number(2.into()));
     }
 
     #[test]
-    fn test_nested_field_disjunction() {
+    fn nested_field_disjunction() {
         let mut json = create_nested_test_json();
 
         // add another field in "nested"
@@ -783,11 +788,11 @@ mod tests {
         assert_eq!(matches.len(), 2);
         let values: Vec<&Value> = matches.iter().map(|m| m.value).collect();
         assert!(values.contains(&&Value::Null));
-        assert!(values.contains(&&Value::String("target".to_string())))
+        assert!(values.contains(&&Value::String("target".to_string())));
     }
 
     #[test]
-    fn test_simple_bounded_range() {
+    fn simple_bounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[1:4]`
         let query: Query =
@@ -802,7 +807,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_unbounded_range() {
+    fn simple_unbounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[:]` => equivalent to `baz[*]`
         let query: Query =
@@ -819,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_unbounded_start() {
+    fn simple_unbounded_start() {
         let json = create_simple_test_json();
         // Query: `baz[:2]`
         let query: Query =
@@ -833,7 +838,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_unbounded_end() {
+    fn simple_unbounded_end() {
         let json = create_simple_test_json();
         // Query: `baz[2:]`
         let query: Query =
@@ -848,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_range_bounds_eq() {
+    fn simple_range_bounds_eq() {
         let json = create_simple_test_json();
         // Query: `baz[1:1]`
         let query: Query =
@@ -860,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_array_wildcard() {
+    fn simple_array_wildcard() {
         let json = create_simple_test_json();
 
         // Query: `baz[*]`
@@ -877,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_optional_query() {
+    fn simple_optional_query() {
         let json = create_simple_test_json();
         // Query: `other?`
         let query = QueryBuilder::new().field("other").optional().build();
@@ -890,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn test_overlapping_ranges() {
+    fn overlapping_ranges() {
         let json = create_simple_test_json();
         // Query: `baz[0:3] | baz[1:]` = `baz[0:]`
         let q1 = QueryBuilder::new().field("baz").range(None, Some(3)).build();
@@ -908,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_query_overlap() {
+    fn single_query_overlap() {
         // Query: `foo[1:5].bar[2]`
         let query = QueryBuilder::new()
             .field("foo")
@@ -919,12 +924,12 @@ mod tests {
 
         // Build DFA and inspect constructed ranges
         let dfa = QueryDFA::from_query(&query);
-        println!("Constructed DFA: {}", dfa);
+        println!("Constructed DFA: {dfa}");
         check_no_range_overlaps(&dfa);
     }
 
     #[test]
-    fn test_single_arraywildcard_overlap() {
+    fn single_arraywildcard_overlap() {
         // Query: `foo[*].bar[2]`
         let query = QueryBuilder::new()
             .field("foo")
@@ -935,12 +940,12 @@ mod tests {
 
         // Build DFA and inspect constructed ranges
         let dfa = QueryDFA::from_query(&query);
-        println!("Constructed DFA: {}", dfa);
+        println!("Constructed DFA: {dfa}");
         check_no_range_overlaps(&dfa);
     }
 
     #[test]
-    fn test_single_startfrom_overlap() {
+    fn single_startfrom_overlap() {
         // Query: `foo[1:].bar[2]`
         let query = QueryBuilder::new()
             .field("foo")
@@ -951,12 +956,12 @@ mod tests {
 
         // Build DFA and inspect constructed ranges
         let dfa = QueryDFA::from_query(&query);
-        println!("Constructed DFA: {}", dfa);
+        println!("Constructed DFA: {dfa}");
         check_no_range_overlaps(&dfa);
     }
 
     #[test]
-    fn test_fieldwildcard_not_recursive() {
+    fn fieldwildcard_not_recursive() {
         let json = create_nested_test_json();
         // Query: `*.c`
         let query = QueryBuilder::new().field_wildcard().field("c").build();
@@ -965,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_nested_fieldwildcard_access_query() {
+    fn single_nested_fieldwildcard_access_query() {
         let json = create_nested_test_json();
         // Query: `nested.*.*.c`
         let query = QueryBuilder::new()
@@ -977,11 +982,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1)
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_fieldwildcard_access_query() {
+    fn fieldwildcard_access_query() {
         let json = create_nested_test_json();
         // Query: `*.*.*.c`
         let query = QueryBuilder::new()
@@ -993,11 +998,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1)
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_kleene_same_key() {
+    fn kleene_same_key() {
         // ```json
         // {
         //   "c": {
@@ -1046,18 +1051,18 @@ mod tests {
     }
 
     #[test]
-    fn test_fieldwildcard_nonunique_keys() {
+    fn fieldwildcard_nonunique_keys() {
         let json = create_duplicate_key_nested_test_json();
         // Query: `c.*.c`
         let query =
             QueryBuilder::new().field_wildcard().field("c").field("c").build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1)
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_multiple_optional_dfa() {
+    fn multiple_optional_dfa() {
         let json = create_duplicate_key_nested_test_json();
         // Query: `c*.c?.c?`
         let query = QueryBuilder::new()
@@ -1070,20 +1075,20 @@ mod tests {
             .build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 4)
+        assert_eq!(matches.len(), 4);
     }
 
     #[test]
-    fn test_empty_query() {
+    fn empty_query() {
         let json = create_simple_test_json();
         let query = QueryBuilder::new().build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1) // identity
+        assert_eq!(matches.len(), 1); // identity
     }
 
     #[test]
-    fn test_kleene_star_recursive_type() {
+    fn kleene_star_recursive_type() {
         let input = r#"
             {
               "type": {
@@ -1110,7 +1115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_all_array_elements_after_root_or_after_field() {
+    fn get_all_array_elements_after_root_or_after_field() {
         let input = r#"
         {
           "root": [["1", "2"], ["3"]]
@@ -1124,11 +1129,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 2)
+        assert_eq!(matches.len(), 2);
     }
 
     #[test]
-    fn test_two_field_wildcards() {
+    fn two_field_wildcards() {
         let input = r#"
         {
           "root": {
@@ -1144,11 +1149,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1)
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_dfa_array_obj_no_fields() {
+    fn dfa_array_obj_no_fields() {
         let input = r#"
         [{
           "root": {
@@ -1161,7 +1166,7 @@ mod tests {
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query = "*.*".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1170,14 +1175,14 @@ mod tests {
     }
 
     #[test]
-    fn test_dfa_recursive_array_indexing() {
-        let input = r#"[[1], [2, 3]]"#;
+    fn dfa_recursive_array_indexing() {
+        let input = r"[[1], [2, 3]]";
         let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query = "[*]*".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
@@ -1192,18 +1197,18 @@ mod tests {
             "found {} matches:\n\t{:?}",
             matches.len(),
             matches
-        )
+        );
     }
 
     #[test]
-    fn test_dfa_recursive_array_indexing_any_level() {
-        let input = r#"[[1], [2, 3]]"#;
+    fn dfa_recursive_array_indexing_any_level() {
+        let input = r"[[1], [2, 3]]";
         let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
@@ -1212,18 +1217,18 @@ mod tests {
         assert!(!matches.is_empty());
 
         // expect 5 total: 2 top-level array elements, 3 inner-most array elements
-        assert_eq!(matches.len(), 5)
+        assert_eq!(matches.len(), 5);
     }
 
     #[test]
-    fn test_dfa_simple_disjunction_group_query() {
+    fn dfa_simple_disjunction_group_query() {
         let input = r#"{"x": {"y": 5, "z": { "t": 2}}}"#;
         let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query =
             "x.(y | z.t)".parse().expect("failed to parse query");
@@ -1233,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dfa_recursive_geojson_fmt_any_fields_then_arrays() {
+    fn dfa_recursive_geojson_fmt_any_fields_then_arrays() {
         let input = r#"
         {
            "type":"FeatureCollection",
@@ -1258,18 +1263,18 @@ mod tests {
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 1)
+        assert_eq!(matches.len(), 1);
     }
 
     #[test]
-    fn test_dfa_recursive_geojson_fmt_any_level_group() {
+    fn dfa_recursive_geojson_fmt_any_level_group() {
         let input = r#"
         {
            "type":"FeatureCollection",
@@ -1294,13 +1299,13 @@ mod tests {
             .unwrap();
 
         #[cfg(test)]
-        println!("Input Value:\n\t{:?}\n", json);
+        println!("Input Value:\n\t{json:?}\n");
 
         let query: Query =
             "(* | [*])*.[*]".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert!(!matches.is_empty());
-        assert_eq!(matches.len(), 5)
+        assert_eq!(matches.len(), 5);
     }
 }

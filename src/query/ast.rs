@@ -50,27 +50,28 @@ pub enum Query {
     Regex(String),
     /// Optional access, e.g., "?"
     /// This represents an optional query that may or may not match.
-    Optional(Box<Query>),
+    Optional(Box<Self>),
     /// Kleene star, e.g., "foo*"
-    KleeneStar(Box<Query>),
+    KleeneStar(Box<Self>),
     /// Disjunction, e.g., "foo | bar"
     /// This represents a logical OR between an arbitrary number of queries.
-    Disjunction(Vec<Query>),
+    Disjunction(Vec<Self>),
     /// Sequence, e.g., "foo.bar"
     /// A wrapper for a sequence of queries that can be executed in order.
-    Sequence(Vec<Query>),
+    Sequence(Vec<Self>),
 }
 
 impl Query {
+    #[must_use]
     pub fn depth(&self) -> usize {
         match self {
-            Query::Disjunction(subqueries) => {
-                1 + subqueries.iter().map(|q| q.depth()).max().unwrap_or(0)
+            Self::Disjunction(subqueries) => {
+                1 + subqueries.iter().map(Self::depth).max().unwrap_or(0)
             }
-            Query::Sequence(queries) => {
-                queries.iter().map(|q| q.depth()).sum::<usize>()
+            Self::Sequence(queries) => {
+                queries.iter().map(Self::depth).sum::<usize>()
             }
-            Query::Optional(inner) | Query::KleeneStar(inner) => {
+            Self::Optional(inner) | Self::KleeneStar(inner) => {
                 1 + inner.depth()
             }
             _ => 1,
@@ -81,42 +82,42 @@ impl Query {
 impl Display for Query {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Query::Field(name) => write!(f, "{}", name),
-            Query::Index(idx) => write!(f, "[{}]", idx),
-            Query::Range(start, end) => write!(f, "[{}:{}]", start, end),
-            Query::RangeFrom(start) => write!(f, "[{}:]", start),
-            Query::FieldWildcard => write!(f, "*"),
-            Query::ArrayWildcard => write!(f, "[*]"),
-            Query::Regex(re) => write!(f, "/{}/", re),
-            Query::Optional(q) => match &**q {
-                Query::Disjunction(queries) | Query::Sequence(queries) => {
+            Self::Field(name) => write!(f, "{name}"),
+            Self::Index(idx) => write!(f, "[{idx}]"),
+            Self::Range(start, end) => write!(f, "[{start}:{end}]"),
+            Self::RangeFrom(start) => write!(f, "[{start}:]"),
+            Self::FieldWildcard => write!(f, "*"),
+            Self::ArrayWildcard => write!(f, "[*]"),
+            Self::Regex(re) => write!(f, "/{re}/"),
+            Self::Optional(q) => match &**q {
+                Self::Disjunction(queries) | Self::Sequence(queries) => {
                     if queries.len() > 1 {
-                        write!(f, "({})?", q)
+                        write!(f, "({q})?")
                     } else {
-                        write!(f, "{}?", q)
+                        write!(f, "{q}?")
                     }
                 }
-                _ => write!(f, "{}?", q),
+                _ => write!(f, "{q}?"),
             },
-            Query::KleeneStar(q) => match &**q {
-                Query::Disjunction(queries) | Query::Sequence(queries) => {
+            Self::KleeneStar(q) => match &**q {
+                Self::Disjunction(queries) | Self::Sequence(queries) => {
                     if queries.len() > 1 {
-                        write!(f, "({})*", q)
+                        write!(f, "({q})*")
                     } else {
-                        write!(f, "{}*", q)
+                        write!(f, "{q}*")
                     }
                 }
-                _ => write!(f, "{}*", q),
+                _ => write!(f, "{q}*"),
             },
-            Query::Disjunction(queries) => {
+            Self::Disjunction(queries) => {
                 let joined = queries
                     .iter()
-                    .map(|q| format!("{}", q))
+                    .map(|q| format!("{q}"))
                     .collect::<Vec<_>>()
                     .join(" | ");
-                write!(f, "{}", joined)
+                write!(f, "{joined}")
             }
-            Query::Sequence(queries) => {
+            Self::Sequence(queries) => {
                 /*
                  * For fields we don't want `.` delimiters between the optional
                  * range accesses and/or postfix unary operators, e.g, the query
@@ -129,22 +130,27 @@ impl Display for Query {
                     {
                         /* Handle optional modifiers -> extract inner queries */
                         let inner_query = match query {
-                            Query::Optional(inner)
-                            | Query::KleeneStar(inner) => inner,
+                            Self::Optional(inner) | Self::KleeneStar(inner) => {
+                                inner
+                            }
                             _ => query,
                         };
                         let prev_inner = match prev_query {
-                            Query::Optional(inner)
-                            | Query::KleeneStar(inner) => inner,
+                            Self::Optional(inner) | Self::KleeneStar(inner) => {
+                                inner
+                            }
                             _ => prev_query,
                         };
                         /* Handle field accessed followed by a ranged accessed. */
                         match (prev_inner, inner_query) {
-                            (Query::Field(_), Query::Index(_))
-                            | (Query::Field(_), Query::Range(_, _))
-                            | (Query::Field(_), Query::RangeFrom(_))
-                            | (Query::Field(_), Query::FieldWildcard)
-                            | (Query::Field(_), Query::ArrayWildcard) => {
+                            (
+                                Self::Field(_),
+                                Self::Index(_)
+                                | Self::Range(_, _)
+                                | Self::RangeFrom(_)
+                                | Self::FieldWildcard
+                                | Self::ArrayWildcard,
+                            ) => {
                                 // continue; no '.' separator
                             }
                             _ => write!(f, ".")?,
@@ -153,8 +159,8 @@ impl Display for Query {
 
                     // Wrap disjunctions in a sequence with parentheses
                     match query {
-                        Query::Disjunction(_) => write!(f, "({})", query)?,
-                        _ => write!(f, "{}", query)?,
+                        Self::Disjunction(_) => write!(f, "({query})")?,
+                        _ => write!(f, "{query}")?,
                     }
                 }
                 Ok(())
@@ -186,8 +192,9 @@ impl QueryBuilder {
     /// let builder = QueryBuilder::new();
     /// assert!(matches!(builder.build(), Query::Sequence(_)));
     /// ```
-    pub fn new() -> Self {
-        QueryBuilder { query: Query::Sequence(vec![]) }
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { query: Query::Sequence(vec![]) }
     }
 
     /// Adds a field access to the query.
@@ -199,6 +206,7 @@ impl QueryBuilder {
     /// let query = QueryBuilder::new().field("foo").build();
     /// assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
     /// ```
+    #[must_use]
     pub fn field(mut self, name: &str) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) => {
@@ -220,6 +228,7 @@ impl QueryBuilder {
     /// let query = QueryBuilder::new().index(3).build();
     /// assert_eq!(query, Query::Sequence(vec![Query::Index(3)]));
     /// ```
+    #[must_use]
     pub fn index(mut self, idx: usize) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) => {
@@ -259,6 +268,11 @@ impl QueryBuilder {
     ///     matches!(seq[0], Query::Optional(_)))
     /// );
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query is empty.
+    #[must_use]
     pub fn optional(mut self) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) if !seq.is_empty() => {
@@ -284,6 +298,11 @@ impl QueryBuilder {
     /// let query = QueryBuilder::new().field("foo").kleene_star().build();
     /// assert!(matches!(query, Query::Sequence(ref seq) if matches!(seq[0], Query::KleeneStar(_))));
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query is empty.
+    #[must_use]
     pub fn kleene_star(mut self) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) if !seq.is_empty() => {
@@ -311,6 +330,7 @@ impl QueryBuilder {
     ///     matches!(seq[1], Query::Range(3, 5)))
     /// );
     /// ```
+    #[must_use]
     pub fn range(mut self, start: Option<usize>, end: Option<usize>) -> Self {
         let q = match (start, end) {
             (None, None) => Query::ArrayWildcard,
@@ -345,6 +365,7 @@ impl QueryBuilder {
     ///     matches!(seq[1], Query::FieldWildcard))
     /// );
     /// ```
+    #[must_use]
     pub fn field_wildcard(mut self) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) => {
@@ -371,6 +392,7 @@ impl QueryBuilder {
     ///     matches!(seq[1], Query::ArrayWildcard))
     /// );
     /// ```
+    #[must_use]
     pub fn array_wildcard(mut self) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) => {
@@ -401,6 +423,7 @@ impl QueryBuilder {
     ///         matches!(seq[1], Query::Regex(_)))
     /// );
     /// ```
+    #[must_use]
     pub fn regex(mut self, re: &str) -> Self {
         self.query = match self.query {
             Query::Sequence(mut seq) => {
@@ -425,6 +448,7 @@ impl QueryBuilder {
     ///    Query::Field("bar".to_string()),
     ///    ]);
     /// ```
+    #[must_use]
     pub fn disjunction(mut self, queries: Vec<Query>) -> Self {
         self.query = Query::Disjunction(queries);
         self
@@ -452,6 +476,7 @@ impl QueryBuilder {
     ///     );
     /// ```
     ///
+    #[must_use]
     pub fn sequence(mut self, queries: Vec<Query>) -> Self {
         self.query = Query::Sequence(queries);
         self
@@ -494,6 +519,7 @@ impl QueryBuilder {
     ///
     /// assert_eq!(query, expected, "Got: {:?}, Expected: {:?}", query, expected);
     /// ```
+    #[must_use]
     pub fn build(self) -> Query {
         self.query
     }

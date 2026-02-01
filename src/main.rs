@@ -2,23 +2,27 @@
 Main binary for jsongrep.
 */
 
-use anyhow::{Context, Result};
-use clap::{ArgAction, CommandFactory, Parser, Subcommand};
+use anyhow::{Context as _, Result};
+use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
 use serde_json::Value;
 use std::io::stdout;
 use std::io::{self};
 use std::{
     fs::{self},
-    io::{IsTerminal, Read},
+    io::{IsTerminal as _, Read as _},
     path::PathBuf,
 };
 
-use jsongrep::{commands, query::*};
+use jsongrep::{
+    commands,
+    query::{DFAQueryEngine, Query, QueryEngine as _},
+};
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
 #[command(name = "jg", version, about, arg_required_else_help = true, long_about = None, disable_help_subcommand = true)]
+#[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Optional subcommands
     #[command(subcommand)]
@@ -76,13 +80,13 @@ fn main() -> Result<()> {
         Some(Commands::Generate(cmd)) => match cmd {
             GenerateCommand::Shell { shell } => {
                 let mut cmd = Args::command();
-                generate(shell, &mut cmd, "jg", &mut stdout().lock())
+                generate(shell, &mut cmd, "jg", &mut stdout().lock());
             }
             GenerateCommand::Man { output_dir } => {
                 commands::generate::generate_man_pages(
-                    Args::command(),
+                    &Args::command(),
                     output_dir,
-                )?
+                )?;
             }
         },
         None => {
@@ -100,7 +104,7 @@ fn main() -> Result<()> {
             // Parse input content
             let input_content = if let Some(path) = args.input {
                 fs::read_to_string(&path).with_context(|| {
-                    format!("Failed to read file {:?}", path)
+                    format!("Failed to read file {}", path.display())
                 })?
             } else {
                 if io::stdin().is_terminal() {
@@ -129,21 +133,21 @@ fn main() -> Result<()> {
             }
 
             if !args.no_display {
-                if !args.compact {
-                    // Pretty-printed output
-                    let json_values: Vec<&Value> =
-                        results.iter().map(|p| p.value).collect();
-                    println!("{}", serde_json::to_string_pretty(&json_values)?);
-                } else {
+                if args.compact {
                     // Compact output
                     let json_output: Vec<String> = results
                         .iter()
                         .map(|p| {
                             serde_json::to_string(p.value)
-                                .unwrap_or_else(|_| "".to_string())
+                                .unwrap_or_else(|_| String::new())
                         })
                         .collect();
                     println!("{}", serde_json::to_string(&json_output)?);
+                } else {
+                    // Pretty-printed output
+                    let json_values: Vec<&Value> =
+                        results.iter().map(|p| p.value).collect();
+                    println!("{}", serde_json::to_string_pretty(&json_values)?);
                 }
             }
         }
