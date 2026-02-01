@@ -8,7 +8,7 @@ predicate definitions for JSON automaton.
 use serde_json::Value;
 use std::rc::Rc;
 
-/// A JSON pointer that points to a value in a JSON document.
+/// A JSON poenter that points to a value in a JSON document.
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONPointer<'a> {
     /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\]
@@ -43,10 +43,6 @@ pub enum TransitionLabel {
     Field(Rc<String>),
     /// Matches any field name, e.g., "*"
     FieldWildcard,
-    // /// TODO: Matches a regular expression, e.g., "/foo/"
-    // /// Future enhancement- need to deal with the problem of overlapping
-    // /// patterns.
-    // Regex(Regex),
     /// Matches a range of indices, e.g., "\[start:end\]"
     Range(usize, usize),
     /// Matches a range from a starting index, e.g., "\[start:\]"

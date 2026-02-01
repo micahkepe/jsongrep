@@ -9,12 +9,16 @@
 </p>
 
 <p align="center">
-<code>jsongrep</code> is a command-line tool and Rust library for querying JSON documents using <strong>regular path expressions</strong>.
+<code>jsongrep</code> is a command-line tool and Rust library for querying JSON
+documents using <strong>regular path expressions</strong>.
 </p>
 
 ## Why jsongrep?
 
-JSON documents are trees: objects and arrays branch into nested values, with edges labeled by field names or array indices. `jsongrep` lets you describe **sets of paths** through this tree using regular expression operators—the same way you'd match patterns in text.
+JSON documents are trees: objects and arrays branch into nested values, with
+edges labeled by field names or array indices. `jsongrep` lets you describe
+**sets of paths** through this tree using regular expression operators—the same
+way you'd match patterns in text.
 
 ```
 **.name          # Kleene star: match "name" at any depth
@@ -22,7 +26,11 @@ users[*].email   # Wildcard: all emails in the users array
 (error|warn).*   # Disjunction: any field under "error" or "warn"
 ```
 
-This is different from tools like `jq`, which use an imperative filter pipeline. With `jsongrep`, you declare _what paths to match_, not _how to traverse_. The query compiles to a [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that processes the document efficiently.
+This is different from tools like `jq`, which use an imperative filter pipeline.
+With `jsongrep`, you declare _what paths to match_, not _how to traverse_. The
+query compiles to a
+[DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that
+processes the document efficiently.
 
 ## Quick Example
 
@@ -89,18 +97,19 @@ jg '**.[*]' data.json --count --no-display
 
 ## Query Syntax
 
-Queries are **regular expressions over paths**. If you know regex, this will feel familiar:
+Queries are **regular expressions over paths**. If you know regex, this will
+feel familiar:
 
-| Operator     | Example              | Description                                        |
-| ------------ | -------------------- | -------------------------------------------------- |
-| Sequence     | `foo.bar.baz`        | Concatenation—match path `foo` → `bar` → `baz`     |
-| Disjunction  | `foo \| bar`         | Union—match either `foo` or `bar`                  |
-| Kleene star  | `**`                 | Match zero or more field/index accesses (any path) |
-| Repetition   | `foo*`               | Repeat the preceding step zero or more times       |
-| Wildcards    | `*` or `[*]`         | Match any single field or array index              |
-| Optional     | `foo?.bar`           | Continue only if `foo` exists                      |
-| Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)           |
-| Array index  | `[0]` or `[1:3]`     | Match specific index or slice                      |
+| Operator     | Example              | Description                                                   |
+| ------------ | -------------------- | ------------------------------------------------------------- |
+| Sequence     | `foo.bar.baz`        | **Concatenation**: match path `foo` &rarr; `bar` &rarr; `baz` |
+| Disjunction  | `foo \| bar`         | **Union**: match either `foo` or `bar`                        |
+| Kleene star  | `**`                 | Match zero or more field/index accesses (any path)            |
+| Repetition   | `foo*`               | Repeat the preceding step zero or more times                  |
+| Wildcards    | `*` or `[*]`         | Match any single field or array index                         |
+| Optional     | `foo?.bar`           | Continue only if `foo` exists                                 |
+| Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
+| Array index  | `[0]` or `[1:3]`     | Match specific index or slice                                 |
 
 The query engine compiles expressions to an
 [NFA](https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton), then
@@ -108,6 +117,11 @@ determinizes to a
 [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) for
 execution. See the [grammar](./src/query/grammar) directory and the
 [`query`](./src/query) module for implementation details.
+
+> **Experimental:** The grammar supports `/regex/` syntax for matching field
+> names by pattern, but this is not yet fully implemented. Determinizing
+> overlapping regexes (e.g., `/a/` vs `/aab/`) requires subset construction
+> across multiple patterns—planned but not complete.
 
 ## Library Usage
 

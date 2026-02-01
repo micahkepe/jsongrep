@@ -78,20 +78,17 @@ use serde_json::Value;
 
 pub mod commands;
 pub mod query;
-pub mod tokenizer;
 
 /// Returns the depth of the JSON value.
 pub fn depth(json: &Value) -> usize {
     match json {
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => 1,
         Value::Array(arr) => {
-            let inner_depth =
-                arr.iter().map(depth).max().unwrap_or(0);
+            let inner_depth = arr.iter().map(depth).max().unwrap_or(0);
             1 + inner_depth
         }
         Value::Object(map) => {
-            let inner_depth =
-                map.values().map(depth).max().unwrap_or(0);
+            let inner_depth = map.values().map(depth).max().unwrap_or(0);
             1 + inner_depth
         }
     }
