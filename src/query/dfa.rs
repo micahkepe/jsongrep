@@ -1094,7 +1094,7 @@ mod tests {
               }
             }
             "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1116,7 +1116,7 @@ mod tests {
           "root": [["1", "2"], ["3"]]
         }
         "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
         let query: Query = "**.[*]".parse().expect("failed to parse query");
@@ -1136,7 +1136,7 @@ mod tests {
           }
         }
         "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
         let query: Query = "*.*".parse().expect("failed to parse query");
@@ -1156,7 +1156,7 @@ mod tests {
           }
         }]
         "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1172,7 +1172,7 @@ mod tests {
     #[test]
     fn test_dfa_recursive_array_indexing() {
         let input = r#"[[1], [2, 3]]"#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1198,7 +1198,7 @@ mod tests {
     #[test]
     fn test_dfa_recursive_array_indexing_any_level() {
         let input = r#"[[1], [2, 3]]"#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1218,7 +1218,7 @@ mod tests {
     #[test]
     fn test_dfa_simple_disjunction_group_query() {
         let input = r#"{"x": {"y": 5, "z": { "t": 2}}}"#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1253,7 +1253,7 @@ mod tests {
            ]
         }
         "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
@@ -1289,7 +1289,7 @@ mod tests {
            ]
         }
         "#;
-        let json = serde_json::from_str(&input)
+        let json = serde_json::from_str(input)
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 

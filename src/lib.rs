@@ -86,12 +86,12 @@ pub fn depth(json: &Value) -> usize {
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => 1,
         Value::Array(arr) => {
             let inner_depth =
-                arr.iter().map(|item| depth(item)).max().unwrap_or(0);
+                arr.iter().map(depth).max().unwrap_or(0);
             1 + inner_depth
         }
         Value::Object(map) => {
             let inner_depth =
-                map.values().map(|val| depth(val)).max().unwrap_or(0);
+                map.values().map(depth).max().unwrap_or(0);
             1 + inner_depth
         }
     }
