@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-01
+
+### Changed
+
+- Removed `tokenizer` module from public API (was unused)
+
+### Documentation
+
+- Documented experimental regex support for pattern matching in queries
+- Updated README with regular path syntax description
+
+### Internal
+
+- Addressed Clippy lints
+
 ## [0.3.0] - 2025-11-21
 
 ### Changed
@@ -64,7 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/micahkepe/jsongrep/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/micahkepe/jsongrep/releases/tag/v0.3.0
 [0.2.0]: https://github.com/micahkepe/jsongrep/releases/tag/v0.2.0
 [0.1.2]: https://github.com/micahkepe/jsongrep/releases/tag/v0.1.2
