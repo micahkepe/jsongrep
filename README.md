@@ -9,23 +9,41 @@
 </p>
 
 <p align="center">
-<code>jsongrep</code> is a JSONPath-inspired query language over JSON documents.
+<code>jsongrep</code> is a command-line tool and Rust library for querying JSON documents using <strong>regular path expressions</strong>.
 </p>
 
-## Table of Contents
+## Why jsongrep?
 
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Query Syntax](#query-syntax)
-- [Examples](#examples)
-- [Shell Completions](#shell-completions)
-- [Man Page](#man-page)
-- [Contributing](#contributing)
-- [License](#license)
+JSON documents are trees: objects and arrays branch into nested values, with edges labeled by field names or array indices. `jsongrep` lets you describe **sets of paths** through this tree using regular expression operators—the same way you'd match patterns in text.
+
+```
+**.name          # Kleene star: match "name" at any depth
+users[*].email   # Wildcard: all emails in the users array
+(error|warn).*   # Disjunction: any field under "error" or "warn"
+```
+
+This is different from tools like `jq`, which use an imperative filter pipeline. With `jsongrep`, you declare _what paths to match_, not _how to traverse_. The query compiles to a [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that processes the document efficiently.
+
+## Quick Example
+
+```bash
+# Extract all names from nested JSON
+$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg '**.name'
+[
+  "Alice",
+  "Bob"
+]
+
+# Query a file directly
+$ jg 'prizes[0].laureates[*].firstname' nobel.json
+[
+  "John",
+  "Geoffrey",
+  "Demis"
+]
+```
 
 ## Installation
-
-`jsongrep` can be installed using `cargo`:
 
 ```bash
 cargo install jsongrep
@@ -33,133 +51,79 @@ cargo install jsongrep
 
 The `jg` binary will be installed to `~/.cargo/bin`.
 
-## Usage
+## CLI Usage
 
 ```
-A JSONPath-inspired query language for JSON documents
-
 Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
-
-Commands:
-  generate  Generate additional documentation and/or completions
 
 Arguments:
   [QUERY]  Query string (e.g., "**.name")
   [FILE]   Optional path to JSON file. If omitted, reads from STDIN
 
 Options:
-      --compact     Do not pretty-print the JSON output, instead use compact
+      --compact     Do not pretty-print the JSON output
       --count       Display count of number of matches
       --depth       Display depth of the input document
   -n, --no-display  Do not display matched JSON values
   -h, --help        Print help
   -V, --version     Print version
+
+Commands:
+  generate  Generate shell completions or man pages
 ```
 
-### Query Syntax
+### More CLI Examples
 
-The query engine allows you to query JSON data using a simple DSL. It supports
-the following operators:
-
-- Field accesses: `foo`
-- Array accesses (0-indexed): `[0] | [start: end]`
-- Field and array wild cards: `foo.*`, `foo[*]`
-- Optional chaining: `foo?.bar`
-- Kleene star: `foo*`
-- Disjunction: `foo | bar`
-- Sequence: `foo.bar.baz`
-
-**Notes**:
-
-- Sequences use `.` to chain steps: `foo.bar.baz`
-
-- Fields can be unquoted (`foo`) or quoted (`"foo bar"`)
-
-- The `*` modifier after a step is different from the `*` field wildcard — the
-  modifier repeats **the preceding step**.
-
-The complete grammar for the query language can be found in the
-[grammar](./src/query/grammar) directory.
-
----
-
-<details>
-<summary>CLI</summary>
-
-**Example**: Pass input file by path
-
-`simple.json`:
-
-```json
-{
-  "name": {
-    "first": "John",
-    "last": "Doe"
-  },
-  "age": 32,
-  "hobbies": ["fishing", "yoga"]
-}
-```
-
-The following query will follow an arbitrary amount of filed accesses followed
-by a wildcard array access:
+**Pipe from curl:**
 
 ```bash
-jg "**.[*]" simple.json
+curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[4].laureates[1].motivation'
 ```
 
-Output:
-
-```text
-[
-  "fishing",
-  "yoga"
-]
-```
-
-**Example**: Pipe input from STDIN
+**Count matches without displaying them:**
 
 ```bash
-curl https://api.nobelprize.org/v1/prize.json | jg "prizes[4].laureates[1].motivation"
+jg '**.[*]' data.json --count --no-display
+# Found matches: 42
 ```
 
-Output:
+## Query Syntax
 
-```text
-[
-  "\"for foundational discoveries and inventions that enable machine learning with artificial neural networks\""
-]
+Queries are **regular expressions over paths**. If you know regex, this will feel familiar:
+
+| Operator     | Example              | Description                                        |
+| ------------ | -------------------- | -------------------------------------------------- |
+| Sequence     | `foo.bar.baz`        | Concatenation—match path `foo` → `bar` → `baz`     |
+| Disjunction  | `foo \| bar`         | Union—match either `foo` or `bar`                  |
+| Kleene star  | `**`                 | Match zero or more field/index accesses (any path) |
+| Repetition   | `foo*`               | Repeat the preceding step zero or more times       |
+| Wildcards    | `*` or `[*]`         | Match any single field or array index              |
+| Optional     | `foo?.bar`           | Continue only if `foo` exists                      |
+| Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)           |
+| Array index  | `[0]` or `[1:3]`     | Match specific index or slice                      |
+
+The query engine compiles expressions to an
+[NFA](https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton), then
+determinizes to a
+[DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) for
+execution. See the [grammar](./src/query/grammar) directory and the
+[`query`](./src/query) module for implementation details.
+
+## Library Usage
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+jsongrep = "0.3"
 ```
 
-**Example**: Check number of matches without displaying them
-
-Again, using the `simple.json` file:
-
-```bash
-jg "**.[*]" simple.json --count --no-display
-```
-
-Output:
-
-```text
-Found matches: 2
-```
-
-</details>
-
----
-
-<details>
-<summary>Rust API: QueryBuilder</summary>
-
-The `jsongrep::query::ast` module defines the `QueryBuilder` fluent API for
-building queries. It allows you to construct queries using a builder pattern.
-
-**Example Usage**:
+Build queries programmatically:
 
 ```rust
-// Construct the query "foo[0].bar.*.baz"
 use jsongrep::query::engine::QueryBuilder;
+
+// Construct the query "foo[0].bar.*.baz"
 let query = QueryBuilder::new()
     .field("foo")
     .index(0)
@@ -169,65 +133,34 @@ let query = QueryBuilder::new()
     .build();
 ```
 
-</details>
-
-## Examples
-
-Examples of using the `jsongrep` crate can be found in the
-[examples](./examples) directory.
+More examples in the [examples](./examples) directory.
 
 ## Shell Completions
 
-To generate completions for your shell, you can use the `jg generate shell`
-subcommand. By default, the completions will be printed to `/dev/stdout` and can
-be redirected to your shell's expected completion location:
+Generate completions with `jg generate shell <SHELL>`:
 
-- Bash
+```bash
+# Bash
+jg generate shell bash > /etc/bash_completion.d/jg.bash
 
-  ```bash
-  # Source the completion script in your .bashrc
-  echo 'source /path/to/jg.bash' >> ~/.bashrc
+# Zsh
+jg generate shell zsh > ~/.zsh/completions/_jg
 
-  # Or copy to the system-wide bash completion directory
-  jg generate shell bash > jg.bash && sudo mv jg.bash /etc/bash_completion.d/
-  ```
-
-- Zsh
-
-  ```bash
-  mkdir -p ~/.zsh/completions
-  jg generate shell zsh > ~/.zsh/completions/_jg
-
-  # Add the directory to fpath in your .zshrc before compinit
-  echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
-  echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
-  ```
-
-- Fish
-
-  ```bash
-  jg generate shell fish > ~/.config/fish/completions/jg.fish
-  ```
+# Fish
+jg generate shell fish > ~/.config/fish/completions/jg.fish
+```
 
 ## Man Page
 
-To generate a Man page for `jg`, you can use the `jg generate man` subcommand to
-generate to a specified output directory with the `-o`/`--output-dir` options
-(defaults to current directory):
-
 ```bash
-mkdir -p ~/.local/share/man/man1/
 jg generate man -o ~/.local/share/man/man1/
+man jg
 ```
-
-Browse the generated Man pages with `man jg`.
 
 ## Contributing
 
-Contributions are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md)
-file for more details.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License - see the
-[LICENSE.md](LICENSE.md) file for details.
+MIT - see [LICENSE.md](LICENSE.md).

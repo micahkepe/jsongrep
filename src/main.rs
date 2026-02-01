@@ -28,7 +28,7 @@ struct Args {
     #[arg(value_name = "FILE")]
     /// Optional path to JSON file. If omitted, reads from STDIN
     input: Option<PathBuf>,
-    /// Do not pretty-print the JSON output, instead use compact
+    /// Do not pretty-print the JSON output
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
     /// Display count of number of matches
