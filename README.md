@@ -36,7 +36,7 @@ processes the document efficiently.
 
 ```bash
 # Extract all names from nested JSON
-$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg '**.name'
+$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
 [
   "Alice",
   "Bob"
