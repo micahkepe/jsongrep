@@ -62,6 +62,7 @@ pub enum Query {
 }
 
 impl Query {
+    /// Calculate the depth of the query.
     #[must_use]
     pub fn depth(&self) -> usize {
         match self {

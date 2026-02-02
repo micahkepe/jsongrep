@@ -1,8 +1,9 @@
+//! `generate` subcommand.
 use anyhow::{Context, Result};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-/// Utility function to generate all Man pages for the main [`Args`] structure and all dependent
+/// Utility function to generate all Man pages for the main argument structure and all dependent
 /// recursive subcommand pages to the output directory if specified, else the current directory.
 ///
 /// # Errors

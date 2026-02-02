@@ -1,3 +1,4 @@
+#![allow(rustdoc::private_intra_doc_links)]
 /*!
 This crate provides a query language for JSON data that can be used to search
 for matching **regular** paths the JSON tree, using a derivation of [regular
@@ -36,8 +37,8 @@ ASTs. The query AST is then used to construct first a non-deterministic finite
 automaton (NFA) which is then determinized into a deterministic finite automaton
 (DFA) that can be directly simulated against the input JSON document.
 
-More more details on the automaton constructions can be found in the `dfa` and
-`nfa` modules of the `query` module.
+More more details on the automaton constructions can be found in the [`dfa`] and
+[`nfa`] modules of the [`query`] module.
 
 # Query Language
 
@@ -72,6 +73,10 @@ Finally, we can use wildcards to match any field or index:
 - `[*].*`: Matches any field or index in any object nested under any object
   nested under the root object.
 - `([*] | *)*`: Matches any filed or index at any level of the JSON tree.
+
+[`nfa`]: crate::query::nfa
+[`dfa`]: crate::query::dfa
+[`query`]: crate::query
 */
 
 use serde_json::Value;
