@@ -104,12 +104,19 @@ feel familiar:
 | ------------ | -------------------- | ------------------------------------------------------------- |
 | Sequence     | `foo.bar.baz`        | **Concatenation**: match path `foo` &rarr; `bar` &rarr; `baz` |
 | Disjunction  | `foo \| bar`         | **Union**: match either `foo` or `bar`                        |
-| Kleene star  | `**`                 | Match zero or more field/index accesses (any path)            |
+| Kleene star  | `**`                 | Match zero or more field accesses                             |
 | Repetition   | `foo*`               | Repeat the preceding step zero or more times                  |
 | Wildcards    | `*` or `[*]`         | Match any single field or array index                         |
 | Optional     | `foo?.bar`           | Continue only if `foo` exists                                 |
 | Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
 | Array index  | `[0]` or `[1:3]`     | Match specific index or slice                                 |
+
+These queries can be arbitrarily nested as well with parentheses. For example,
+`foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.
+
+This also means you can also recursively descend **any** path with `(* | [*])*`,
+e.g., `(* | [*])*.foo` to find all matching paths that have a `foo` field at any
+depth.
 
 The query engine compiles expressions to an
 [NFA](https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton), then
