@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-02-01
+
+### Added
+
+- `field!` macro for constructing field queries (e.g., `field!("foo")` =>
+  `Query::Field("foo".to_string())`)
+- `Query::field` method for constructing field queries from type `T: Into<String>`
+  for convenience (e.g., `Query::field("foo")`)
+
+### Fixed
+
+- Fixed incorrect example query in README
+
 ## [0.4.0] - 2026-02-01
 
 ### Changed
@@ -79,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/micahkepe/jsongrep/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/micahkepe/jsongrep/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/micahkepe/jsongrep/releases/tag/v0.3.0
 [0.2.0]: https://github.com/micahkepe/jsongrep/releases/tag/v0.2.0
