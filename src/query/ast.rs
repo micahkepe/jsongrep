@@ -14,7 +14,7 @@ use:
 ```
 use jsongrep::query::{Query, QueryBuilder};
 let query = QueryBuilder::new().field("foo").build();
-assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
+assert_eq!(query, Query::Sequence(vec![Query::field("foo")]));
 ```
 
 In addition, the query can be constructed from a raw string:
@@ -22,7 +22,7 @@ In addition, the query can be constructed from a raw string:
 ```
 use jsongrep::query::Query;
 let query : Query = "foo".parse().expect("Invalid query");
-assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
+assert_eq!(query, Query::Sequence(vec![Query::field("foo")]));
 ```
 */
 use std::{cmp::PartialEq, fmt::Display, str::FromStr};
@@ -77,6 +77,11 @@ impl Query {
             }
             _ => 1,
         }
+    }
+
+    /// Helper for ergonomic construction of field queries
+    pub fn field<T: Into<String>>(name: T) -> Self {
+        Self::Field(name.into())
     }
 }
 
@@ -178,6 +183,14 @@ impl FromStr for Query {
     }
 }
 
+/// Constructs a query that matches a specific field name.
+#[macro_export]
+macro_rules! field {
+    ($name: expr) => {
+        Query::Field($name.to_owned())
+    };
+}
+
 /// Builder for constructing queries
 pub struct QueryBuilder {
     /// The underlying query being built
@@ -205,7 +218,7 @@ impl QueryBuilder {
     /// ```
     /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new().field("foo").build();
-    /// assert_eq!(query, Query::Sequence(vec![Query::Field("foo".to_string())]));
+    /// assert_eq!(query, Query::Sequence(vec![Query::field("foo")]));
     /// ```
     #[must_use]
     pub fn field(mut self, name: &str) -> Self {
@@ -445,8 +458,8 @@ impl QueryBuilder {
     /// use jsongrep::query::{Query, QueryBuilder};
     /// let query = QueryBuilder::new()
     ///    .disjunction(vec![
-    ///    Query::Field("foo".to_string()),
-    ///    Query::Field("bar".to_string()),
+    ///    Query::field("foo"),
+    ///    Query::field("bar"),
     ///    ]);
     /// ```
     #[must_use]
@@ -464,9 +477,9 @@ impl QueryBuilder {
     /// use jsongrep::query::{Query, QueryBuilder};
     /// // Create a sequence of queries: "foo.bar.baz"
     /// let query = QueryBuilder::new().sequence(vec![
-    ///   Query::Field("foo".to_string()),
-    ///   Query::Field("bar".to_string()),
-    ///   Query::Field("baz".to_string()),
+    ///   Query::field("foo"),
+    ///   Query::field("bar"),
+    ///   Query::field("baz"),
     ///   ]).build();
     ///
     /// assert!(
@@ -512,10 +525,10 @@ impl QueryBuilder {
     ///                         .build();
     ///
     /// let expected = Query::Sequence(vec![
-    ///    Query::Field("foo".to_string()),
-    ///    Query::Field("bar".to_string()),
+    ///    Query::field("foo"),
+    ///    Query::field("bar"),
     ///    Query::Optional(Box::new(Query::Index(3))),
-    ///    Query::KleeneStar(Box::new(Query::Field("baz".to_string()))),
+    ///    Query::KleeneStar(Box::new(Query::field("baz"))),
     ///    ]);
     ///
     /// assert_eq!(query, expected, "Got: {:?}, Expected: {:?}", query, expected);
