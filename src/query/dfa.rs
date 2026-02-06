@@ -16,7 +16,7 @@ crate provides NFA and DFA implementations for regular expressions using
 Thompson's construction and other techniques such as a Pike VM.
 */
 use core::cmp::Ordering;
-use serde_json::Value;
+use serde_json_borrow::Value;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Display,
@@ -497,7 +497,7 @@ impl DFAQueryEngine {
         dfa: &QueryDFA,
         current_state: usize,
         path: &mut Vec<PathType>,
-        value: &'a Value,
+        value: &'a Value<'a>,
         results: &mut Vec<JSONPointer<'a>>,
     ) {
         // Check if current state is accepting
@@ -510,7 +510,7 @@ impl DFAQueryEngine {
 
         match value {
             Value::Object(map) => {
-                for (key, val) in map {
+                for (key, val) in map.as_vec() {
                     // Get symbol ID for this field
                     let symbol_id = dfa.get_field_symbol_id(key);
 
@@ -519,7 +519,7 @@ impl DFAQueryEngine {
                         dfa.transition(current_state, symbol_id)
                     {
                         // extend the current path using reference counter smart pointer
-                        let key_rc: Rc<String> = Rc::new(key.clone());
+                        let key_rc: Rc<String> = Rc::new(key.to_string());
                         path.push(PathType::Field(key_rc));
 
                         // Recurse on the extended path
@@ -556,10 +556,8 @@ impl DFAQueryEngine {
                 }
             }
             // Leaf JSON nodes - no further traversal needed
-            Value::Null
-            | Value::Bool(_)
-            | Value::Number(_)
-            | Value::String(_) => {}
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::Str(_) => {
+            }
         }
     }
 }
@@ -604,6 +602,7 @@ impl QueryEngine for DFAQueryEngine {
 mod tests {
     use anyhow::Context;
     use serde_json::Map;
+    use std::borrow::Cow;
 
     use super::*;
     use crate::query::QueryBuilder;
@@ -619,28 +618,19 @@ mod tests {
     ///   "other": 42
     /// }
     /// ```
-    fn create_simple_test_json() -> Value {
-        let mut inner = Map::new();
-        inner.insert("bar".to_string(), Value::String("val".to_string()));
+    fn create_simple_test_json() -> Value<'static> {
+        static TEST_JSON: &str = r#"
+            {
+              "foo": {
+                "bar": "val"
+              },
+              "baz": [1, 2, 3, 4, 5],
+              "other": 42
+            }
+        "#;
 
-        let mut root = Map::new();
-        root.insert("foo".to_string(), Value::Object(inner));
-        root.insert(
-            "baz".to_string(),
-            Value::Array(vec![
-                Value::Number(1_i32.into()),
-                Value::Number(2_i32.into()),
-                Value::Number(3.into()),
-                Value::Number(4.into()),
-                Value::Number(5.into()),
-            ]),
-        );
-        root.insert(
-            "other".to_owned(),
-            Value::Number(<serde_json::Number>::from(42i32)),
-        );
-
-        Value::Object(root)
+        serde_json::from_str::<Value<'static>>(TEST_JSON)
+            .expect("hardcoded test json")
     }
 
     /// Creates a nested test JSON object for unit tests.
@@ -656,17 +646,20 @@ mod tests {
     ///   }
     /// }
     /// ```
-    fn create_nested_test_json() -> Value {
-        let mut root = Map::new();
-        let mut nested = Map::new();
-        let mut a = Map::new();
-        let mut b = Map::new();
-        b.insert("c".to_string(), Value::String("target".to_string()));
-        a.insert("b".to_string(), Value::Object(b));
-        nested.insert("a".to_string(), Value::Object(a));
-        root.insert("nested".to_string(), Value::Object(nested));
-
-        Value::Object(root)
+    fn create_nested_test_json() -> Value<'static> {
+        static TEST_JSON: &str = r#"
+            {
+              "nested": {
+                "a": {
+                  "b": {
+                    "c": "target"
+                  }
+                }
+              }
+            }
+        "#;
+        serde_json::from_str::<Value<'static>>(TEST_JSON)
+            .expect("hardcoded test json")
     }
 
     /// Creates a nested test JSON object with duplicate keys for unit tests.
@@ -678,15 +671,18 @@ mod tests {
     //     }
     //   }
     // }
-    fn create_duplicate_key_nested_test_json() -> Value {
-        let mut root = Map::new();
-        let mut c1 = Map::new();
-        let mut c2 = Map::new();
-        c2.insert("c".to_string(), Value::String("target".to_string()));
-        c1.insert("c".to_string(), Value::Object(c2));
-        root.insert("c".to_string(), Value::Object(c1));
-
-        Value::Object(root)
+    fn create_duplicate_key_nested_test_json() -> Value<'static> {
+        static TEST_JSON: &str = r#"
+            {
+              "c": {
+                "c": {
+                   "c": "target"
+                }
+              }
+            }
+        "#;
+        serde_json::from_str::<Value<'static>>(TEST_JSON)
+            .expect("hardcoded test json")
     }
 
     /// Checks that a constructed `QueryDFA` does not contain any overlapping
@@ -715,7 +711,7 @@ mod tests {
                 PathType::Field(Rc::new("bar".to_string())),
             ]
         );
-        assert_eq!(matches[0].value, &Value::String("val".to_string()));
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("val")));
     }
 
     #[test]
@@ -760,7 +756,7 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Should have 1 match
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].value, &Value::Number(2.into()));
+        assert_eq!(matches[0].value, &Value::Number(2i64.into()));
     }
 
     #[test]
@@ -771,7 +767,7 @@ mod tests {
         if let Value::Object(ref mut root) = json
             && let Some(Value::Object(nested)) = root.get_mut("nested")
         {
-            nested.insert("d".to_string(), Value::Null);
+            nested.insert("d", Value::Null);
         }
 
         // Query: nested.a.b.c | nested.d
@@ -788,7 +784,7 @@ mod tests {
         assert_eq!(matches.len(), 2);
         let values: Vec<&Value> = matches.iter().map(|m| m.value).collect();
         assert!(values.contains(&&Value::Null));
-        assert!(values.contains(&&Value::String("target".to_string())));
+        assert!(values.contains(&&Value::Str(Cow::Borrowed("target"))));
     }
 
     #[test]
@@ -801,9 +797,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [2, 3, 4]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &Value::Number(2.into()));
-        assert_eq!(matches[1].value, &Value::Number(3.into()));
-        assert_eq!(matches[2].value, &Value::Number(4.into()));
+        assert_eq!(matches[0].value, &Value::Number(2i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(3i64.into()));
+        assert_eq!(matches[2].value, &Value::Number(4i64.into()));
     }
 
     #[test]
@@ -816,11 +812,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &Value::Number(1.into()));
-        assert_eq!(matches[1].value, &Value::Number(2.into()));
-        assert_eq!(matches[2].value, &Value::Number(3.into()));
-        assert_eq!(matches[3].value, &Value::Number(4.into()));
-        assert_eq!(matches[4].value, &Value::Number(5.into()));
+        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
+        assert_eq!(matches[2].value, &Value::Number(3i64.into()));
+        assert_eq!(matches[3].value, &Value::Number(4i64.into()));
+        assert_eq!(matches[4].value, &Value::Number(5i64.into()));
     }
 
     #[test]
@@ -833,8 +829,8 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [0, 1]
         assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0].value, &Value::Number(1.into()));
-        assert_eq!(matches[1].value, &Value::Number(2.into()));
+        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
     }
 
     #[test]
@@ -847,9 +843,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [3, 4, 5]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &Value::Number(3.into()));
-        assert_eq!(matches[1].value, &Value::Number(4.into()));
-        assert_eq!(matches[2].value, &Value::Number(5.into()));
+        assert_eq!(matches[0].value, &Value::Number(3i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(4i64.into()));
+        assert_eq!(matches[2].value, &Value::Number(5i64.into()));
     }
 
     #[test]
@@ -874,11 +870,11 @@ mod tests {
 
         // Expected [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &Value::Number(1.into()));
-        assert_eq!(matches[1].value, &Value::Number(2.into()));
-        assert_eq!(matches[2].value, &Value::Number(3.into()));
-        assert_eq!(matches[3].value, &Value::Number(4.into()));
-        assert_eq!(matches[4].value, &Value::Number(5.into()));
+        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
+        assert_eq!(matches[2].value, &Value::Number(3i64.into()));
+        assert_eq!(matches[3].value, &Value::Number(4i64.into()));
+        assert_eq!(matches[4].value, &Value::Number(5i64.into()));
     }
 
     #[test]
@@ -891,7 +887,7 @@ mod tests {
         // Expected [(root object), 42]
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].value, &json); // the root object
-        assert_eq!(matches[1].value, &Value::Number(42.into()));
+        assert_eq!(matches[1].value, &Value::Number(42i64.into()));
     }
 
     #[test]
@@ -1003,22 +999,17 @@ mod tests {
 
     #[test]
     fn kleene_same_key() {
-        // ```json
-        // {
-        //   "c": {
-        //     "c": {
-        //        "c": "target"
-        //     }
-        //   }
-        // }
-        let mut root = Map::new();
-        let mut c1 = Map::new();
-        let mut c2 = Map::new();
-        c2.insert("c".to_string(), Value::String("target".to_string()));
-        c1.insert("c".to_string(), Value::Object(c2));
-        root.insert("c".to_string(), Value::Object(c1));
-
-        let json = Value::Object(root);
+        static KLEENE_JSON: &str = r#"
+            {
+              "c": {
+                "c": {
+                   "c": "target"
+                }
+              }
+            }
+        "#;
+        let json = serde_json::from_str::<Value<'_>>(KLEENE_JSON)
+            .expect("hardcoded json");
 
         // Query: `c*`
         let query = QueryBuilder::new().field("c").kleene_star().build();

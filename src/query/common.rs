@@ -5,7 +5,7 @@ This module contains shared types used in the JSON query engine, including
 the JSON pointer and path types. Additionally, this module defines the
 predicate definitions for JSON automaton.
 */
-use serde_json::Value;
+use serde_json_borrow::Value;
 use std::rc::Rc;
 
 /// A JSON poenter that points to a value in a JSON document.
@@ -14,7 +14,7 @@ pub struct JSONPointer<'a> {
     /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\]
     pub path: Vec<PathType>,
     /// A reference to the value in the JSON document
-    pub value: &'a Value,
+    pub value: &'a Value<'a>,
 }
 
 impl std::fmt::Display for JSONPointer<'_> {
