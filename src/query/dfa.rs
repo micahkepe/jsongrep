@@ -756,7 +756,7 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Should have 1 match
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].value, &Value::Number(2i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(2u64.into()));
     }
 
     #[test]
@@ -797,9 +797,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [2, 3, 4]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &Value::Number(2i64.into()));
-        assert_eq!(matches[1].value, &Value::Number(3i64.into()));
-        assert_eq!(matches[2].value, &Value::Number(4i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(2u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(3u64.into()));
+        assert_eq!(matches[2].value, &Value::Number(4u64.into()));
     }
 
     #[test]
@@ -812,11 +812,11 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
-        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
-        assert_eq!(matches[2].value, &Value::Number(3i64.into()));
-        assert_eq!(matches[3].value, &Value::Number(4i64.into()));
-        assert_eq!(matches[4].value, &Value::Number(5i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2u64.into()));
+        assert_eq!(matches[2].value, &Value::Number(3u64.into()));
+        assert_eq!(matches[3].value, &Value::Number(4u64.into()));
+        assert_eq!(matches[4].value, &Value::Number(5u64.into()));
     }
 
     #[test]
@@ -829,8 +829,8 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [0, 1]
         assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
-        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2u64.into()));
     }
 
     #[test]
@@ -843,9 +843,9 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [3, 4, 5]
         assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0].value, &Value::Number(3i64.into()));
-        assert_eq!(matches[1].value, &Value::Number(4i64.into()));
-        assert_eq!(matches[2].value, &Value::Number(5i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(3u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(4u64.into()));
+        assert_eq!(matches[2].value, &Value::Number(5u64.into()));
     }
 
     #[test]
@@ -870,11 +870,11 @@ mod tests {
 
         // Expected [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].value, &Value::Number(1i64.into()));
-        assert_eq!(matches[1].value, &Value::Number(2i64.into()));
-        assert_eq!(matches[2].value, &Value::Number(3i64.into()));
-        assert_eq!(matches[3].value, &Value::Number(4i64.into()));
-        assert_eq!(matches[4].value, &Value::Number(5i64.into()));
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(2u64.into()));
+        assert_eq!(matches[2].value, &Value::Number(3u64.into()));
+        assert_eq!(matches[3].value, &Value::Number(4u64.into()));
+        assert_eq!(matches[4].value, &Value::Number(5u64.into()));
     }
 
     #[test]
@@ -887,7 +887,7 @@ mod tests {
         // Expected [(root object), 42]
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].value, &json); // the root object
-        assert_eq!(matches[1].value, &Value::Number(42i64.into()));
+        assert_eq!(matches[1].value, &Value::Number(42u64.into()));
     }
 
     #[test]
