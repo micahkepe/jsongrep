@@ -28,6 +28,7 @@ serde_json = "1.0.142"
 clap_mangen = "0.2.29"
 clap_complete = "4.5.57"
 regex = "1.12.2"
+memmap2 = "0.9.9"
 
 [lints.clippy]
 # See: <https://rust-lang.github.io/rust-clippy/master/index.html.
