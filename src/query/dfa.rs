@@ -601,7 +601,6 @@ impl QueryEngine for DFAQueryEngine {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use anyhow::Context;
-    use serde_json::Map;
     use std::borrow::Cow;
 
     use super::*;
