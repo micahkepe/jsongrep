@@ -5,16 +5,19 @@ Main binary for jsongrep.
 use anyhow::{Context as _, Result};
 use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
-use jsongrep::{
-    commands,
-    query::{DFAQueryEngine, Query, QueryEngine as _},
-};
+use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
 use serde_json_borrow::Value;
 use std::{
-    fs::{self},
+    fs::OpenOptions,
     io::{self, BufWriter, ErrorKind, IsTerminal as _, Read as _, stdout},
     path::PathBuf,
+    str::Utf8Error,
+};
+
+use jsongrep::{
+    commands,
+    query::{DFAQueryEngine, Query, QueryEngine as _},
 };
 
 /// Query an input JSON document against a jsongrep query.
@@ -66,6 +69,20 @@ enum GenerateCommand {
     },
 }
 
+enum Input {
+    Stdin(String),
+    File(Mmap),
+}
+
+impl Input {
+    fn to_str(&self) -> Result<&str, Utf8Error> {
+        match self {
+            Self::Stdin(buffer) => Ok(buffer.as_str()),
+            Self::File(mmap) => str::from_utf8(mmap),
+        }
+    }
+}
+
 /// Entry point for main binary.
 ///
 /// This parses the command line arguments and executes the query. If the input
@@ -101,9 +118,23 @@ fn main() -> Result<()> {
 
             // Parse input content
             let input_content = if let Some(path) = args.input {
-                fs::read_to_string(&path).with_context(|| {
-                    format!("Failed to read file {}", path.display())
-                })?
+                let fd =
+                    OpenOptions::new().read(true).open(&path).with_context(
+                        || format!("Failed to open file {}", path.display()),
+                    )?;
+
+                // SAFETY:
+                // mmap is unsafe if the backing file is modified, either by ourselves or by
+                // other processes.
+                // We will never modify the file, and if other processes do,
+                // there is not much we can do about it.
+                let map = unsafe {
+                    MmapOptions::new().map(&fd).with_context(|| {
+                        format!("Failed to mmap file {}", path.display())
+                    })?
+                };
+
+                Input::File(map)
             } else {
                 if io::stdin().is_terminal() {
                     // No piped input and no file specified
@@ -112,10 +143,14 @@ fn main() -> Result<()> {
                 }
                 let mut buffer = String::new();
                 io::stdin().read_to_string(&mut buffer)?;
-                buffer
+                Input::Stdin(buffer)
             };
-            let json: Value = serde_json::from_str(&input_content)
-                .with_context(|| "Failed to parse JSON")?;
+            let json: Value = serde_json::from_str(
+                input_content
+                    .to_str()
+                    .context("File contents are not valid utf-8")?,
+            )
+            .with_context(|| "Failed to parse JSON")?;
 
             // Execute query
             let results = DFAQueryEngine.find(&json, &query);
