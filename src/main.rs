@@ -5,18 +5,16 @@ Main binary for jsongrep.
 use anyhow::{Context as _, Result};
 use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
-use serde_json_borrow::Value;
-use std::io::stdout;
-use std::io::{self};
-use std::{
-    fs::{self},
-    io::{IsTerminal as _, Read as _},
-    path::PathBuf,
-};
-
 use jsongrep::{
     commands,
     query::{DFAQueryEngine, Query, QueryEngine as _},
+};
+use serde::Serialize;
+use serde_json_borrow::Value;
+use std::{
+    fs::{self},
+    io::{self, BufWriter, ErrorKind, IsTerminal as _, Read as _, stdout},
+    path::PathBuf,
 };
 
 /// Query an input JSON document against a jsongrep query.
@@ -142,16 +140,35 @@ fn main() -> Result<()> {
                                 .unwrap_or_else(|_| String::new())
                         })
                         .collect();
-                    println!("{}", serde_json::to_string(&json_output)?);
+                    write_to_stdout(&json_output, false)?;
                 } else {
                     // Pretty-printed output
                     let json_values: Vec<&Value> =
                         results.iter().map(|p| p.value).collect();
-                    println!("{}", serde_json::to_string_pretty(&json_values)?);
+                    write_to_stdout(&json_values, true)?;
                 }
             }
         }
     }
 
     Ok(())
+}
+
+fn write_to_stdout<T: Serialize>(
+    values: &T,
+    pretty: bool,
+) -> Result<(), serde_json::Error> {
+    let mut buffered = BufWriter::new(stdout().lock());
+    let result = if pretty {
+        serde_json::to_writer_pretty(&mut buffered, values)
+    } else {
+        serde_json::to_writer(&mut buffered, values)
+    };
+    match result {
+        Err(err) if err.io_error_kind() == Some(ErrorKind::BrokenPipe) => {
+            Ok(())
+        }
+        Err(err) => Err(err),
+        Ok(()) => Ok(()),
+    }
 }
