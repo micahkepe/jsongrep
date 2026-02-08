@@ -5,7 +5,7 @@ Main binary for jsongrep.
 use anyhow::{Context as _, Result};
 use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
-use serde_json::Value;
+use serde_json_borrow::Value;
 use std::io::stdout;
 use std::io::{self};
 use std::{

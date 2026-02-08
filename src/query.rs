@@ -8,7 +8,7 @@ pub mod dfa;
 pub(crate) mod nfa;
 pub mod parser;
 
-use serde_json::Value;
+use serde_json_borrow::Value;
 
 use common::JSONPointer;
 
@@ -21,7 +21,7 @@ pub trait QueryEngine {
     /// array of `JSONPointer` instances.
     fn find<'a>(
         &self,
-        json: &'a Value,
+        json: &'a Value<'a>,
         query: &'a Query,
     ) -> Vec<JSONPointer<'a>>;
 }
