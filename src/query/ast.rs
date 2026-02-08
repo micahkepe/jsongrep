@@ -43,6 +43,8 @@ pub enum Query {
     /// Array index access (0-based), e.g, "\[3\]")
     Index(usize),
     /// Array range access with start and end: "\[3:5\]"
+    ///
+    /// NOTE: The end index is exclusive, so the range is `start..end`.
     Range(Option<usize>, Option<usize>),
     /// Array range access from a starting index, e.g., "foo\[3:\]"
     RangeFrom(usize),
