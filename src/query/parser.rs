@@ -369,9 +369,9 @@ fn parse_range(
 
     match (start, end) {
         (None, None) => Ok(Query::ArrayWildcard),
-        (None, Some(e)) => Ok(Query::Range(0, e)),
+        (None, Some(e)) => Ok(Query::Range(Some(0), Some(e))),
         (Some(s), None) => Ok(Query::RangeFrom(s)),
-        (Some(s), Some(e)) => Ok(Query::Range(s, e)),
+        (Some(s), Some(e)) => Ok(Query::Range(Some(s), Some(e))),
     }
 }
 

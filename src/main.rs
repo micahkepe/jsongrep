@@ -22,7 +22,14 @@ use jsongrep::{
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
-#[command(name = "jg", version, about, arg_required_else_help = true, long_about = None, disable_help_subcommand = true)]
+#[command(
+    name = "jg",
+    version,
+    about,
+    arg_required_else_help = true,
+    long_about = None,
+    disable_help_subcommand = true
+)]
 #[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Optional subcommands
@@ -69,8 +76,11 @@ enum GenerateCommand {
     },
 }
 
+/// Possible input sources for jsongrep.
 enum Input {
+    /// Buffered standard input.
     Stdin(String),
+    /// A memory-mapped file from the file system. Assumes an immutable handle.
     File(Mmap),
 }
 
@@ -133,7 +143,6 @@ fn main() -> Result<()> {
                         format!("Failed to mmap file {}", path.display())
                     })?
                 };
-
                 Input::File(map)
             } else {
                 if io::stdin().is_terminal() {

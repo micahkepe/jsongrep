@@ -25,7 +25,12 @@ let query : Query = "foo".parse().expect("Invalid query");
 assert_eq!(query, Query::Sequence(vec![Query::field("foo")]));
 ```
 */
-use std::{cmp::PartialEq, fmt::Display, str::FromStr};
+use std::{
+    cmp::PartialEq,
+    fmt::Display,
+    ops::{Bound, RangeBounds},
+    str::FromStr,
+};
 
 use super::{QueryParseError, parse_query};
 
@@ -38,7 +43,9 @@ pub enum Query {
     /// Array index access (0-based), e.g, "\[3\]")
     Index(usize),
     /// Array range access with start and end: "\[3:5\]"
-    Range(usize, usize),
+    ///
+    /// NOTE: The end index is exclusive, so the range is `start..end`.
+    Range(Option<usize>, Option<usize>),
     /// Array range access from a starting index, e.g., "foo\[3:\]"
     RangeFrom(usize),
     /// Wildcard field access, e.g., "foo.*". Represents a single-level field
@@ -90,7 +97,17 @@ impl Display for Query {
         match self {
             Self::Field(name) => write!(f, "{name}"),
             Self::Index(idx) => write!(f, "[{idx}]"),
-            Self::Range(start, end) => write!(f, "[{start}:{end}]"),
+            Self::Range(start, end) => {
+                write!(f, "[")?;
+                if let Some(s) = start {
+                    write!(f, "{s}")?;
+                }
+                write!(f, ":")?;
+                if let Some(e) = end {
+                    write!(f, "{e}")?;
+                }
+                write!(f, "]")
+            }
             Self::RangeFrom(start) => write!(f, "[{start}:]"),
             Self::FieldWildcard => write!(f, "*"),
             Self::ArrayWildcard => write!(f, "[*]"),
@@ -338,20 +355,27 @@ impl QueryBuilder {
     /// use jsongrep::query::{Query, QueryBuilder};
     ///
     /// // Query: "foo[3:5]"
-    /// let query = QueryBuilder::new().field("foo").range(Some(3), Some(5)).build();
+    /// let query = QueryBuilder::new().field("foo").range(3..5).build();
     /// assert!(
     ///     matches!(query, Query::Sequence(ref seq) if matches!(seq[0], Query::Field(_)) &&
-    ///     matches!(seq[1], Query::Range(3, 5)))
+    ///     matches!(seq[1], Query::Range(Some(3), Some(5))))
     /// );
     /// ```
     #[must_use]
-    pub fn range(mut self, start: Option<usize>, end: Option<usize>) -> Self {
-        let q = match (start, end) {
-            (None, None) => Query::ArrayWildcard,
-            (None, Some(e)) => Query::Range(0, e),
-            (Some(s), None) => Query::RangeFrom(s),
-            (Some(s), Some(e)) => Query::Range(s, e),
+    pub fn range(mut self, range: impl RangeBounds<usize>) -> Self {
+        let start = match range.start_bound() {
+            Bound::Included(&s) => Some(s),
+            Bound::Excluded(&s) => Some(s + 1),
+            Bound::Unbounded => None,
         };
+        let end = match range.end_bound() {
+            Bound::Included(&e) => Some(e + 1),
+            Bound::Excluded(&e) => Some(e),
+            Bound::Unbounded => None,
+        };
+
+        let q = Query::Range(start, end);
+
         self.query = match self.query {
             Query::Sequence(mut seq) => {
                 seq.push(q);

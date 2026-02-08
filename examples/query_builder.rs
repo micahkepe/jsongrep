@@ -14,7 +14,7 @@ fn main() {
         QueryBuilder::new().field("bar").index(2).optional().build();
     let subquery2 = QueryBuilder::new()
         .field("foo")
-        .range(Some(2), Some(5))
+        .range(2..5)
         .field_wildcard()
         .array_wildcard()
         .build();

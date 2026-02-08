@@ -230,7 +230,8 @@ impl DFABuilder {
                 self.collected_ranges.push((*idx, *idx + 1));
             }
             Query::Range(s, e) => {
-                self.collected_ranges.push((*s, *e));
+                self.collected_ranges
+                    .push(((*s).unwrap_or(0), (*e).unwrap_or(usize::MAX)));
             }
             Query::RangeFrom(s) => self.collected_ranges.push((*s, usize::MAX)),
             Query::ArrayWildcard => {
@@ -790,8 +791,7 @@ mod tests {
     fn simple_bounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[1:4]`
-        let query: Query =
-            QueryBuilder::new().field("baz").range(Some(1), Some(4)).build();
+        let query: Query = QueryBuilder::new().field("baz").range(1..4).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [2, 3, 4]
@@ -805,8 +805,7 @@ mod tests {
     fn simple_unbounded_range() {
         let json = create_simple_test_json();
         // Query: `baz[:]` => equivalent to `baz[*]`
-        let query: Query =
-            QueryBuilder::new().field("baz").range(None, None).build();
+        let query: Query = QueryBuilder::new().field("baz").range(..).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [1, 2, 3, 4, 5]
@@ -822,8 +821,7 @@ mod tests {
     fn simple_unbounded_start() {
         let json = create_simple_test_json();
         // Query: `baz[:2]`
-        let query: Query =
-            QueryBuilder::new().field("baz").range(None, Some(2)).build();
+        let query: Query = QueryBuilder::new().field("baz").range(..2).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [0, 1]
@@ -836,8 +834,7 @@ mod tests {
     fn simple_unbounded_end() {
         let json = create_simple_test_json();
         // Query: `baz[2:]`
-        let query: Query =
-            QueryBuilder::new().field("baz").range(Some(2), None).build();
+        let query: Query = QueryBuilder::new().field("baz").range(2..).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect [3, 4, 5]
@@ -851,8 +848,7 @@ mod tests {
     fn simple_range_bounds_eq() {
         let json = create_simple_test_json();
         // Query: `baz[1:1]`
-        let query: Query =
-            QueryBuilder::new().field("baz").range(Some(1), Some(1)).build();
+        let query: Query = QueryBuilder::new().field("baz").range(1..1).build();
 
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Expect empty result set
@@ -893,8 +889,8 @@ mod tests {
     fn overlapping_ranges() {
         let json = create_simple_test_json();
         // Query: `baz[0:3] | baz[1:]` = `baz[0:]`
-        let q1 = QueryBuilder::new().field("baz").range(None, Some(3)).build();
-        let q2 = QueryBuilder::new().field("baz").range(Some(1), None).build();
+        let q1 = QueryBuilder::new().field("baz").range(..3).build();
+        let q2 = QueryBuilder::new().field("baz").range(1..).build();
         let query = QueryBuilder::new().disjunction(vec![q1, q2]).build();
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
         // Only expected matches [1, 2, 3, 4, 5]
@@ -912,7 +908,7 @@ mod tests {
         // Query: `foo[1:5].bar[2]`
         let query = QueryBuilder::new()
             .field("foo")
-            .range(Some(1), Some(5))
+            .range(1..5)
             .field("baz")
             .index(2)
             .build();
@@ -944,7 +940,7 @@ mod tests {
         // Query: `foo[1:].bar[2]`
         let query = QueryBuilder::new()
             .field("foo")
-            .range(Some(1), None)
+            .range(1..)
             .field("baz")
             .index(2)
             .build();
