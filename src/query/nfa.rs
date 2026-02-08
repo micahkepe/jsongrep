@@ -224,7 +224,10 @@ impl QueryNFA {
                 self.pos_to_label.push(range);
             }
             Query::Range(s, e) => {
-                let range = TransitionLabel::Range(*s, *e);
+                let range = TransitionLabel::Range(
+                    (*s).unwrap_or(0),
+                    (*e).unwrap_or(usize::MAX),
+                );
                 self.pos_to_label.push(range);
             }
             Query::RangeFrom(s) => {
