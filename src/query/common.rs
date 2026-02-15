@@ -5,6 +5,7 @@ This module contains shared types used in the JSON query engine, including
 the JSON pointer and path types. Additionally, this module defines the
 predicate definitions for JSON automaton.
 */
+use serde::Serialize;
 use serde_json_borrow::Value;
 use std::rc::Rc;
 
@@ -25,12 +26,21 @@ impl std::fmt::Display for JSONPointer<'_> {
 }
 
 /// Represents the type of path being explored in the query.
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Hash, PartialEq, Eq, Debug, Clone)]
 pub enum PathType {
     /// Represents an index in an array, e.g., "foo\[3\]"
     Index(usize),
     /// Represents a field in an object, e.g., "foo.bar"
     Field(Rc<String>),
+}
+
+impl std::fmt::Display for PathType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Index(i) => write!(f, "[{i}]"),
+            Self::Field(s) => write!(f, "\"{s}\""),
+        }
+    }
 }
 
 /// Represents the condition for a transition in an automaton from walking a

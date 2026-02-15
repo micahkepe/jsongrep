@@ -5,19 +5,22 @@ Main binary for jsongrep.
 use anyhow::{Context as _, Result};
 use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
+use colored::Colorize;
 use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
 use serde_json_borrow::Value;
 use std::{
     fs::OpenOptions,
-    io::{self, BufWriter, ErrorKind, IsTerminal as _, Read as _, stdout},
+    io::{
+        self, BufWriter, ErrorKind, IsTerminal as _, Read as _, Write, stdout,
+    },
     path::PathBuf,
     str::Utf8Error,
 };
 
 use jsongrep::{
     commands,
-    query::{DFAQueryEngine, Query, QueryEngine as _},
+    query::{DFAQueryEngine, PathType, Query, QueryEngine as _},
 };
 
 /// Query an input JSON document against a jsongrep query.
@@ -93,6 +96,44 @@ impl Input {
     }
 }
 
+/// Parse input content
+///
+/// # Errors
+///
+/// Returns early with an error if the file cannot be opened or read. If the input is not a file or
+/// piped input, prints the help message and exits with an error.
+fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
+    // Parse input content
+    if let Some(path) = input {
+        let fd =
+            OpenOptions::new().read(true).open(&path).with_context(|| {
+                format!("Failed to open file {}", path.display())
+            })?;
+
+        // SAFETY:
+        // mmap is unsafe if the backing file is modified, either by ourselves or by
+        // other processes.
+        // We will never modify the file, and if other processes do,
+        // there is not much we can do about it.
+        let map = unsafe {
+            MmapOptions::new().map(&fd).with_context(|| {
+                format!("Failed to mmap file {}", path.display())
+            })?
+        };
+        Ok(Input::File(map))
+    } else {
+        if io::stdin().is_terminal() {
+            // No piped input and no file specified
+            let mut cmd = Args::command();
+            cmd.print_help()?;
+            anyhow::bail!("No input specified");
+        }
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer)?;
+        Ok(Input::Stdin(buffer))
+    }
+}
+
 /// Entry point for main binary.
 ///
 /// This parses the command line arguments and executes the query. If the input
@@ -126,93 +167,107 @@ fn main() -> Result<()> {
                 .parse()
                 .with_context(|| "Failed to parse query")?;
 
-            // Parse input content
-            let input_content = if let Some(path) = args.input {
-                let fd =
-                    OpenOptions::new().read(true).open(&path).with_context(
-                        || format!("Failed to open file {}", path.display()),
-                    )?;
-
-                // SAFETY:
-                // mmap is unsafe if the backing file is modified, either by ourselves or by
-                // other processes.
-                // We will never modify the file, and if other processes do,
-                // there is not much we can do about it.
-                let map = unsafe {
-                    MmapOptions::new().map(&fd).with_context(|| {
-                        format!("Failed to mmap file {}", path.display())
-                    })?
-                };
-                Input::File(map)
-            } else {
-                if io::stdin().is_terminal() {
-                    // No piped input and no file specified
-                    let mut cmd = Args::command();
-                    return Ok(cmd.print_help()?);
-                }
-                let mut buffer = String::new();
-                io::stdin().read_to_string(&mut buffer)?;
-                Input::Stdin(buffer)
-            };
+            let input_content = parse_input_content(args.input)?;
             let json: Value = serde_json::from_str(
                 input_content
                     .to_str()
                     .context("File contents are not valid utf-8")?,
             )
             .with_context(|| "Failed to parse JSON")?;
-
-            // Execute query
             let results = DFAQueryEngine.find(&json, &query);
 
-            // Display output
+            let stdout = stdout().lock();
+            let mut writer = BufWriter::new(stdout);
+
             if args.count {
-                println!("Found matches: {}", results.len());
+                writeln!(
+                    writer,
+                    "{} {}",
+                    "Found matches:".bold().blue(),
+                    results.len()
+                )
+                .with_context(|| "Failed to write to stdout")?;
             }
 
             // Display depth
             if args.depth {
-                println!("Depth: {}", jsongrep::depth(&json));
+                writeln!(
+                    writer,
+                    "{} {}",
+                    "Depth:".bold().blue(),
+                    jsongrep::depth(&json)
+                )?;
             }
 
             if !args.no_display {
                 if args.compact {
                     // Compact output
-                    let json_output: Vec<String> = results
+                    results
                         .iter()
                         .map(|p| {
-                            serde_json::to_string(p.value)
-                                .unwrap_or_else(|_| String::new())
+                            let val = serde_json::to_string(p.value)
+                                .unwrap_or_else(|_| String::new());
+                            write_colored_result_to_stdout(
+                                &mut writer,
+                                &val,
+                                &p.path,
+                                true,
+                            )
                         })
-                        .collect();
-                    write_to_stdout(&json_output, false)?;
+                        .collect::<Result<Vec<_>, _>>()?;
                 } else {
                     // Pretty-printed output
-                    let json_values: Vec<&Value> =
-                        results.iter().map(|p| p.value).collect();
-                    write_to_stdout(&json_values, true)?;
+                    results
+                        .iter()
+                        .map(|p| {
+                            write_colored_result_to_stdout(
+                                &mut writer,
+                                p.value,
+                                &p.path,
+                                true,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
                 }
             }
+
+            writer.flush()?;
         }
     }
 
     Ok(())
 }
 
-fn write_to_stdout<T: Serialize>(
-    values: &T,
+/// Write found result to stdout with color.
+fn write_colored_result_to_stdout<T: Serialize, W: Write>(
+    writer: &mut W,
+    value: &T,
+    path: &[PathType],
     pretty: bool,
-) -> Result<(), serde_json::Error> {
-    let mut buffered = BufWriter::new(stdout().lock());
+) -> Result<()> {
+    // Print path
+    let path = path
+        .iter()
+        .map(std::string::ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(".");
+
+    writeln!(writer, "{}:", path.bold().magenta())?;
+
     let result = if pretty {
-        serde_json::to_writer_pretty(&mut buffered, values)
+        serde_json::to_writer_pretty(&mut *writer, value)
     } else {
-        serde_json::to_writer(&mut buffered, values)
+        serde_json::to_writer(&mut *writer, value)
     };
+
     match result {
         Err(err) if err.io_error_kind() == Some(ErrorKind::BrokenPipe) => {
             Ok(())
         }
-        Err(err) => Err(err),
-        Ok(()) => Ok(()),
+        Err(err) => Err(err.into()),
+        Ok(()) => {
+            writeln!(writer)?;
+            Ok(())
+        }
     }
 }
