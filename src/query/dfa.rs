@@ -1294,4 +1294,143 @@ mod tests {
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 5);
     }
+
+    // ==============================================================================
+    // Quoted field matching tests — verify that quoted fields with special
+    // characters actually match the corresponding JSON keys
+    // ==============================================================================
+
+    #[test]
+    fn quoted_field_with_slash_matches_json_key() {
+        let input = r#"{ "/activities": { "get": "list" } }"#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        let query: Query = r#""/activities""#
+            .parse()
+            .expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].path,
+            vec![PathType::Field(Rc::new("/activities".to_string()))]
+        );
+    }
+
+    #[test]
+    fn quoted_field_sequence_openapi_style() {
+        let input = r#"
+        {
+          "paths": {
+            "/activities": { "get": "list" },
+            "/users": { "get": "list_users" }
+          }
+        }
+        "#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        let query: Query = r#"paths."/activities""#
+            .parse()
+            .expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].path,
+            vec![
+                PathType::Field(Rc::new("paths".to_string())),
+                PathType::Field(Rc::new("/activities".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn quoted_field_recursive_descent() {
+        let input = r#"
+        {
+          "paths": {
+            "/activities": { "get": "list" },
+            "/activities/statistics": { "get": "stats" }
+          }
+        }
+        "#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        // Use ** to recursively find the key
+        let query: Query = r#"**."/activities""#
+            .parse()
+            .expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].path,
+            vec![
+                PathType::Field(Rc::new("paths".to_string())),
+                PathType::Field(Rc::new("/activities".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn quoted_field_with_dot_matches_json_key() {
+        let input = r#"{ "a.b": 42, "a": { "b": 99 } }"#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        // Quoted "a.b" should match the literal key "a.b", not the path a → b
+        let query: Query =
+            r#""a.b""#.parse().expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(42u64.into()));
+    }
+
+    #[test]
+    fn quoted_field_with_spaces_matches_json_key() {
+        let input = r#"{ "my key": "value" }"#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        let query: Query =
+            r#""my key""#.parse().expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].value,
+            &Value::Str(Cow::Borrowed("value"))
+        );
+    }
+
+    #[test]
+    fn quoted_field_disjunction() {
+        let input = r#"
+        {
+          "paths": {
+            "/activities": { "get": "list" },
+            "/users": { "get": "list_users" }
+          }
+        }
+        "#;
+        let json = serde_json::from_str(input)
+            .with_context(|| "Failed to parse JSON")
+            .unwrap();
+
+        let query: Query = r#"paths.("/activities" | "/users")"#
+            .parse()
+            .expect("failed to parse query");
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 2);
+    }
 }
