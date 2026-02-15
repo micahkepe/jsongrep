@@ -78,23 +78,6 @@ Finally, we can use wildcards to match any field or index:
 [`dfa`]: crate::query::dfa
 [`query`]: crate::query
 */
-
-use serde_json_borrow::Value;
-
 pub mod commands;
 pub mod query;
-
-/// Returns the depth of the JSON value.
-pub fn depth(json: &Value) -> usize {
-    match json {
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::Str(_) => 1,
-        Value::Array(arr) => {
-            let inner_depth = arr.iter().map(depth).max().unwrap_or(0);
-            1 + inner_depth
-        }
-        Value::Object(map) => {
-            let inner_depth = map.values().map(depth).max().unwrap_or(0);
-            1 + inner_depth
-        }
-    }
-}
+pub mod utils;

@@ -7,7 +7,6 @@ use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
 use colored::Colorize;
 use memmap2::{Mmap, MmapOptions};
-use serde::Serialize;
 use serde_json_borrow::Value;
 use std::{
     fs::OpenOptions,
@@ -20,7 +19,8 @@ use std::{
 
 use jsongrep::{
     commands,
-    query::{DFAQueryEngine, PathType, Query, QueryEngine as _},
+    query::{DFAQueryEngine, Query, QueryEngine as _},
+    utils::{depth, write_colored_result},
 };
 
 /// Query an input JSON document against a jsongrep query.
@@ -156,7 +156,6 @@ fn main() -> Result<()> {
             }
         },
         None => {
-            // Parse query
             let query: Query = args
                 .query
                 .ok_or_else(|| {
@@ -176,6 +175,7 @@ fn main() -> Result<()> {
             .with_context(|| "Failed to parse JSON")?;
             let results = DFAQueryEngine.find(&json, &query);
 
+            // NOTE: use single, locked stdout handle to avoid interleaving
             let stdout = stdout().lock();
             let mut writer = BufWriter::new(stdout);
 
@@ -189,85 +189,34 @@ fn main() -> Result<()> {
                 .with_context(|| "Failed to write to stdout")?;
             }
 
-            // Display depth
             if args.depth {
                 writeln!(
                     writer,
                     "{} {}",
                     "Depth:".bold().blue(),
-                    jsongrep::depth(&json)
+                    depth(&json)
                 )?;
             }
 
             if !args.no_display {
-                if args.compact {
-                    // Compact output
-                    results
-                        .iter()
-                        .map(|p| {
-                            let val = serde_json::to_string(p.value)
-                                .unwrap_or_else(|_| String::new());
-                            write_colored_result_to_stdout(
-                                &mut writer,
-                                &val,
-                                &p.path,
-                                true,
-                            )
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                } else {
-                    // Pretty-printed output
-                    results
-                        .iter()
-                        .map(|p| {
-                            write_colored_result_to_stdout(
-                                &mut writer,
-                                p.value,
-                                &p.path,
-                                true,
-                            )
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
+                let pretty = !args.compact;
+                for result in &results {
+                    write_colored_result(
+                        &mut writer,
+                        result.value,
+                        &result.path,
+                        pretty,
+                    )?;
                 }
             }
 
-            writer.flush()?;
+            match writer.flush() {
+                Ok(()) => {}
+                Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+                Err(err) => return Err(err.into()),
+            }
         }
     }
 
     Ok(())
-}
-
-/// Write found result to stdout with color.
-fn write_colored_result_to_stdout<T: Serialize, W: Write>(
-    writer: &mut W,
-    value: &T,
-    path: &[PathType],
-    pretty: bool,
-) -> Result<()> {
-    // Print path
-    let path = path
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(".");
-
-    writeln!(writer, "{}:", path.bold().magenta())?;
-
-    let result = if pretty {
-        serde_json::to_writer_pretty(&mut *writer, value)
-    } else {
-        serde_json::to_writer(&mut *writer, value)
-    };
-
-    match result {
-        Err(err) if err.io_error_kind() == Some(ErrorKind::BrokenPipe) => {
-            Ok(())
-        }
-        Err(err) => Err(err.into()),
-        Ok(()) => {
-            writeln!(writer)?;
-            Ok(())
-        }
-    }
 }
