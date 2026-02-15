@@ -3,7 +3,7 @@
 </div>
 
 <p align="center">
-<a href="https://github.com/micahkepe/jsongrep/releases"><img alt="Crates.io Version" src="https://img.shields.io/crates/v/jsongrep"></a>
+<a href="https://crates.io/crates/jsongrep"><img alt="Crates.io Version" src="https://img.shields.io/crates/v/jsongrep"></a>
 <a href="https://github.com/micahkepe/jsongrep/blob/main/LICENSE"><img alt="GitHub License" src="https://img.shields.io/github/license/micahkepe/jsongrep"></a>
 <a href="https://github.com/micahkepe/jsongrep/actions"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/micahkepe/jsongrep/rust.yml"> </a>
 </p>
@@ -21,13 +21,14 @@ documents using <strong>regular path expressions</strong>.
 
 JSON documents are trees: objects and arrays branch into nested values, with
 edges labeled by field names or array indices. `jsongrep` lets you describe
-**sets of paths** through this tree using regular expression operators—the same
-way you'd match patterns in text.
+**sets of paths** through this tree using regular expression operators - the
+same way you'd match patterns in text.
 
 ```
-**.name          # Kleene star: match "name" at any depth
+**.name          # Kleene star: match "name" under nested objects
 users[*].email   # Wildcard: all emails in the users array
 (error|warn).*   # Disjunction: any field under "error" or "warn"
+(* | [*])*.name  # Any depth: match "name" through both objects and arrays
 ```
 
 This is different from tools like `jq`, which use an imperative filter pipeline.
@@ -36,24 +37,90 @@ query compiles to a
 [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that
 processes the document efficiently.
 
-## Quick Example
+### jsongrep vs jq
+
+`jq` is a powerful tool, but its imperative filter syntax can be verbose for
+common path-matching tasks. `jsongrep` is declarative: you describe the shape of
+the paths you want, and the engine finds them.
+
+**Find a field at any depth:**
 
 ```bash
-# Extract all names from nested JSON
-$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
-users.[0].name:
-"Alice"
-users.[1].name:
-"Bob"
-
-# Query a file directly
-$ jg 'prizes[0].laureates[*].firstname' nobel.json
+# jsongrep: -F treats the query as a literal field name at any depth
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | head -6
 prizes.[0].laureates.[0].firstname:
 "Susumu"
 prizes.[0].laureates.[1].firstname:
 "Richard"
 prizes.[0].laureates.[2].firstname:
 "Omar M."
+
+# jq: requires a recursive descent operator and null suppression
+$ curl -s https://api.nobelprize.org/v1/prize.json | jq '.. | .firstname? // empty' | head -3
+"Susumu"
+"Richard"
+"Omar M."
+```
+
+`jsongrep` also shows _where_ each match was found (e.g.,
+`prizes.[0].laureates.[0].firstname:`), which `jq` does not.
+
+**Select multiple fields at once:**
+
+```bash
+# jsongrep: disjunction with (year|category)
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].(year|category)'
+prizes.[0].year:
+"2025"
+prizes.[0].category:
+"chemistry"
+
+# jq: requires listing each field separately
+$ curl -s https://api.nobelprize.org/v1/prize.json | jq '.prizes[0] | .year, .category'
+"2025"
+"chemistry"
+```
+
+**Count matches:**
+
+```bash
+# jsongrep
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
+Found matches: 1026
+
+# jq
+$ curl -s https://api.nobelprize.org/v1/prize.json | jq '[.. | .firstname? // empty] | length'
+1026
+```
+
+**Pretty-print JSON** (like `jq '.'`):
+
+```bash
+$ echo '{"name":"Ada","age":36}' | jg ''
+{
+  "name": "Ada",
+  "age": 36
+}
+```
+
+## Quick Example
+
+```bash
+# Extract all firstnames from the Nobel Prize API
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].laureates[*].firstname'
+prizes.[0].laureates.[0].firstname:
+"Susumu"
+prizes.[0].laureates.[1].firstname:
+"Richard"
+prizes.[0].laureates.[2].firstname:
+"Omar M."
+
+# Works with inline JSON too
+$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
+users.[0].name:
+"Alice"
+users.[1].name:
+"Bob"
 ```
 
 ## Installation
@@ -90,17 +157,17 @@ Options:
 
 ### More CLI Examples
 
-**Pipe from curl:**
+**Search for a literal field name at any depth:**
 
 ```bash
-curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[4].laureates[1].motivation'
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F motivation | head -4
 ```
 
 **Count matches without displaying them:**
 
 ```bash
-jg '**.[*]' data.json --count --no-display
-# Found matches: 42
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
+# Found matches: 1026
 ```
 
 ## Query Syntax
@@ -136,7 +203,7 @@ execution. See the [grammar](./src/query/grammar) directory and the
 > **Experimental:** The grammar supports `/regex/` syntax for matching field
 > names by pattern, but this is not yet fully implemented. Determinizing
 > overlapping regexes (e.g., `/a/` vs `/aab/`) requires subset construction
-> across multiple patterns—planned but not complete.
+> across multiple patterns - planned but not complete.
 
 ## Library Usage
 
