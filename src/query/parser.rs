@@ -279,7 +279,11 @@ fn parse_step(
 }
 
 /// Parse a field rule into a [`Query::Field`]. This handles both cases of quoted and unquoted
-/// field accesses, e.g. `\"\"foo\"\"` and `\"foo\"`
+/// field accesses, e.g. `"foo"` (quoted) and `foo` (unquoted).
+///
+/// For quoted fields, the surrounding double quotes are stripped and JSON
+/// string escape sequences are unescaped so that the stored field name
+/// matches the actual JSON key.
 fn parse_field(
     pair: &pest::iterators::Pair<Rule>,
 ) -> Result<Query, QueryParseError> {
@@ -290,7 +294,73 @@ fn parse_field(
         )));
     }
 
-    Ok(Query::Field(pair.as_str().to_string()))
+    let raw = pair.as_str();
+
+    // Quoted fields: strip the surrounding double quotes and unescape
+    let name = if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
+        unescape_json_string(&raw[1..raw.len() - 1])
+    } else {
+        raw.to_string()
+    };
+
+    Ok(Query::Field(name))
+}
+
+/// Unescape a JSON string interior (the content between the surrounding
+/// double quotes). Handles the standard JSON escape sequences defined in
+/// [RFC 8259 §7](https://datatracker.ietf.org/doc/html/rfc8259#section-7):
+///
+/// - `\"` -> `"`
+/// - `\\` -> `\`
+/// - `\/` -> `/`
+/// - `\b` -> backspace (U+0008)
+/// - `\f` -> form feed (U+000C)
+/// - `\n` -> newline (U+000A)
+/// - `\r` -> carriage return (U+000D)
+/// - `\t` -> tab (U+0009)
+/// - `\uXXXX` -> the Unicode code point U+XXXX
+fn unescape_json_string(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => result.push('"'),
+                Some('\\') => result.push('\\'),
+                Some('/') => result.push('/'),
+                Some('b') => result.push('\u{0008}'),
+                Some('f') => result.push('\u{000C}'),
+                Some('n') => result.push('\n'),
+                Some('r') => result.push('\r'),
+                Some('t') => result.push('\t'),
+                Some('u') => {
+                    // Collect exactly 4 hex digits
+                    let hex: String = chars.by_ref().take(4).collect();
+                    if let Ok(code_point) = u32::from_str_radix(&hex, 16)
+                        && let Some(ch) = char::from_u32(code_point)
+                    {
+                        result.push(ch);
+                    }
+                    // Silently skip invalid code points — the pest
+                    // grammar already validates the 4-hex-digit format
+                }
+                Some(other) => {
+                    // Unrecognized escape: preserve as-is
+                    result.push('\\');
+                    result.push(other);
+                }
+                None => {
+                    // Trailing backslash: preserve as-is
+                    result.push('\\');
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }
 
 /// Parse a group rule into a [`Query::Disjunction`]
@@ -563,5 +633,73 @@ mod tests {
     fn parse_invalid_key_with_reserved_chars() {
         let result = parse_query(r"][");
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
+    }
+
+    // ==============================================================================
+    // Quoted field unescaping tests
+    // ==============================================================================
+
+    #[test]
+    fn quoted_field_strips_quotes() {
+        let result = parse_query(r#""foo""#).unwrap();
+        // The stored field name should be "foo" without quotes
+        assert_eq!(result, Query::Sequence(vec![Query::Field("foo".into())]));
+        // Display re-quotes only when needed; "foo" has no reserved chars
+        assert_eq!("foo", result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_with_slash() {
+        let result = parse_query(r#""/activities""#).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Field("/activities".into())])
+        );
+        // Must re-quote because `/` is reserved
+        assert_eq!(r#""/activities""#, result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_with_dot() {
+        let result = parse_query(r#""a.b""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("a.b".into())]));
+        assert_eq!(r#""a.b""#, result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_unescape_backslash() {
+        let result = parse_query(r#""a\\b""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field(r"a\b".into())]));
+        // Contains backslash → needs quoting, and the backslash is re-escaped
+        assert_eq!(r#""a\\b""#, result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_unescape_inner_quote() {
+        let result = parse_query(r#""a\"b""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("a\"b".into())]));
+        assert_eq!(r#""a\"b""#, result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_unescape_unicode() {
+        // \u0041 = 'A'
+        let result = parse_query(r#""\u0041""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("A".into())]));
+        // 'A' has no reserved chars, so displayed unquoted
+        assert_eq!("A", result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_in_sequence() {
+        let result = parse_query(r#"paths."/activities""#).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![
+                Query::Field("paths".into()),
+                Query::Field("/activities".into()),
+            ])
+        );
+        assert_eq!(r#"paths."/activities""#, result.to_string());
     }
 }

@@ -55,6 +55,10 @@ struct Args {
     /// Do not display matched JSON values
     #[arg(short, long, action = ArgAction::SetTrue)]
     no_display: bool,
+    /// Treat the query as a literal field name (no DSL parsing).
+    /// Searches for the field at any depth, equivalent to (* | [*])*."<query>".
+    #[arg(short = 'F', long, action = ArgAction::SetTrue)]
+    fixed_string: bool,
 }
 
 /// Available subcommands for `jg`
@@ -156,15 +160,23 @@ fn main() -> Result<()> {
             }
         },
         None => {
-            let query: Query = args
-                .query
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Query string required unless using subcommand"
-                    )
-                })?
-                .parse()
-                .with_context(|| "Failed to parse query")?;
+            let raw_query = args.query.ok_or_else(|| {
+                anyhow::anyhow!("Query string required unless using subcommand")
+            })?;
+
+            let query: Query = if args.fixed_string {
+                // -F/--fixed-string: treat the query as a literal field name
+                // and search at any depth, equivalent to (* | [*])*."<literal>"
+                Query::Sequence(vec![
+                    Query::KleeneStar(Box::new(Query::Disjunction(vec![
+                        Query::FieldWildcard,
+                        Query::ArrayWildcard,
+                    ]))),
+                    Query::Field(raw_query),
+                ])
+            } else {
+                raw_query.parse().with_context(|| "Failed to parse query")?
+            };
 
             let input_content = parse_input_content(args.input)?;
             let json: Value = serde_json::from_str(

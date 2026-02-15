@@ -95,7 +95,13 @@ impl Query {
 impl Display for Query {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Field(name) => write!(f, "{name}"),
+            Self::Field(name) => {
+                if needs_quoting(name) {
+                    write!(f, "\"{}\"", escape_for_quoted_field(name))
+                } else {
+                    write!(f, "{name}")
+                }
+            }
             Self::Index(idx) => write!(f, "[{idx}]"),
             Self::Range(start, end) => {
                 write!(f, "[")?;
@@ -190,6 +196,35 @@ impl Display for Query {
             }
         }
     }
+}
+
+/// Returns `true` if a field name contains characters that require quoting
+/// in the query DSL. This mirrors the pest grammar's `unquoted_field` rule,
+/// which forbids reserved characters, whitespace, and double quotes.
+fn needs_quoting(name: &str) -> bool {
+    // An empty field name cannot be represented unquoted
+    name.is_empty()
+        || name.contains(|c: char| {
+            matches!(c, '.' | '|' | '*' | '?' | '[' | ']' | '(' | ')' | '/')
+                || c.is_whitespace()
+                || c == '"'
+                || c == '\\'
+        })
+}
+
+/// Escape characters inside a quoted field name for display. This is the
+/// inverse of `unescape_json_string` in the parser: `"` -> `\"` and
+/// `\` -> `\\`.
+fn escape_for_quoted_field(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    for c in name.chars() {
+        match c {
+            '"' => result.push_str("\\\""),
+            '\\' => result.push_str("\\\\"),
+            _ => result.push(c),
+        }
+    }
+    result
 }
 
 impl FromStr for Query {

@@ -1,0 +1,7 @@
+{
+  "paths": {
+    "/activities": { "get": { "summary": "List activities" } },
+    "/activities/{id}": { "get": { "summary": "Get activity" } },
+    "/users": { "get": { "summary": "List users" } }
+  }
+}
