@@ -47,7 +47,10 @@ pub fn write_colored_result<W: Write>(
         .join(".");
 
     let result = (|| -> io::Result<()> {
-        writeln!(writer, "{}:", path.bold().magenta())?;
+        if !path.is_empty() {
+            // skip root path printing
+            writeln!(writer, "{}:", path.bold().magenta())?;
+        }
         write_colored_json(writer, value, 0, pretty)?;
         writeln!(writer)?;
         Ok(())
