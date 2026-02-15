@@ -1,7 +1,7 @@
 #![allow(rustdoc::private_intra_doc_links)]
 /*!
 This crate provides a query language for JSON data that can be used to search
-for matching **regular** paths the JSON tree, using a derivation of [regular
+for matching **regular** paths in the JSON tree, using a derivation of [regular
 expressions].
 
 [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression
@@ -37,7 +37,7 @@ ASTs. The query AST is then used to construct first a non-deterministic finite
 automaton (NFA) which is then determinized into a deterministic finite automaton
 (DFA) that can be directly simulated against the input JSON document.
 
-More more details on the automaton constructions can be found in the [`dfa`] and
+For more details on the automaton constructions, see the [`dfa`] and
 [`nfa`] modules of the [`query`] module.
 
 # Query Language
@@ -59,20 +59,19 @@ Here are some example queries and their meanings:
 - `address.*`: Matches any field in the `address` object (e.g., `street`, `city`, etc.).
 - `address.[*]`: Matches all elements in an array if `address` were an array.
 - `(name|age)`: Matches either the `name` or `age` field in the root object.
-- `address.*.*`: Matches any field in any object nested under `address`.
+- `address.([*] | *)*`: Matches any value at any depth under `address`.
 
 We can also use ranges to match specific indices in arrays:
 
-- `address.[2:4]`: Matches the `street` and `city` fields in the `address` object.
-- `address.[2:]`: Matches all elements in the `address` array after index 2.
+- `foo.[2:4]`: Matches elements at indices 2 and 3 in the `foo` array.
+- `foo.[2:]`: Matches all elements in the `foo` array from index 2 onward.
 
 Finally, we can use wildcards to match any field or index:
 
-- `*`: Matches any field or index in the root object.
-- `[*]`: Matches any field or index in any object nested under the root object.
-- `[*].*`: Matches any field or index in any object nested under any object
-  nested under the root object.
-- `([*] | *)*`: Matches any filed or index at any level of the JSON tree.
+- `*`: Matches any single field in the root object.
+- `[*]`: Matches any single array index in the root array.
+- `[*].*`: Matches any field inside each element of an array.
+- `([*] | *)*`: Matches any field or index at any level of the JSON tree.
 
 [`nfa`]: crate::query::nfa
 [`dfa`]: crate::query::dfa

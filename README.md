@@ -13,6 +13,10 @@
 documents using <strong>regular path expressions</strong>.
 </p>
 
+<p align="center">
+  <img src="./images/screenshot.png" alt="jsongrep colored output example" width="700"/>
+</p>
+
 ## Why jsongrep?
 
 JSON documents are trees: objects and arrays branch into nested values, with
@@ -37,18 +41,19 @@ processes the document efficiently.
 ```bash
 # Extract all names from nested JSON
 $ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
-[
-  "Alice",
-  "Bob"
-]
+users.[0].name:
+"Alice"
+users.[1].name:
+"Bob"
 
 # Query a file directly
 $ jg 'prizes[0].laureates[*].firstname' nobel.json
-[
-  "John",
-  "Geoffrey",
-  "Demis"
-]
+prizes.[0].laureates.[0].firstname:
+"Susumu"
+prizes.[0].laureates.[1].firstname:
+"Richard"
+prizes.[0].laureates.[2].firstname:
+"Omar M."
 ```
 
 ## Installation
@@ -136,7 +141,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-jsongrep = "0.3"
+jsongrep = "0.5"
 ```
 
 Build queries programmatically:

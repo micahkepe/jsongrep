@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json_borrow::Value;
 use std::rc::Rc;
 
-/// A JSON poenter that points to a value in a JSON document.
+/// A JSON pointer that points to a value in a JSON document.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct JSONPointer<'a> {
     /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\]
