@@ -66,4 +66,88 @@ mod tests {
 
         assert_eq!(output_json, expected_json);
     }
+
+    // ==============================================================================
+    // Quoted field and --fixed-string tests
+    // ==============================================================================
+
+    #[test]
+    fn quoted_field_query_matches() {
+        let assert = run_main(&[
+            r#"paths."/activities""#,
+            "tests/data/openapi_paths.json",
+            "--count",
+            "--no-display",
+        ])
+        .success()
+        .code(0);
+        let output_str = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+
+        assert!(
+            output_str.contains("1"),
+            "Expected 1 match for quoted field query, got: {output_str:?}"
+        );
+    }
+
+    #[test]
+    fn fixed_string_finds_key_at_any_depth() {
+        let assert = run_main(&[
+            "-F",
+            "/activities",
+            "tests/data/openapi_paths.json",
+        ])
+        .success()
+        .code(0);
+        let output_str = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+
+        // Should find the "/activities" key and output its value
+        assert!(
+            !output_str.trim().is_empty(),
+            "Expected output for -F '/activities', got empty"
+        );
+    }
+
+    #[test]
+    fn fixed_string_count() {
+        let assert = run_main(&[
+            "-F",
+            "/activities",
+            "tests/data/openapi_paths.json",
+            "--count",
+            "--no-display",
+        ])
+        .success()
+        .code(0);
+        let output_str = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+
+        // Only "/activities" should match, not "/activities/{id}"
+        assert!(
+            output_str.contains("1"),
+            "Expected exactly 1 match for -F '/activities', got: {output_str:?}"
+        );
+    }
+
+    #[test]
+    fn fixed_string_no_match() {
+        let output = run_main(&[
+            "-F",
+            "/nonexistent",
+            "tests/data/openapi_paths.json",
+        ])
+        .success()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+        let output_str =
+            String::from_utf8(output).expect("Invalid UTF-8 output");
+
+        assert!(
+            output_str.trim().is_empty(),
+            "Expected no output for nonexistent fixed string, got: {output_str:?}"
+        );
+    }
 }
