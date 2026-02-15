@@ -38,7 +38,7 @@ impl std::fmt::Display for PathType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Index(i) => write!(f, "[{i}]"),
-            Self::Field(s) => write!(f, "\"{s}\""),
+            Self::Field(s) => write!(f, "{s}"),
         }
     }
 }

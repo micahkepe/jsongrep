@@ -25,8 +25,10 @@ mod tests {
         let output_str =
             String::from_utf8(output).expect("Invalid UTF-8 output");
 
-        let expected = r"[]";
-        assert_eq!(output_str.trim(), expected);
+        assert!(
+            output_str.trim().is_empty(),
+            "Expected no output for nonexistent field, got: {output_str:?}"
+        );
     }
 
     #[test]
@@ -43,17 +45,24 @@ mod tests {
 
     #[test]
     fn simple_query() {
-        // Test a simple query "age" on simple.json, expecting ["32"]
+        // Test a simple query "age" on simple.json. The output format is a
+        // path header line followed by the JSON value, e.g.:
+        //   "age":
+        //   32
         let assert =
-            run_main(&["age", "tests/data/simple.json"]).success().code(0); // Ensure the command exits successfully
+            run_main(&["age", "tests/data/simple.json"]).success().code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
-        // Parse the output JSON
-        let output_json: Value = serde_json::from_str(&output_str)
+        let mut lines = output_str.lines();
+        let path_line = lines.next().expect("expected path header line");
+        assert_eq!(path_line, "age:");
+
+        let value_str: String = lines.collect::<Vec<_>>().join("\n");
+        let output_json: Value = serde_json::from_str(value_str.trim())
             .expect("Failed to parse output JSON");
-        let expected_json: Value = serde_json::from_str(r"[32]")
-            .expect("Failed to parse expected JSON");
+        let expected_json: Value =
+            serde_json::from_str("32").expect("Failed to parse expected JSON");
 
         assert_eq!(output_json, expected_json);
     }
