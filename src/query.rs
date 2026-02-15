@@ -10,8 +10,6 @@ pub mod parser;
 
 use serde_json_borrow::Value;
 
-use common::JSONPointer;
-
 /// Interface for query engine implementations.
 pub trait QueryEngine {
     /// Finds all JSON pointers in the given JSON document that match the
@@ -28,6 +26,7 @@ pub trait QueryEngine {
 
 // Re-exports
 pub use ast::*;
+pub use common::{JSONPointer, PathType};
 pub use dfa::*;
 pub use nfa::*;
 pub use parser::*;
