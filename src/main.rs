@@ -55,7 +55,8 @@ struct Args {
     /// Do not display matched JSON values
     #[arg(short, long, action = ArgAction::SetTrue)]
     no_display: bool,
-    /// Treat the query as a literal field name (no DSL parsing).
+    /// Treat the query as a literal field name and search at any depth.
+    ///
     /// Searches for the field at any depth, equivalent to (* | [*])*."<query>".
     #[arg(short = 'F', long, action = ArgAction::SetTrue)]
     fixed_string: bool,

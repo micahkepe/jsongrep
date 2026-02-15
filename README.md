@@ -67,22 +67,25 @@ The `jg` binary will be installed to `~/.cargo/bin`.
 ## CLI Usage
 
 ```
+A JSONPath-inspired query language for JSON documents
+
 Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
+
+Commands:
+  generate  Generate additional documentation and/or completions
 
 Arguments:
   [QUERY]  Query string (e.g., "**.name")
   [FILE]   Optional path to JSON file. If omitted, reads from STDIN
 
 Options:
-      --compact     Do not pretty-print the JSON output
-      --count       Display count of number of matches
-      --depth       Display depth of the input document
-  -n, --no-display  Do not display matched JSON values
-  -h, --help        Print help
-  -V, --version     Print version
-
-Commands:
-  generate  Generate shell completions or man pages
+      --compact       Do not pretty-print the JSON output
+      --count         Display count of number of matches
+      --depth         Display depth of the input document
+  -n, --no-display    Do not display matched JSON values
+  -F, --fixed-string  Treat the query as a literal field name and search at any depth
+  -h, --help          Print help (see more with '--help')
+  -V, --version       Print version
 ```
 
 ### More CLI Examples
