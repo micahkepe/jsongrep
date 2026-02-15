@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-15
+
+### Added
+
+- `-F` / `--fixed-string` CLI flag that treats the query as a literal field name
+  and searches at any depth (equivalent to `(* | [*])*."<literal>"`)
+- `--with-path` / `--no-path` flags for controlling path header display
+- TTY-aware path header suppression: headers are shown when output is a
+  terminal and hidden when piped, following ripgrep conventions
+
+### Fixed
+
+- Quoted field names with special characters (e.g., `/endpoint`) now correctly
+  round-trip through parsing, escaping, and matching
+- Don't display root path in colorized output - no longer prints `:` when
+  no query is provided (e.g, `cat data.json | jg ""`)
+- `jg generate man` now correctly prefixes all subcommand man pages with
+  `jg-` (e.g., `jg-generate-shell.1` instead of `generate-shell.1`)
+- `jg generate man` now overwrites existing man pages instead of failing
+  with `AlreadyExists`, making version upgrades seamless
+
+### Changed
+
+- **BREAKING**: `jsongrep::utils::write_colored_result` now takes a
+  `show_path: bool` parameter to control path header display
+- Updated README usage examples to reflect `-F` flag and current output format
+- Updated README with more examples and comparisons to `jq`
+
 ## [0.5.1] - 2026-02-14
 
 ### Fixed
@@ -127,7 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/micahkepe/jsongrep/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/micahkepe/jsongrep/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/micahkepe/jsongrep/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/micahkepe/jsongrep/compare/v0.4.0...v0.4.1
