@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-14
+
+### Added
+
+- Syntax-highlighted JSON output using the `colored` crate — keys in cyan,
+  strings in green, numbers in yellow, Booleans in bold yellow, null in
+  dimmed red
+- Each query result now displays its matched JSON path as a colored header
+  (e.g., `prizes.[4].laureates.[1]:`) above the value
+- `Display` impl for `PathType` for human-readable path rendering
+- New `utils` module with `write_colored_result` for colorized output and
+  `depth()` (moved from `lib.rs`)
+
+### Changed
+
+- **BREAKING**: CLI output format changed from a single JSON array of all
+  results to individual values, each preceded by its matched path. Scripts
+  parsing the old `[...]` array output will need updating.
+- **BREAKING**: `jsongrep::depth()` moved to `jsongrep::utils::depth()`
+- `PathType` is now publicly re-exported from the `query` module
+- Input parsing extracted into `parse_input_content` function
+- Output uses a single locked `BufWriter<Stdout>` with explicit flush
+
+### Fixed
+
+- Broken pipe errors when piping to `less` or `head` are now silently
+  handled instead of printing an error
+
 ## [0.4.1] - 2026-02-01
 
 ### Added
@@ -92,7 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/micahkepe/jsongrep/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/micahkepe/jsongrep/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/micahkepe/jsongrep/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/micahkepe/jsongrep/releases/tag/v0.3.0
