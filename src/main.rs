@@ -60,6 +60,12 @@ struct Args {
     /// Searches for the field at any depth, equivalent to (* | [*])*."<query>".
     #[arg(short = 'F', long, action = ArgAction::SetTrue)]
     fixed_string: bool,
+    /// Always print the path header, even when output is piped.
+    #[arg(long, action = ArgAction::SetTrue, conflicts_with = "no_path")]
+    with_path: bool,
+    /// Never print the path header, even in a terminal.
+    #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
+    no_path: bool,
 }
 
 /// Available subcommands for `jg`
@@ -190,6 +196,17 @@ fn main() -> Result<()> {
 
             // NOTE: use single, locked stdout handle to avoid interleaving
             let stdout = stdout().lock();
+
+            // Path headers follow ripgrep conventions: shown in terminals,
+            // hidden when piped, with explicit overrides.
+            let show_path = if args.with_path {
+                true
+            } else if args.no_path {
+                false
+            } else {
+                stdout.is_terminal()
+            };
+
             let mut writer = BufWriter::new(stdout);
 
             if args.count {
@@ -219,6 +236,7 @@ fn main() -> Result<()> {
                         result.value,
                         &result.path,
                         pretty,
+                        show_path,
                     )?;
                 }
             }

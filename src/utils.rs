@@ -39,6 +39,7 @@ pub fn write_colored_result<W: Write>(
     value: &Value,
     path: &[PathType],
     pretty: bool,
+    show_path: bool,
 ) -> anyhow::Result<()> {
     let path = path
         .iter()
@@ -47,8 +48,7 @@ pub fn write_colored_result<W: Write>(
         .join(".");
 
     let result = (|| -> io::Result<()> {
-        if !path.is_empty() {
-            // skip root path printing
+        if show_path && !path.is_empty() {
             writeln!(writer, "{}:", path.bold().magenta())?;
         }
         write_colored_json(writer, value, 0, pretty)?;

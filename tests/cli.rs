@@ -49,8 +49,12 @@ mod tests {
         // path header line followed by the JSON value, e.g.:
         //   "age":
         //   32
+        // NOTE: --with-path is needed because assert_cmd captures stdout
+        // via pipe, so path headers are auto-hidden without it.
         let assert =
-            run_main(&["age", "tests/data/simple.json"]).success().code(0);
+            run_main(&["age", "tests/data/simple.json", "--with-path"])
+                .success()
+                .code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
@@ -85,20 +89,17 @@ mod tests {
             .expect("Invalid UTF-8 output");
 
         assert!(
-            output_str.contains("1"),
+            output_str.contains('1'),
             "Expected 1 match for quoted field query, got: {output_str:?}"
         );
     }
 
     #[test]
     fn fixed_string_finds_key_at_any_depth() {
-        let assert = run_main(&[
-            "-F",
-            "/activities",
-            "tests/data/openapi_paths.json",
-        ])
-        .success()
-        .code(0);
+        let assert =
+            run_main(&["-F", "/activities", "tests/data/openapi_paths.json"])
+                .success()
+                .code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
@@ -125,23 +126,20 @@ mod tests {
 
         // Only "/activities" should match, not "/activities/{id}"
         assert!(
-            output_str.contains("1"),
+            output_str.contains('1'),
             "Expected exactly 1 match for -F '/activities', got: {output_str:?}"
         );
     }
 
     #[test]
     fn fixed_string_no_match() {
-        let output = run_main(&[
-            "-F",
-            "/nonexistent",
-            "tests/data/openapi_paths.json",
-        ])
-        .success()
-        .code(0)
-        .get_output()
-        .stdout
-        .clone();
+        let output =
+            run_main(&["-F", "/nonexistent", "tests/data/openapi_paths.json"])
+                .success()
+                .code(0)
+                .get_output()
+                .stdout
+                .clone();
         let output_str =
             String::from_utf8(output).expect("Invalid UTF-8 output");
 
@@ -149,5 +147,54 @@ mod tests {
             output_str.trim().is_empty(),
             "Expected no output for nonexistent fixed string, got: {output_str:?}"
         );
+    }
+
+    // ==============================================================================
+    // Path header display tests
+    // ==============================================================================
+
+    #[test]
+    fn no_path_flag_suppresses_headers() {
+        let assert =
+            run_main(&["age", "tests/data/simple.json", "--no-path"])
+                .success()
+                .code(0);
+        let output_str = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+
+        assert!(
+            !output_str.contains("age:"),
+            "Expected no path header with --no-path, got: {output_str:?}"
+        );
+        assert!(
+            output_str.contains("32"),
+            "Expected value to be present, got: {output_str:?}"
+        );
+    }
+
+    #[test]
+    fn with_path_flag_shows_headers() {
+        let assert =
+            run_main(&["age", "tests/data/simple.json", "--with-path"])
+                .success()
+                .code(0);
+        let output_str = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+
+        assert!(
+            output_str.contains("age:"),
+            "Expected path header with --with-path, got: {output_str:?}"
+        );
+    }
+
+    #[test]
+    fn path_flags_are_mutually_exclusive() {
+        run_main(&[
+            "age",
+            "tests/data/simple.json",
+            "--with-path",
+            "--no-path",
+        ])
+        .failure();
     }
 }

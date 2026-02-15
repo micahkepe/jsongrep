@@ -151,6 +151,8 @@ Options:
       --depth         Display depth of the input document
   -n, --no-display    Do not display matched JSON values
   -F, --fixed-string  Treat the query as a literal field name and search at any depth
+      --with-path     Always print the path header, even when output is piped
+      --no-path       Never print the path header, even in a terminal
   -h, --help          Print help (see more with '--help')
   -V, --version       Print version
 ```
@@ -170,6 +172,27 @@ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
 # Found matches: 1026
 ```
 
+**Piping to other tools:**
+
+By default, path headers are shown in terminals and hidden when output is
+piped (like ripgrep's `--heading`). This makes piping to `sort`, `uniq`,
+etc. work cleanly:
+
+```bash
+# Piped: values only, ready for sort/uniq/wc
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | sort | head -3
+"A. Michael"
+"Aage N."
+"Aaron"
+
+# Force path headers when piped
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --with-path | head -4
+prizes.[0].laureates.[0].firstname:
+"Susumu"
+prizes.[0].laureates.[1].firstname:
+"Richard"
+```
+
 ## Query Syntax
 
 Queries are **regular expressions over paths**. If you know regex, this will
@@ -182,9 +205,9 @@ feel familiar:
 | Kleene star  | `**`                 | Match zero or more field accesses                             |
 | Repetition   | `foo*`               | Repeat the preceding step zero or more times                  |
 | Wildcards    | `*` or `[*]`         | Match any single field or array index                         |
-| Optional     | `foo?.bar`           | Continue only if `foo` exists                                 |
+| Optional     | `foo?.bar`           | Optional `foo` field access                                   |
 | Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
-| Array index  | `[0]` or `[1:3]`     | Match specific index or slice                                 |
+| Array index  | `[0]` or `[1:3]`     | Match specific index or slice (inclusive)                     |
 
 These queries can be arbitrarily nested as well with parentheses. For example,
 `foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.
