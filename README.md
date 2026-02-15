@@ -1,5 +1,5 @@
 <div align="center">
- <img src="./images/logo.svg" alt"jsongrep SVG logo"/>
+ <img src="./images/logo.svg" alt="jsongrep SVG logo"/>
 </div>
 
 <p align="center">
@@ -63,7 +63,9 @@ $ curl -s https://api.nobelprize.org/v1/prize.json | jq '.. | .firstname? // emp
 ```
 
 `jsongrep` also shows _where_ each match was found (e.g.,
-`prizes.[0].laureates.[0].firstname:`), which `jq` does not.
+`prizes.[0].laureates.[0].firstname:`), which `jq` does not. *(Examples
+below show terminal output; when piped, path headers are hidden by
+default. See `--with-path` / `--no-path`.)*
 
 **Select multiple fields at once:**
 
