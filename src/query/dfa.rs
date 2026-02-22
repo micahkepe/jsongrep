@@ -575,6 +575,29 @@ impl DFAQueryEngine {
     }
 }
 
+impl DFAQueryEngine {
+    /// Search a JSON document using a pre-compiled [`QueryDFA`].
+    ///
+    /// This is useful when the same query is applied to multiple documents,
+    /// as it avoids re-compiling the DFA on each call.
+    #[must_use]
+    pub fn find_with_dfa<'a>(
+        json: &'a Value<'a>,
+        dfa: &QueryDFA,
+    ) -> Vec<JSONPointer<'a>> {
+        let mut results = Vec::new();
+        let mut path = Vec::new();
+        Self::traverse_json(
+            dfa,
+            dfa.start_state,
+            &mut path,
+            json,
+            &mut results,
+        );
+        results
+    }
+}
+
 impl QueryEngine for DFAQueryEngine {
     fn find<'haystack>(
         &self,
