@@ -1,0 +1,9 @@
+[submodule "tests/data/json-schema-corpus"]
+	path = tests/data/json-schema-corpus
+	url = https://github.com/sdbs-uni-p/json-schema-corpus.git
+[submodule "tests/data/JSON-Schema-Test-Suite"]
+	path = tests/data/JSON-Schema-Test-Suite
+	url = https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
+[submodule "tests/data/schemastore"]
+	path = tests/data/schemastore
+	url = https://github.com/SchemaStore/schemastore.git
