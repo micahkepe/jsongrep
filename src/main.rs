@@ -57,7 +57,7 @@ struct Args {
     no_display: bool,
     /// Treat the query as a literal field name and search at any depth.
     ///
-    /// Searches for the field at any depth, equivalent to (* | [*])*."<query>".
+    /// Searches for the field at any depth, equivalent to `(* | [*])*."<query>"`.
     #[arg(short = 'F', long, action = ArgAction::SetTrue)]
     fixed_string: bool,
     /// Always print the path header, even when output is piped.
@@ -173,7 +173,7 @@ fn main() -> Result<()> {
 
             let query: Query = if args.fixed_string {
                 // -F/--fixed-string: treat the query as a literal field name
-                // and search at any depth, equivalent to (* | [*])*."<literal>"
+                // and search at any depth, equivalent to `(* | [*])*."<literal>"`
                 Query::Sequence(vec![
                     Query::KleeneStar(Box::new(Query::Disjunction(vec![
                         Query::FieldWildcard,
