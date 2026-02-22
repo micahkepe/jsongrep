@@ -12,7 +12,10 @@ categories = ["command-line-utilities", "text-processing"]
 exclude = [
   ".github/",
   "examples/",
-  "images/"
+  "images/",
+  "benches/",
+  "tests/",
+  ".gitmodules"
 ]
 
 [dependencies]
@@ -40,6 +43,14 @@ nursery = { level = "warn" }
 
 [dev-dependencies]
 assert_cmd = "2.0"
+criterion = { version = "0.8.2", features = ["html_reports"] }
+jsonpath-rust = "1.0"
+jmespath = "0.5"
+jaq-core = "2"
+jaq-std = "2"
+jaq-json = { version = "1", features = ["serde_json"] }
+jql-parser = "8"
+jql-runner = "8"
 
 [[bin]]
 path = "src/main.rs"
@@ -48,4 +59,8 @@ name = "jg"
 [[test]]
 name = "cli"
 path = "tests/cli.rs"
+
+[[bench]]
+name = "query"
+harness = false
 
