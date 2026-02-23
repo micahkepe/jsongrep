@@ -27,7 +27,7 @@ const LARGE_JSON: &str = include_str!(
 const DATA_SETS: &[(&str, &str)] =
     &[("small", SMALL_JSON), ("medium", MEDIUM_JSON), ("large", LARGE_JSON)];
 
-/// Try to load the xlarge GeoJSON file from disk (`just bench-download`).
+/// Try to load the xlarge `GeoJSON` file from disk (`just bench-download`).
 /// Returns `None` if the file is absent — xlarge benchmarks are silently skipped.
 fn load_xlarge() -> Option<String> {
     std::fs::read_to_string("benches/data/citylots.json").ok()
@@ -45,7 +45,7 @@ struct QueryVariants {
     jql: Option<&'static str>,
     /// Only run on medium/large (schema) documents
     schema_only: bool,
-    /// Only run on the xlarge (GeoJSON) document
+    /// Only run on the xlarge (`GeoJSON`) document
     geojson_only: bool,
 }
 
@@ -307,6 +307,7 @@ fn bench_query_compile(c: &mut Criterion) {
 // Group 3: query_search -- Search with pre-compiled queries + pre-parsed docs
 // ==========================================================================
 
+#[allow(clippy::too_many_lines)]
 fn bench_query_search(c: &mut Criterion) {
     let queries = all_queries();
 
@@ -317,8 +318,7 @@ fn bench_query_search(c: &mut Criterion) {
     }
 
     for (data_name, json_str) in &sets {
-        let mut group =
-            c.benchmark_group(format!("query_search/{data_name}"));
+        let mut group = c.benchmark_group(format!("query_search/{data_name}"));
         if *data_name == "large" || *data_name == "xlarge" {
             group.sample_size(10);
         }
