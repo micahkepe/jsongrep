@@ -421,8 +421,7 @@ impl DFABuilder {
                                     TransitionLabel::Field(dfa_field),
                                 ) if {
                                     if self.case_insensitive {
-                                        nfa_field.to_lowercase()
-                                            == **dfa_field
+                                        nfa_field.to_lowercase() == **dfa_field
                                     } else {
                                         nfa_field == dfa_field
                                     }
@@ -1519,5 +1518,121 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 2);
+    }
+
+    // ==============================================================================
+    // Case-insensitive matching tests
+    // ==============================================================================
+
+    /// Helper: build a case-insensitive DFA and run it against JSON input.
+    fn find_ignore_case<'a>(
+        json: &'a Value<'a>,
+        query: &Query,
+    ) -> Vec<JSONPointer<'a>> {
+        let dfa = QueryDFA::from_query_ignore_case(query);
+        DFAQueryEngine::find_with_dfa(json, &dfa)
+    }
+
+    #[test]
+    fn case_insensitive_basic_field() {
+        let input = r#"{ "FOO": 1, "bar": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Lowercase query matches uppercase JSON key
+        let query = QueryBuilder::new().field("foo").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    #[test]
+    fn case_insensitive_sequence() {
+        let input = r#"{ "Foo": { "BAR": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = QueryBuilder::new().field("foo").field("bar").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_insensitive_mixed_case_query() {
+        let input = r#"{ "foo": { "bar": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Query uses mixed case, JSON keys are lowercase
+        let query = QueryBuilder::new().field("FoO").field("bAr").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_insensitive_recursive_wildcard() {
+        let input = r#"
+        {
+          "a": {
+            "FOO": "deep"
+          },
+          "FOO": "shallow"
+        }
+        "#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // **.foo with case-insensitive should find both "FOO" keys
+        let query = QueryBuilder::new()
+            .field_wildcard()
+            .kleene_star()
+            .field("foo")
+            .build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn case_insensitive_disjunction_dedup() {
+        let input = r#"{ "foo": 1, "bar": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // "Foo | foo" should not produce duplicate matches — both
+        // normalize to the same DFA symbol.
+        let q1 = QueryBuilder::new().field("Foo").build();
+        let q2 = QueryBuilder::new().field("foo").build();
+        let query = QueryBuilder::new().disjunction(vec![q1, q2]).build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    #[test]
+    fn case_insensitive_from_query_str() {
+        let input = r#"{ "Foo": { "BAR": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let dfa = QueryDFA::from_query_str_ignore_case("foo.bar")
+            .expect("valid query");
+        let matches = DFAQueryEngine::find_with_dfa(&json, &dfa);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_sensitive_default_unchanged() {
+        let input = r#"{ "FOO": 1, "foo": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Case-sensitive (default) should only match exact case
+        let query = QueryBuilder::new().field("foo").build();
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(2u64.into()));
     }
 }
