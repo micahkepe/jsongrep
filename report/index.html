@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Index - Criterion.rs</title>
+    <style type="text/css">
+        body {
+            font: 14px Helvetica Neue;
+            text-rendering: optimizelegibility;
+        }
+
+        .body {
+            width: 960px;
+            margin: auto;
+        }
+
+        a:link {
+            color: #1F78B4;
+            text-decoration: none;
+        }
+
+        h2 {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        h3 {
+            font-size: 24px;
+            font-weight: 300;
+        }
+
+        #footer {
+            height: 40px;
+            background: #888;
+            color: white;
+            font-size: larger;
+            font-weight: 300;
+        }
+
+        #footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        #footer p {
+            text-align: center
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #888;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="body">
+        <h2>Criterion.rs Benchmark Index</h2>
+        See individual benchmark pages below for more details.
+        <ul>
+            <li><a href="../document_parse/report/index.html">document_parse</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../document_parse/jmespath_variable/report/index.html">jmespath_variable</a></th>
+                            <th><a href="../document_parse/serde_json/report/index.html">serde_json</a></th>
+                            <th><a href="../document_parse/serde_json_borrow/report/index.html">serde_json_borrow</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../document_parse/large/report/index.html">large</a></th>
+                            <td><a href="../document_parse/jmespath_variable/large/report/index.html">document_parse/jmespath_variable/large</a></td>
+                            <td><a href="../document_parse/serde_json/large/report/index.html">document_parse/serde_json/large</a></td>
+                            <td><a href="../document_parse/serde_json_borrow/large/report/index.html">document_parse/serde_json_borrow/large</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../document_parse/medium/report/index.html">medium</a></th>
+                            <td><a href="../document_parse/jmespath_variable/medium/report/index.html">document_parse/jmespath_variable/medium</a></td>
+                            <td><a href="../document_parse/serde_json/medium/report/index.html">document_parse/serde_json/medium</a></td>
+                            <td><a href="../document_parse/serde_json_borrow/medium/report/index.html">document_parse/serde_json_borrow/medium</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../document_parse/small/report/index.html">small</a></th>
+                            <td><a href="../document_parse/jmespath_variable/small/report/index.html">document_parse/jmespath_variable/small</a></td>
+                            <td><a href="../document_parse/serde_json/small/report/index.html">document_parse/serde_json/small</a></td>
+                            <td><a href="../document_parse/serde_json_borrow/small/report/index.html">document_parse/serde_json_borrow/small</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../document_parse/xlarge/report/index.html">xlarge</a></th>
+                            <td><a href="../document_parse/jmespath_variable/xlarge/report/index.html">document_parse/jmespath_variable/xlarge</a></td>
+                            <td><a href="../document_parse/serde_json/xlarge/report/index.html">document_parse/serde_json/xlarge</a></td>
+                            <td><a href="../document_parse/serde_json_borrow/xlarge/report/index.html">document_parse/serde_json_borrow/xlarge</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../end_to_end_large/report/index.html">end_to_end/large</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../end_to_end_large/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../end_to_end_large/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../end_to_end_large/jql/report/index.html">jql</a></th>
+                            <th><a href="../end_to_end_large/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../end_to_end_large/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../end_to_end_large/jaq/array_index/report/index.html">end_to_end/large/jaq/array_index</a></td>
+                            <td><a href="../end_to_end_large/jmespath/array_index/report/index.html">end_to_end/large/jmespath/array_index</a></td>
+                            <td><a href="../end_to_end_large/jql/array_index/report/index.html">end_to_end/large/jql/array_index</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/array_index/report/index.html">end_to_end/large/jsongrep/array_index</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/array_index/report/index.html">end_to_end/large/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../end_to_end_large/jaq/array_wildcard/report/index.html">end_to_end/large/jaq/array_wildcard</a></td>
+                            <td><a href="../end_to_end_large/jmespath/array_wildcard/report/index.html">end_to_end/large/jmespath/array_wildcard</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/array_wildcard/report/index.html">end_to_end/large/jsongrep/array_wildcard</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/array_wildcard/report/index.html">end_to_end/large/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/deep_nested/report/index.html">deep_nested</a></th>
+                            <td><a href="../end_to_end_large/jaq/deep_nested/report/index.html">end_to_end/large/jaq/deep_nested</a></td>
+                            <td><a href="../end_to_end_large/jmespath/deep_nested/report/index.html">end_to_end/large/jmespath/deep_nested</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/deep_nested/report/index.html">end_to_end/large/jsongrep/deep_nested</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/deep_nested/report/index.html">end_to_end/large/jsonpath_rust/deep_nested</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../end_to_end_large/jaq/nested_path/report/index.html">end_to_end/large/jaq/nested_path</a></td>
+                            <td><a href="../end_to_end_large/jmespath/nested_path/report/index.html">end_to_end/large/jmespath/nested_path</a></td>
+                            <td><a href="../end_to_end_large/jql/nested_path/report/index.html">end_to_end/large/jql/nested_path</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/nested_path/report/index.html">end_to_end/large/jsongrep/nested_path</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/nested_path/report/index.html">end_to_end/large/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/recursive_field/report/index.html">recursive_field</a></th>
+                            <td><a href="../end_to_end_large/jaq/recursive_field/report/index.html">end_to_end/large/jaq/recursive_field</a></td>
+                            <td><a href="../end_to_end_large/jql/recursive_field/report/index.html">end_to_end/large/jql/recursive_field</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/recursive_field/report/index.html">end_to_end/large/jsongrep/recursive_field</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/recursive_field/report/index.html">end_to_end/large/jsonpath_rust/recursive_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../end_to_end_large/jaq/simple_field/report/index.html">end_to_end/large/jaq/simple_field</a></td>
+                            <td><a href="../end_to_end_large/jmespath/simple_field/report/index.html">end_to_end/large/jmespath/simple_field</a></td>
+                            <td><a href="../end_to_end_large/jql/simple_field/report/index.html">end_to_end/large/jql/simple_field</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/simple_field/report/index.html">end_to_end/large/jsongrep/simple_field</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/simple_field/report/index.html">end_to_end/large/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_large/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../end_to_end_large/jaq/wildcard_field/report/index.html">end_to_end/large/jaq/wildcard_field</a></td>
+                            <td><a href="../end_to_end_large/jmespath/wildcard_field/report/index.html">end_to_end/large/jmespath/wildcard_field</a></td>
+                            <td><a href="../end_to_end_large/jsongrep/wildcard_field/report/index.html">end_to_end/large/jsongrep/wildcard_field</a></td>
+                            <td><a href="../end_to_end_large/jsonpath_rust/wildcard_field/report/index.html">end_to_end/large/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../end_to_end_medium/report/index.html">end_to_end/medium</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../end_to_end_medium/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../end_to_end_medium/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../end_to_end_medium/jql/report/index.html">jql</a></th>
+                            <th><a href="../end_to_end_medium/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../end_to_end_medium/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../end_to_end_medium/jaq/array_index/report/index.html">end_to_end/medium/jaq/array_index</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/array_index/report/index.html">end_to_end/medium/jmespath/array_index</a></td>
+                            <td><a href="../end_to_end_medium/jql/array_index/report/index.html">end_to_end/medium/jql/array_index</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/array_index/report/index.html">end_to_end/medium/jsongrep/array_index</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/array_index/report/index.html">end_to_end/medium/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../end_to_end_medium/jaq/array_wildcard/report/index.html">end_to_end/medium/jaq/array_wildcard</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/array_wildcard/report/index.html">end_to_end/medium/jmespath/array_wildcard</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/array_wildcard/report/index.html">end_to_end/medium/jsongrep/array_wildcard</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/array_wildcard/report/index.html">end_to_end/medium/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/deep_nested/report/index.html">deep_nested</a></th>
+                            <td><a href="../end_to_end_medium/jaq/deep_nested/report/index.html">end_to_end/medium/jaq/deep_nested</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/deep_nested/report/index.html">end_to_end/medium/jmespath/deep_nested</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/deep_nested/report/index.html">end_to_end/medium/jsongrep/deep_nested</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/deep_nested/report/index.html">end_to_end/medium/jsonpath_rust/deep_nested</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../end_to_end_medium/jaq/nested_path/report/index.html">end_to_end/medium/jaq/nested_path</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/nested_path/report/index.html">end_to_end/medium/jmespath/nested_path</a></td>
+                            <td><a href="../end_to_end_medium/jql/nested_path/report/index.html">end_to_end/medium/jql/nested_path</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/nested_path/report/index.html">end_to_end/medium/jsongrep/nested_path</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/nested_path/report/index.html">end_to_end/medium/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/recursive_field/report/index.html">recursive_field</a></th>
+                            <td><a href="../end_to_end_medium/jaq/recursive_field/report/index.html">end_to_end/medium/jaq/recursive_field</a></td>
+                            <td><a href="../end_to_end_medium/jql/recursive_field/report/index.html">end_to_end/medium/jql/recursive_field</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/recursive_field/report/index.html">end_to_end/medium/jsongrep/recursive_field</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/recursive_field/report/index.html">end_to_end/medium/jsonpath_rust/recursive_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../end_to_end_medium/jaq/simple_field/report/index.html">end_to_end/medium/jaq/simple_field</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/simple_field/report/index.html">end_to_end/medium/jmespath/simple_field</a></td>
+                            <td><a href="../end_to_end_medium/jql/simple_field/report/index.html">end_to_end/medium/jql/simple_field</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/simple_field/report/index.html">end_to_end/medium/jsongrep/simple_field</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/simple_field/report/index.html">end_to_end/medium/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_medium/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../end_to_end_medium/jaq/wildcard_field/report/index.html">end_to_end/medium/jaq/wildcard_field</a></td>
+                            <td><a href="../end_to_end_medium/jmespath/wildcard_field/report/index.html">end_to_end/medium/jmespath/wildcard_field</a></td>
+                            <td><a href="../end_to_end_medium/jsongrep/wildcard_field/report/index.html">end_to_end/medium/jsongrep/wildcard_field</a></td>
+                            <td><a href="../end_to_end_medium/jsonpath_rust/wildcard_field/report/index.html">end_to_end/medium/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../end_to_end_small/report/index.html">end_to_end/small</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../end_to_end_small/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../end_to_end_small/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../end_to_end_small/jql/report/index.html">jql</a></th>
+                            <th><a href="../end_to_end_small/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../end_to_end_small/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_small/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../end_to_end_small/jaq/array_index/report/index.html">end_to_end/small/jaq/array_index</a></td>
+                            <td><a href="../end_to_end_small/jmespath/array_index/report/index.html">end_to_end/small/jmespath/array_index</a></td>
+                            <td><a href="../end_to_end_small/jql/array_index/report/index.html">end_to_end/small/jql/array_index</a></td>
+                            <td><a href="../end_to_end_small/jsongrep/array_index/report/index.html">end_to_end/small/jsongrep/array_index</a></td>
+                            <td><a href="../end_to_end_small/jsonpath_rust/array_index/report/index.html">end_to_end/small/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_small/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../end_to_end_small/jaq/array_wildcard/report/index.html">end_to_end/small/jaq/array_wildcard</a></td>
+                            <td><a href="../end_to_end_small/jmespath/array_wildcard/report/index.html">end_to_end/small/jmespath/array_wildcard</a></td>
+                            <td><a href="../end_to_end_small/jsongrep/array_wildcard/report/index.html">end_to_end/small/jsongrep/array_wildcard</a></td>
+                            <td><a href="../end_to_end_small/jsonpath_rust/array_wildcard/report/index.html">end_to_end/small/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_small/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../end_to_end_small/jaq/nested_path/report/index.html">end_to_end/small/jaq/nested_path</a></td>
+                            <td><a href="../end_to_end_small/jmespath/nested_path/report/index.html">end_to_end/small/jmespath/nested_path</a></td>
+                            <td><a href="../end_to_end_small/jql/nested_path/report/index.html">end_to_end/small/jql/nested_path</a></td>
+                            <td><a href="../end_to_end_small/jsongrep/nested_path/report/index.html">end_to_end/small/jsongrep/nested_path</a></td>
+                            <td><a href="../end_to_end_small/jsonpath_rust/nested_path/report/index.html">end_to_end/small/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_small/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../end_to_end_small/jaq/simple_field/report/index.html">end_to_end/small/jaq/simple_field</a></td>
+                            <td><a href="../end_to_end_small/jmespath/simple_field/report/index.html">end_to_end/small/jmespath/simple_field</a></td>
+                            <td><a href="../end_to_end_small/jql/simple_field/report/index.html">end_to_end/small/jql/simple_field</a></td>
+                            <td><a href="../end_to_end_small/jsongrep/simple_field/report/index.html">end_to_end/small/jsongrep/simple_field</a></td>
+                            <td><a href="../end_to_end_small/jsonpath_rust/simple_field/report/index.html">end_to_end/small/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_small/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../end_to_end_small/jaq/wildcard_field/report/index.html">end_to_end/small/jaq/wildcard_field</a></td>
+                            <td><a href="../end_to_end_small/jmespath/wildcard_field/report/index.html">end_to_end/small/jmespath/wildcard_field</a></td>
+                            <td><a href="../end_to_end_small/jsongrep/wildcard_field/report/index.html">end_to_end/small/jsongrep/wildcard_field</a></td>
+                            <td><a href="../end_to_end_small/jsonpath_rust/wildcard_field/report/index.html">end_to_end/small/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../end_to_end_xlarge/report/index.html">end_to_end/xlarge</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../end_to_end_xlarge/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../end_to_end_xlarge/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../end_to_end_xlarge/jql/report/index.html">jql</a></th>
+                            <th><a href="../end_to_end_xlarge/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../end_to_end_xlarge/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/array_index/report/index.html">end_to_end/xlarge/jaq/array_index</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/array_index/report/index.html">end_to_end/xlarge/jmespath/array_index</a></td>
+                            <td><a href="../end_to_end_xlarge/jql/array_index/report/index.html">end_to_end/xlarge/jql/array_index</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/array_index/report/index.html">end_to_end/xlarge/jsongrep/array_index</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/array_index/report/index.html">end_to_end/xlarge/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/array_wildcard/report/index.html">end_to_end/xlarge/jaq/array_wildcard</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/array_wildcard/report/index.html">end_to_end/xlarge/jmespath/array_wildcard</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/array_wildcard/report/index.html">end_to_end/xlarge/jsongrep/array_wildcard</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/array_wildcard/report/index.html">end_to_end/xlarge/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/geo_all_geometry_types/report/index.html">geo_all_geometry_types</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/geo_all_geometry_types/report/index.html">end_to_end/xlarge/jaq/geo_all_geometry_types</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/geo_all_geometry_types/report/index.html">end_to_end/xlarge/jmespath/geo_all_geometry_types</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/geo_all_geometry_types/report/index.html">end_to_end/xlarge/jsongrep/geo_all_geometry_types</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/geo_all_geometry_types/report/index.html">end_to_end/xlarge/jsonpath_rust/geo_all_geometry_types</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/geo_recursive_coords/report/index.html">geo_recursive_coords</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/geo_recursive_coords/report/index.html">end_to_end/xlarge/jaq/geo_recursive_coords</a></td>
+                            <td><a href="../end_to_end_xlarge/jql/geo_recursive_coords/report/index.html">end_to_end/xlarge/jql/geo_recursive_coords</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/geo_recursive_coords/report/index.html">end_to_end/xlarge/jsongrep/geo_recursive_coords</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/geo_recursive_coords/report/index.html">end_to_end/xlarge/jsonpath_rust/geo_recursive_coords</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/nested_path/report/index.html">end_to_end/xlarge/jaq/nested_path</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/nested_path/report/index.html">end_to_end/xlarge/jmespath/nested_path</a></td>
+                            <td><a href="../end_to_end_xlarge/jql/nested_path/report/index.html">end_to_end/xlarge/jql/nested_path</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/nested_path/report/index.html">end_to_end/xlarge/jsongrep/nested_path</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/nested_path/report/index.html">end_to_end/xlarge/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/simple_field/report/index.html">end_to_end/xlarge/jaq/simple_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/simple_field/report/index.html">end_to_end/xlarge/jmespath/simple_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jql/simple_field/report/index.html">end_to_end/xlarge/jql/simple_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/simple_field/report/index.html">end_to_end/xlarge/jsongrep/simple_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/simple_field/report/index.html">end_to_end/xlarge/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../end_to_end_xlarge/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../end_to_end_xlarge/jaq/wildcard_field/report/index.html">end_to_end/xlarge/jaq/wildcard_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jmespath/wildcard_field/report/index.html">end_to_end/xlarge/jmespath/wildcard_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jsongrep/wildcard_field/report/index.html">end_to_end/xlarge/jsongrep/wildcard_field</a></td>
+                            <td><a href="../end_to_end_xlarge/jsonpath_rust/wildcard_field/report/index.html">end_to_end/xlarge/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../query_compile/report/index.html">query_compile</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../query_compile/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../query_compile/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../query_compile/jql/report/index.html">jql</a></th>
+                            <th><a href="../query_compile/jsongrep/report/index.html">jsongrep</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../query_compile/jaq/array_index/report/index.html">query_compile/jaq/array_index</a></td>
+                            <td><a href="../query_compile/jmespath/array_index/report/index.html">query_compile/jmespath/array_index</a></td>
+                            <td><a href="../query_compile/jql/array_index/report/index.html">query_compile/jql/array_index</a></td>
+                            <td><a href="../query_compile/jsongrep/array_index/report/index.html">query_compile/jsongrep/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../query_compile/jaq/array_wildcard/report/index.html">query_compile/jaq/array_wildcard</a></td>
+                            <td><a href="../query_compile/jmespath/array_wildcard/report/index.html">query_compile/jmespath/array_wildcard</a></td>
+                            <td><a href="../query_compile/jsongrep/array_wildcard/report/index.html">query_compile/jsongrep/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/deep_nested/report/index.html">deep_nested</a></th>
+                            <td><a href="../query_compile/jaq/deep_nested/report/index.html">query_compile/jaq/deep_nested</a></td>
+                            <td><a href="../query_compile/jmespath/deep_nested/report/index.html">query_compile/jmespath/deep_nested</a></td>
+                            <td><a href="../query_compile/jsongrep/deep_nested/report/index.html">query_compile/jsongrep/deep_nested</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/geo_all_geometry_types/report/index.html">geo_all_geometry_types</a></th>
+                            <td><a href="../query_compile/jaq/geo_all_geometry_types/report/index.html">query_compile/jaq/geo_all_geometry_types</a></td>
+                            <td><a href="../query_compile/jmespath/geo_all_geometry_types/report/index.html">query_compile/jmespath/geo_all_geometry_types</a></td>
+                            <td><a href="../query_compile/jsongrep/geo_all_geometry_types/report/index.html">query_compile/jsongrep/geo_all_geometry_types</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/geo_recursive_coords/report/index.html">geo_recursive_coords</a></th>
+                            <td><a href="../query_compile/jaq/geo_recursive_coords/report/index.html">query_compile/jaq/geo_recursive_coords</a></td>
+                            <td><a href="../query_compile/jql/geo_recursive_coords/report/index.html">query_compile/jql/geo_recursive_coords</a></td>
+                            <td><a href="../query_compile/jsongrep/geo_recursive_coords/report/index.html">query_compile/jsongrep/geo_recursive_coords</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../query_compile/jaq/nested_path/report/index.html">query_compile/jaq/nested_path</a></td>
+                            <td><a href="../query_compile/jmespath/nested_path/report/index.html">query_compile/jmespath/nested_path</a></td>
+                            <td><a href="../query_compile/jql/nested_path/report/index.html">query_compile/jql/nested_path</a></td>
+                            <td><a href="../query_compile/jsongrep/nested_path/report/index.html">query_compile/jsongrep/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/recursive_field/report/index.html">recursive_field</a></th>
+                            <td><a href="../query_compile/jaq/recursive_field/report/index.html">query_compile/jaq/recursive_field</a></td>
+                            <td><a href="../query_compile/jql/recursive_field/report/index.html">query_compile/jql/recursive_field</a></td>
+                            <td><a href="../query_compile/jsongrep/recursive_field/report/index.html">query_compile/jsongrep/recursive_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../query_compile/jaq/simple_field/report/index.html">query_compile/jaq/simple_field</a></td>
+                            <td><a href="../query_compile/jmespath/simple_field/report/index.html">query_compile/jmespath/simple_field</a></td>
+                            <td><a href="../query_compile/jql/simple_field/report/index.html">query_compile/jql/simple_field</a></td>
+                            <td><a href="../query_compile/jsongrep/simple_field/report/index.html">query_compile/jsongrep/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_compile/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../query_compile/jaq/wildcard_field/report/index.html">query_compile/jaq/wildcard_field</a></td>
+                            <td><a href="../query_compile/jmespath/wildcard_field/report/index.html">query_compile/jmespath/wildcard_field</a></td>
+                            <td><a href="../query_compile/jsongrep/wildcard_field/report/index.html">query_compile/jsongrep/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../query_search_large/report/index.html">query_search/large</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../query_search_large/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../query_search_large/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../query_search_large/jql/report/index.html">jql</a></th>
+                            <th><a href="../query_search_large/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../query_search_large/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../query_search_large/jaq/array_index/report/index.html">query_search/large/jaq/array_index</a></td>
+                            <td><a href="../query_search_large/jmespath/array_index/report/index.html">query_search/large/jmespath/array_index</a></td>
+                            <td><a href="../query_search_large/jql/array_index/report/index.html">query_search/large/jql/array_index</a></td>
+                            <td><a href="../query_search_large/jsongrep/array_index/report/index.html">query_search/large/jsongrep/array_index</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/array_index/report/index.html">query_search/large/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../query_search_large/jaq/array_wildcard/report/index.html">query_search/large/jaq/array_wildcard</a></td>
+                            <td><a href="../query_search_large/jmespath/array_wildcard/report/index.html">query_search/large/jmespath/array_wildcard</a></td>
+                            <td><a href="../query_search_large/jsongrep/array_wildcard/report/index.html">query_search/large/jsongrep/array_wildcard</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/array_wildcard/report/index.html">query_search/large/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/deep_nested/report/index.html">deep_nested</a></th>
+                            <td><a href="../query_search_large/jaq/deep_nested/report/index.html">query_search/large/jaq/deep_nested</a></td>
+                            <td><a href="../query_search_large/jmespath/deep_nested/report/index.html">query_search/large/jmespath/deep_nested</a></td>
+                            <td><a href="../query_search_large/jsongrep/deep_nested/report/index.html">query_search/large/jsongrep/deep_nested</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/deep_nested/report/index.html">query_search/large/jsonpath_rust/deep_nested</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../query_search_large/jaq/nested_path/report/index.html">query_search/large/jaq/nested_path</a></td>
+                            <td><a href="../query_search_large/jmespath/nested_path/report/index.html">query_search/large/jmespath/nested_path</a></td>
+                            <td><a href="../query_search_large/jql/nested_path/report/index.html">query_search/large/jql/nested_path</a></td>
+                            <td><a href="../query_search_large/jsongrep/nested_path/report/index.html">query_search/large/jsongrep/nested_path</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/nested_path/report/index.html">query_search/large/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/recursive_field/report/index.html">recursive_field</a></th>
+                            <td><a href="../query_search_large/jaq/recursive_field/report/index.html">query_search/large/jaq/recursive_field</a></td>
+                            <td><a href="../query_search_large/jql/recursive_field/report/index.html">query_search/large/jql/recursive_field</a></td>
+                            <td><a href="../query_search_large/jsongrep/recursive_field/report/index.html">query_search/large/jsongrep/recursive_field</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/recursive_field/report/index.html">query_search/large/jsonpath_rust/recursive_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../query_search_large/jaq/simple_field/report/index.html">query_search/large/jaq/simple_field</a></td>
+                            <td><a href="../query_search_large/jmespath/simple_field/report/index.html">query_search/large/jmespath/simple_field</a></td>
+                            <td><a href="../query_search_large/jql/simple_field/report/index.html">query_search/large/jql/simple_field</a></td>
+                            <td><a href="../query_search_large/jsongrep/simple_field/report/index.html">query_search/large/jsongrep/simple_field</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/simple_field/report/index.html">query_search/large/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_large/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../query_search_large/jaq/wildcard_field/report/index.html">query_search/large/jaq/wildcard_field</a></td>
+                            <td><a href="../query_search_large/jmespath/wildcard_field/report/index.html">query_search/large/jmespath/wildcard_field</a></td>
+                            <td><a href="../query_search_large/jsongrep/wildcard_field/report/index.html">query_search/large/jsongrep/wildcard_field</a></td>
+                            <td><a href="../query_search_large/jsonpath_rust/wildcard_field/report/index.html">query_search/large/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../query_search_medium/report/index.html">query_search/medium</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../query_search_medium/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../query_search_medium/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../query_search_medium/jql/report/index.html">jql</a></th>
+                            <th><a href="../query_search_medium/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../query_search_medium/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../query_search_medium/jaq/array_index/report/index.html">query_search/medium/jaq/array_index</a></td>
+                            <td><a href="../query_search_medium/jmespath/array_index/report/index.html">query_search/medium/jmespath/array_index</a></td>
+                            <td><a href="../query_search_medium/jql/array_index/report/index.html">query_search/medium/jql/array_index</a></td>
+                            <td><a href="../query_search_medium/jsongrep/array_index/report/index.html">query_search/medium/jsongrep/array_index</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/array_index/report/index.html">query_search/medium/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../query_search_medium/jaq/array_wildcard/report/index.html">query_search/medium/jaq/array_wildcard</a></td>
+                            <td><a href="../query_search_medium/jmespath/array_wildcard/report/index.html">query_search/medium/jmespath/array_wildcard</a></td>
+                            <td><a href="../query_search_medium/jsongrep/array_wildcard/report/index.html">query_search/medium/jsongrep/array_wildcard</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/array_wildcard/report/index.html">query_search/medium/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/deep_nested/report/index.html">deep_nested</a></th>
+                            <td><a href="../query_search_medium/jaq/deep_nested/report/index.html">query_search/medium/jaq/deep_nested</a></td>
+                            <td><a href="../query_search_medium/jmespath/deep_nested/report/index.html">query_search/medium/jmespath/deep_nested</a></td>
+                            <td><a href="../query_search_medium/jsongrep/deep_nested/report/index.html">query_search/medium/jsongrep/deep_nested</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/deep_nested/report/index.html">query_search/medium/jsonpath_rust/deep_nested</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../query_search_medium/jaq/nested_path/report/index.html">query_search/medium/jaq/nested_path</a></td>
+                            <td><a href="../query_search_medium/jmespath/nested_path/report/index.html">query_search/medium/jmespath/nested_path</a></td>
+                            <td><a href="../query_search_medium/jql/nested_path/report/index.html">query_search/medium/jql/nested_path</a></td>
+                            <td><a href="../query_search_medium/jsongrep/nested_path/report/index.html">query_search/medium/jsongrep/nested_path</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/nested_path/report/index.html">query_search/medium/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/recursive_field/report/index.html">recursive_field</a></th>
+                            <td><a href="../query_search_medium/jaq/recursive_field/report/index.html">query_search/medium/jaq/recursive_field</a></td>
+                            <td><a href="../query_search_medium/jql/recursive_field/report/index.html">query_search/medium/jql/recursive_field</a></td>
+                            <td><a href="../query_search_medium/jsongrep/recursive_field/report/index.html">query_search/medium/jsongrep/recursive_field</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/recursive_field/report/index.html">query_search/medium/jsonpath_rust/recursive_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../query_search_medium/jaq/simple_field/report/index.html">query_search/medium/jaq/simple_field</a></td>
+                            <td><a href="../query_search_medium/jmespath/simple_field/report/index.html">query_search/medium/jmespath/simple_field</a></td>
+                            <td><a href="../query_search_medium/jql/simple_field/report/index.html">query_search/medium/jql/simple_field</a></td>
+                            <td><a href="../query_search_medium/jsongrep/simple_field/report/index.html">query_search/medium/jsongrep/simple_field</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/simple_field/report/index.html">query_search/medium/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_medium/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../query_search_medium/jaq/wildcard_field/report/index.html">query_search/medium/jaq/wildcard_field</a></td>
+                            <td><a href="../query_search_medium/jmespath/wildcard_field/report/index.html">query_search/medium/jmespath/wildcard_field</a></td>
+                            <td><a href="../query_search_medium/jsongrep/wildcard_field/report/index.html">query_search/medium/jsongrep/wildcard_field</a></td>
+                            <td><a href="../query_search_medium/jsonpath_rust/wildcard_field/report/index.html">query_search/medium/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../query_search_small/report/index.html">query_search/small</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../query_search_small/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../query_search_small/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../query_search_small/jql/report/index.html">jql</a></th>
+                            <th><a href="../query_search_small/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../query_search_small/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_small/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../query_search_small/jaq/array_index/report/index.html">query_search/small/jaq/array_index</a></td>
+                            <td><a href="../query_search_small/jmespath/array_index/report/index.html">query_search/small/jmespath/array_index</a></td>
+                            <td><a href="../query_search_small/jql/array_index/report/index.html">query_search/small/jql/array_index</a></td>
+                            <td><a href="../query_search_small/jsongrep/array_index/report/index.html">query_search/small/jsongrep/array_index</a></td>
+                            <td><a href="../query_search_small/jsonpath_rust/array_index/report/index.html">query_search/small/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_small/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../query_search_small/jaq/array_wildcard/report/index.html">query_search/small/jaq/array_wildcard</a></td>
+                            <td><a href="../query_search_small/jmespath/array_wildcard/report/index.html">query_search/small/jmespath/array_wildcard</a></td>
+                            <td><a href="../query_search_small/jsongrep/array_wildcard/report/index.html">query_search/small/jsongrep/array_wildcard</a></td>
+                            <td><a href="../query_search_small/jsonpath_rust/array_wildcard/report/index.html">query_search/small/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_small/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../query_search_small/jaq/nested_path/report/index.html">query_search/small/jaq/nested_path</a></td>
+                            <td><a href="../query_search_small/jmespath/nested_path/report/index.html">query_search/small/jmespath/nested_path</a></td>
+                            <td><a href="../query_search_small/jql/nested_path/report/index.html">query_search/small/jql/nested_path</a></td>
+                            <td><a href="../query_search_small/jsongrep/nested_path/report/index.html">query_search/small/jsongrep/nested_path</a></td>
+                            <td><a href="../query_search_small/jsonpath_rust/nested_path/report/index.html">query_search/small/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_small/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../query_search_small/jaq/simple_field/report/index.html">query_search/small/jaq/simple_field</a></td>
+                            <td><a href="../query_search_small/jmespath/simple_field/report/index.html">query_search/small/jmespath/simple_field</a></td>
+                            <td><a href="../query_search_small/jql/simple_field/report/index.html">query_search/small/jql/simple_field</a></td>
+                            <td><a href="../query_search_small/jsongrep/simple_field/report/index.html">query_search/small/jsongrep/simple_field</a></td>
+                            <td><a href="../query_search_small/jsonpath_rust/simple_field/report/index.html">query_search/small/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_small/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../query_search_small/jaq/wildcard_field/report/index.html">query_search/small/jaq/wildcard_field</a></td>
+                            <td><a href="../query_search_small/jmespath/wildcard_field/report/index.html">query_search/small/jmespath/wildcard_field</a></td>
+                            <td><a href="../query_search_small/jsongrep/wildcard_field/report/index.html">query_search/small/jsongrep/wildcard_field</a></td>
+                            <td><a href="../query_search_small/jsonpath_rust/wildcard_field/report/index.html">query_search/small/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../query_search_xlarge/report/index.html">query_search/xlarge</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../query_search_xlarge/jaq/report/index.html">jaq</a></th>
+                            <th><a href="../query_search_xlarge/jmespath/report/index.html">jmespath</a></th>
+                            <th><a href="../query_search_xlarge/jql/report/index.html">jql</a></th>
+                            <th><a href="../query_search_xlarge/jsongrep/report/index.html">jsongrep</a></th>
+                            <th><a href="../query_search_xlarge/jsonpath_rust/report/index.html">jsonpath_rust</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/array_index/report/index.html">array_index</a></th>
+                            <td><a href="../query_search_xlarge/jaq/array_index/report/index.html">query_search/xlarge/jaq/array_index</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/array_index/report/index.html">query_search/xlarge/jmespath/array_index</a></td>
+                            <td><a href="../query_search_xlarge/jql/array_index/report/index.html">query_search/xlarge/jql/array_index</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/array_index/report/index.html">query_search/xlarge/jsongrep/array_index</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/array_index/report/index.html">query_search/xlarge/jsonpath_rust/array_index</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/array_wildcard/report/index.html">array_wildcard</a></th>
+                            <td><a href="../query_search_xlarge/jaq/array_wildcard/report/index.html">query_search/xlarge/jaq/array_wildcard</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/array_wildcard/report/index.html">query_search/xlarge/jmespath/array_wildcard</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/array_wildcard/report/index.html">query_search/xlarge/jsongrep/array_wildcard</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/array_wildcard/report/index.html">query_search/xlarge/jsonpath_rust/array_wildcard</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/geo_all_geometry_types/report/index.html">geo_all_geometry_types</a></th>
+                            <td><a href="../query_search_xlarge/jaq/geo_all_geometry_types/report/index.html">query_search/xlarge/jaq/geo_all_geometry_types</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/geo_all_geometry_types/report/index.html">query_search/xlarge/jmespath/geo_all_geometry_types</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/geo_all_geometry_types/report/index.html">query_search/xlarge/jsongrep/geo_all_geometry_types</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/geo_all_geometry_types/report/index.html">query_search/xlarge/jsonpath_rust/geo_all_geometry_types</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/geo_recursive_coords/report/index.html">geo_recursive_coords</a></th>
+                            <td><a href="../query_search_xlarge/jaq/geo_recursive_coords/report/index.html">query_search/xlarge/jaq/geo_recursive_coords</a></td>
+                            <td><a href="../query_search_xlarge/jql/geo_recursive_coords/report/index.html">query_search/xlarge/jql/geo_recursive_coords</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/geo_recursive_coords/report/index.html">query_search/xlarge/jsongrep/geo_recursive_coords</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/geo_recursive_coords/report/index.html">query_search/xlarge/jsonpath_rust/geo_recursive_coords</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/nested_path/report/index.html">nested_path</a></th>
+                            <td><a href="../query_search_xlarge/jaq/nested_path/report/index.html">query_search/xlarge/jaq/nested_path</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/nested_path/report/index.html">query_search/xlarge/jmespath/nested_path</a></td>
+                            <td><a href="../query_search_xlarge/jql/nested_path/report/index.html">query_search/xlarge/jql/nested_path</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/nested_path/report/index.html">query_search/xlarge/jsongrep/nested_path</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/nested_path/report/index.html">query_search/xlarge/jsonpath_rust/nested_path</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/simple_field/report/index.html">simple_field</a></th>
+                            <td><a href="../query_search_xlarge/jaq/simple_field/report/index.html">query_search/xlarge/jaq/simple_field</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/simple_field/report/index.html">query_search/xlarge/jmespath/simple_field</a></td>
+                            <td><a href="../query_search_xlarge/jql/simple_field/report/index.html">query_search/xlarge/jql/simple_field</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/simple_field/report/index.html">query_search/xlarge/jsongrep/simple_field</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/simple_field/report/index.html">query_search/xlarge/jsonpath_rust/simple_field</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../query_search_xlarge/wildcard_field/report/index.html">wildcard_field</a></th>
+                            <td><a href="../query_search_xlarge/jaq/wildcard_field/report/index.html">query_search/xlarge/jaq/wildcard_field</a></td>
+                            <td><a href="../query_search_xlarge/jmespath/wildcard_field/report/index.html">query_search/xlarge/jmespath/wildcard_field</a></td>
+                            <td><a href="../query_search_xlarge/jsongrep/wildcard_field/report/index.html">query_search/xlarge/jsongrep/wildcard_field</a></td>
+                            <td><a href="../query_search_xlarge/jsonpath_rust/wildcard_field/report/index.html">query_search/xlarge/jsonpath_rust/wildcard_field</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+        </ul>
+    </div>
+    <div id="footer">
+        <p>This report was generated by
+            <a href="https://github.com/criterion-rs/criterion.rs">Criterion.rs</a>, a statistics-driven benchmarking
+            library in Rust.</p>
+    </div>
+</body>
+</html>

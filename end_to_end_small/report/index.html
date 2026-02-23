@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>end_to_end/small Summary - Criterion.rs</title>
+    <style type="text/css">
+        body {
+            font: 14px Helvetica Neue;
+            text-rendering: optimizelegibility;
+        }
+
+        .body {
+            width: 960px;
+            margin: auto;
+        }
+
+        a:link {
+            color: #1F78B4;
+            text-decoration: none;
+        }
+
+        h2 {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        h3 {
+            font-size: 24px;
+            font-weight: 300;
+        }
+
+        #footer {
+            height: 40px;
+            background: #888;
+            color: white;
+            font-size: larger;
+            font-weight: 300;
+        }
+
+        #footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        #footer p {
+            text-align: center
+        }
+    </style>
+</head>
+
+<body>
+    <div class="body">
+        <h2>end_to_end/small</h2>
+        <h3>Violin Plot</h3>
+        <a href="violin.svg">
+            <img src="violin.svg" alt="Violin Plot" />
+        </a>
+        <p>This chart shows the relationship between function/parameter and iteration time. The thickness of the shaded
+            region indicates the probability that a measurement of the given function/parameter would take a particular
+            length of time.</p>
+        <section class="plots">
+            <a href="../../end_to_end_small/jaq/array_index/report/index.html">
+                <h4>end_to_end/small/jaq/array_index</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/array_index/report/pdf.svg">
+                                <img src="../../end_to_end_small/jaq/array_index/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/array_index/report/regression.svg">
+                                <img src="../../end_to_end_small/jaq/array_index/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jaq/array_wildcard/report/index.html">
+                <h4>end_to_end/small/jaq/array_wildcard</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/array_wildcard/report/pdf.svg">
+                                <img src="../../end_to_end_small/jaq/array_wildcard/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/array_wildcard/report/regression.svg">
+                                <img src="../../end_to_end_small/jaq/array_wildcard/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jaq/nested_path/report/index.html">
+                <h4>end_to_end/small/jaq/nested_path</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/nested_path/report/pdf.svg">
+                                <img src="../../end_to_end_small/jaq/nested_path/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/nested_path/report/regression.svg">
+                                <img src="../../end_to_end_small/jaq/nested_path/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jaq/simple_field/report/index.html">
+                <h4>end_to_end/small/jaq/simple_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/simple_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jaq/simple_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/simple_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jaq/simple_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jaq/wildcard_field/report/index.html">
+                <h4>end_to_end/small/jaq/wildcard_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/wildcard_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jaq/wildcard_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jaq/wildcard_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jaq/wildcard_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jmespath/array_index/report/index.html">
+                <h4>end_to_end/small/jmespath/array_index</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/array_index/report/pdf.svg">
+                                <img src="../../end_to_end_small/jmespath/array_index/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/array_index/report/regression.svg">
+                                <img src="../../end_to_end_small/jmespath/array_index/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jmespath/array_wildcard/report/index.html">
+                <h4>end_to_end/small/jmespath/array_wildcard</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/array_wildcard/report/pdf.svg">
+                                <img src="../../end_to_end_small/jmespath/array_wildcard/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/array_wildcard/report/regression.svg">
+                                <img src="../../end_to_end_small/jmespath/array_wildcard/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jmespath/nested_path/report/index.html">
+                <h4>end_to_end/small/jmespath/nested_path</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/nested_path/report/pdf.svg">
+                                <img src="../../end_to_end_small/jmespath/nested_path/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/nested_path/report/regression.svg">
+                                <img src="../../end_to_end_small/jmespath/nested_path/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jmespath/simple_field/report/index.html">
+                <h4>end_to_end/small/jmespath/simple_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/simple_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jmespath/simple_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/simple_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jmespath/simple_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jmespath/wildcard_field/report/index.html">
+                <h4>end_to_end/small/jmespath/wildcard_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/wildcard_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jmespath/wildcard_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jmespath/wildcard_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jmespath/wildcard_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jql/array_index/report/index.html">
+                <h4>end_to_end/small/jql/array_index</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jql/array_index/report/pdf.svg">
+                                <img src="../../end_to_end_small/jql/array_index/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jql/array_index/report/regression.svg">
+                                <img src="../../end_to_end_small/jql/array_index/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jql/nested_path/report/index.html">
+                <h4>end_to_end/small/jql/nested_path</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jql/nested_path/report/pdf.svg">
+                                <img src="../../end_to_end_small/jql/nested_path/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jql/nested_path/report/regression.svg">
+                                <img src="../../end_to_end_small/jql/nested_path/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jql/simple_field/report/index.html">
+                <h4>end_to_end/small/jql/simple_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jql/simple_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jql/simple_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jql/simple_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jql/simple_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsongrep/array_index/report/index.html">
+                <h4>end_to_end/small/jsongrep/array_index</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/array_index/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsongrep/array_index/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/array_index/report/regression.svg">
+                                <img src="../../end_to_end_small/jsongrep/array_index/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsongrep/array_wildcard/report/index.html">
+                <h4>end_to_end/small/jsongrep/array_wildcard</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/array_wildcard/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsongrep/array_wildcard/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/array_wildcard/report/regression.svg">
+                                <img src="../../end_to_end_small/jsongrep/array_wildcard/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsongrep/nested_path/report/index.html">
+                <h4>end_to_end/small/jsongrep/nested_path</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/nested_path/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsongrep/nested_path/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/nested_path/report/regression.svg">
+                                <img src="../../end_to_end_small/jsongrep/nested_path/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsongrep/simple_field/report/index.html">
+                <h4>end_to_end/small/jsongrep/simple_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/simple_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsongrep/simple_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/simple_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jsongrep/simple_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsongrep/wildcard_field/report/index.html">
+                <h4>end_to_end/small/jsongrep/wildcard_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/wildcard_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsongrep/wildcard_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsongrep/wildcard_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jsongrep/wildcard_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsonpath_rust/array_index/report/index.html">
+                <h4>end_to_end/small/jsonpath_rust/array_index</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/array_index/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/array_index/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/array_index/report/regression.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/array_index/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsonpath_rust/array_wildcard/report/index.html">
+                <h4>end_to_end/small/jsonpath_rust/array_wildcard</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/array_wildcard/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/array_wildcard/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/array_wildcard/report/regression.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/array_wildcard/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsonpath_rust/nested_path/report/index.html">
+                <h4>end_to_end/small/jsonpath_rust/nested_path</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/nested_path/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/nested_path/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/nested_path/report/regression.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/nested_path/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsonpath_rust/simple_field/report/index.html">
+                <h4>end_to_end/small/jsonpath_rust/simple_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/simple_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/simple_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/simple_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/simple_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section class="plots">
+            <a href="../../end_to_end_small/jsonpath_rust/wildcard_field/report/index.html">
+                <h4>end_to_end/small/jsonpath_rust/wildcard_field</h4>
+            </a>
+            <table width="100%">
+                <tbody>
+                    <tr>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/wildcard_field/report/pdf.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/wildcard_field/report/pdf_small.svg" alt="PDF of Slope" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                        <td>
+                            <a href="../../end_to_end_small/jsonpath_rust/wildcard_field/report/regression.svg">
+                                <img src="../../end_to_end_small/jsonpath_rust/wildcard_field/report/regression_small.svg" alt="Regression" width="450"
+                                    height="300" />
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+    <div id="footer">
+        <p>This report was generated by
+            <a href="https://github.com/criterion-rs/criterion.rs">Criterion.rs</a>, a statistics-driven benchmarking
+            library in Rust.</p>
+    </div>
+</body>
+
+</html>
