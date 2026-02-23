@@ -181,6 +181,7 @@ Arguments:
   [FILE]   Optional path to JSON file. If omitted, reads from STDIN
 
 Options:
+  -i, --ignore-case   Case insensitive search
       --compact       Do not pretty-print the JSON output
       --count         Display count of number of matches
       --depth         Display depth of the input document
