@@ -19,7 +19,7 @@ use std::{
 
 use jsongrep::{
     commands,
-    query::{DFAQueryEngine, Query, QueryEngine as _},
+    query::{DFAQueryEngine, Query, QueryDFA},
     utils::{depth, write_colored_result},
 };
 
@@ -43,6 +43,9 @@ struct Args {
     #[arg(value_name = "FILE")]
     /// Optional path to JSON file. If omitted, reads from STDIN
     input: Option<PathBuf>,
+    /// Case insensitive search
+    #[arg(short, long, action = ArgAction::SetTrue)]
+    ignore_case: bool,
     /// Do not pretty-print the JSON output
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
@@ -192,7 +195,12 @@ fn main() -> Result<()> {
                     .context("File contents are not valid utf-8")?,
             )
             .with_context(|| "Failed to parse JSON")?;
-            let results = DFAQueryEngine.find(&json, &query);
+            let dfa = if args.ignore_case {
+                QueryDFA::from_query_ignore_case(&query)
+            } else {
+                QueryDFA::from_query(&query)
+            };
+            let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
 
             // NOTE: use single, locked stdout handle to avoid interleaving
             let stdout = stdout().lock();
