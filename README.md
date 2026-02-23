@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-<code>jsongrep</code> is a command-line tool and Rust library for querying JSON
-documents using <strong>regular path expressions</strong>.
+<code>jsongrep</code> is a command-line tool and Rust library for 
+<a href="https://micahkepe.com/jsongrep/end_to_end_xlarge/report/index.html">fast querying</a> 
+of JSON documents using <strong>regular path expressions</strong>.
 </p>
 
 <p align="center">
@@ -63,9 +64,9 @@ $ curl -s https://api.nobelprize.org/v1/prize.json | jq '.. | .firstname? // emp
 ```
 
 `jsongrep` also shows _where_ each match was found (e.g.,
-`prizes.[0].laureates.[0].firstname:`), which `jq` does not. *(Examples
-below show terminal output; when piped, path headers are hidden by
-default. See `--with-path` / `--no-path`.)*
+`prizes.[0].laureates.[0].firstname:`), which `jq` does not. _(Examples below
+show terminal output; when piped, path headers are hidden by default. See
+`--with-path` / `--no-path`.)_
 
 **Select multiple fields at once:**
 
@@ -104,6 +105,38 @@ $ echo '{"name":"Ada","age":36}' | jg ''
   "age": 36
 }
 ```
+
+## Benchmarks
+
+`jsongrep` is benchmarked against
+[jsonpath-rust](https://crates.io/crates/jsonpath-rust),
+[jmespath](https://crates.io/crates/jmespath),
+[jaq](https://crates.io/crates/jaq-core), and
+[jql](https://crates.io/crates/jql-runner) using
+[Criterion](https://crates.io/crates/criterion). Four benchmark groups isolate
+different costs:
+
+| Group            | What's measured                                   |
+| ---------------- | ------------------------------------------------- |
+| `document_parse` | JSON string &rarr; in-memory document             |
+| `query_compile`  | Query string &rarr; compiled query/DFA/filter     |
+| `query_search`   | Search only (pre-parsed doc + pre-compiled query) |
+| `end_to_end`     | Full pipeline: parse + compile + search           |
+
+Test data ranges from a small sample JSON to a 190 MB GeoJSON file
+([citylots.json](https://github.com/zemirco/sf-city-lots-json)), with queries
+chosen to exercise equivalent functionality across tools (recursive descent,
+wildcards, nested paths). Where a tool lacks a feature, the benchmark is
+skipped rather than faked.
+
+**End-to-end on 190 MB GeoJSON (xlarge):**
+
+<p align="center">
+  <img src="./images/benchmark-xlarge-e2e.png" alt="End-to-end xlarge benchmark violin plot" width="700"/>
+</p>
+
+[Interactive Criterion reports](https://micahkepe.com/jsongrep/report/index.html)
+&nbsp;|&nbsp; [Benchmark source and methodology](./benches/README.md)
 
 ## Quick Example
 
@@ -176,9 +209,9 @@ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
 
 **Piping to other tools:**
 
-By default, path headers are shown in terminals and hidden when output is
-piped (like ripgrep's `--heading`). This makes piping to `sort`, `uniq`,
-etc. work cleanly:
+By default, path headers are shown in terminals and hidden when output is piped
+(like ripgrep's `--heading`). This makes piping to `sort`, `uniq`, etc., work
+cleanly:
 
 ```bash
 # Piped: values only, ready for sort/uniq/wc
