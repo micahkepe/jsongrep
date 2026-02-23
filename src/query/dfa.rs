@@ -69,6 +69,9 @@ pub struct QueryDFA {
     /// single-element ranges `[i, i+1)`. Used by `get_index_symbol_id` to
     /// resolve array indices to symbol IDs during DFA traversal.
     pub range_to_range_id: Vec<(std::ops::Range<usize>, usize)>,
+
+    /// Whether fields are case-sensitive.
+    pub case_insensitive: bool,
 }
 
 impl Display for QueryDFA {
@@ -113,8 +116,15 @@ impl QueryDFA {
     /// Constructs a new [`QueryDFA`] from a constructed [`Query`].
     #[must_use]
     pub fn from_query(query: &Query) -> Self {
-        let mut builder = DFABuilder::new();
-        builder.build_dfa(query)
+        Self::build_from_query(query, false)
+    }
+
+    /// Constructs a new case-insensitive [`QueryDFA`] from a constructed
+    /// [`Query`]. Field names in the query and in JSON keys are compared
+    /// after lowercasing.
+    #[must_use]
+    pub fn from_query_ignore_case(query: &Query) -> Self {
+        Self::build_from_query(query, true)
     }
 
     /// Attempt to construct a new [`QueryDFA`] from the query string.
@@ -127,16 +137,42 @@ impl QueryDFA {
         Ok(Self::from_query(&query))
     }
 
+    /// Attempt to construct a new case-insensitive [`QueryDFA`] from the
+    /// query string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the case of an invalid query string.
+    pub fn from_query_str_ignore_case(
+        query: &str,
+    ) -> Result<Self, QueryParseError> {
+        let query: Query = query.parse()?;
+        Ok(Self::from_query_ignore_case(&query))
+    }
+
+    /// Shared constructor that threads `case_insensitive` into the builder.
+    fn build_from_query(query: &Query, case_insensitive: bool) -> Self {
+        let mut builder = DFABuilder::new();
+        builder.case_insensitive = case_insensitive;
+        builder.build_dfa(query)
+    }
+
     /// Check if a given state is accepting/final.
     #[must_use]
     pub fn is_accepting_state(&self, state: usize) -> bool {
         state < self.num_states && self.is_accepting[state]
     }
 
-    /// Get the key id for a key.
+    /// Get the symbol index for a field name. When the DFA was built with
+    /// case-insensitive matching, the key is lowercased before lookup.
     #[must_use]
     pub fn get_field_symbol_id(&self, field: &str) -> usize {
-        let field_rc = Rc::new(field.to_string());
+        let normalized = if self.case_insensitive {
+            field.to_lowercase()
+        } else {
+            field.to_owned()
+        };
+        let field_rc = Rc::new(normalized);
         self.key_to_key_id.get(&field_rc).copied().unwrap_or(0) // default to "other"
     }
 
@@ -197,6 +233,9 @@ struct DFABuilder {
     /// Sorted array of tuples containing the disjoint ranges by start index and
     /// their respective index in the alphabet.
     range_to_range_id: Vec<(std::ops::Range<usize>, usize)>,
+
+    /// Whether fields are case-sensitive.
+    pub case_insensitive: bool,
 }
 
 impl DFABuilder {
@@ -207,6 +246,7 @@ impl DFABuilder {
             key_to_key_id: HashMap::new(),
             collected_ranges: Vec::new(),
             range_to_range_id: Vec::new(),
+            case_insensitive: false,
         }
     }
 
@@ -214,8 +254,14 @@ impl DFABuilder {
     fn extract_symbols(&mut self, query: &Query) {
         match query {
             Query::Field(name) => {
-                // create a new key state if it does not exist
-                let name_rc: Rc<String> = Rc::new(name.clone());
+                // When case-insensitive, store the lowercased form so that
+                // JSON keys are matched after normalization.
+                let normalized = if self.case_insensitive {
+                    name.to_lowercase()
+                } else {
+                    name.clone()
+                };
+                let name_rc: Rc<String> = Rc::new(normalized);
                 self.key_to_key_id.entry(name_rc.clone()).or_insert_with(
                     || {
                         // NOTE: `or_insert_with` defers execution until it is
@@ -366,11 +412,21 @@ impl DFABuilder {
 
                             // Check if the NFA transition label matches or overlaps with the DFA symbol
                             match (nfa_label, dfa_symbol) {
-                                // Field match
+                                // Field match: when case-insensitive, the DFA
+                                // alphabet stores lowercased names (from
+                                // extract_symbols), so we lowercase the NFA
+                                // field before comparing.
                                 (
                                     TransitionLabel::Field(nfa_field),
                                     TransitionLabel::Field(dfa_field),
-                                ) if nfa_field == dfa_field => {
+                                ) if {
+                                    if self.case_insensitive {
+                                        nfa_field.to_lowercase() == **dfa_field
+                                    } else {
+                                        nfa_field == dfa_field
+                                    }
+                                } =>
+                                {
                                     next_nfa_states[dest_state] = true;
                                 }
 
@@ -459,6 +515,7 @@ impl DFABuilder {
             alphabet: std::mem::take(&mut self.alphabet),
             key_to_key_id: std::mem::take(&mut self.key_to_key_id),
             range_to_range_id: std::mem::take(&mut self.range_to_range_id),
+            case_insensitive: self.case_insensitive,
         }
     }
 
@@ -482,6 +539,7 @@ impl DFABuilder {
                 alphabet: vec![],
                 key_to_key_id: HashMap::new(),
                 range_to_range_id: vec![],
+                case_insensitive: false,
             };
         }
 
@@ -1460,5 +1518,121 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 2);
+    }
+
+    // ==============================================================================
+    // Case-insensitive matching tests
+    // ==============================================================================
+
+    /// Helper: build a case-insensitive DFA and run it against JSON input.
+    fn find_ignore_case<'a>(
+        json: &'a Value<'a>,
+        query: &Query,
+    ) -> Vec<JSONPointer<'a>> {
+        let dfa = QueryDFA::from_query_ignore_case(query);
+        DFAQueryEngine::find_with_dfa(json, &dfa)
+    }
+
+    #[test]
+    fn case_insensitive_basic_field() {
+        let input = r#"{ "FOO": 1, "bar": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Lowercase query matches uppercase JSON key
+        let query = QueryBuilder::new().field("foo").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    #[test]
+    fn case_insensitive_sequence() {
+        let input = r#"{ "Foo": { "BAR": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = QueryBuilder::new().field("foo").field("bar").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_insensitive_mixed_case_query() {
+        let input = r#"{ "foo": { "bar": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Query uses mixed case, JSON keys are lowercase
+        let query = QueryBuilder::new().field("FoO").field("bAr").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_insensitive_recursive_wildcard() {
+        let input = r#"
+        {
+          "a": {
+            "FOO": "deep"
+          },
+          "FOO": "shallow"
+        }
+        "#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // **.foo with case-insensitive should find both "FOO" keys
+        let query = QueryBuilder::new()
+            .field_wildcard()
+            .kleene_star()
+            .field("foo")
+            .build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn case_insensitive_disjunction_dedup() {
+        let input = r#"{ "foo": 1, "bar": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // "Foo | foo" should not produce duplicate matches — both
+        // normalize to the same DFA symbol.
+        let q1 = QueryBuilder::new().field("Foo").build();
+        let q2 = QueryBuilder::new().field("foo").build();
+        let query = QueryBuilder::new().disjunction(vec![q1, q2]).build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    #[test]
+    fn case_insensitive_from_query_str() {
+        let input = r#"{ "Foo": { "BAR": "found" } }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let dfa = QueryDFA::from_query_str_ignore_case("foo.bar")
+            .expect("valid query");
+        let matches = DFAQueryEngine::find_with_dfa(&json, &dfa);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("found")));
+    }
+
+    #[test]
+    fn case_sensitive_default_unchanged() {
+        let input = r#"{ "FOO": 1, "foo": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        // Case-sensitive (default) should only match exact case
+        let query = QueryBuilder::new().field("foo").build();
+        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].value, &Value::Number(2u64.into()));
     }
 }

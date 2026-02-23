@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `-i` / `--ignore-case` flag for case-insensitive field name matching
+- `QueryDFA::from_query_ignore_case` and `QueryDFA::from_query_str_ignore_case`
+  public API methods for building case-insensitive DFAs
 - Criterion benchmark suite comparing `jsongrep` against `jsonpath-rust`,
   `jmespath`, `jaq`, and `jql` across four benchmark groups (document parse,
   query compile, query search, end-to-end)
