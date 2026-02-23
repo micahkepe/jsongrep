@@ -23,9 +23,11 @@ use std::{
     rc::Rc,
 };
 
-use crate::query::ast::Query;
-use crate::query::common::{JSONPointer, PathType, TransitionLabel};
-use crate::query::{QueryEngine, QueryNFA};
+use crate::query::{
+    QueryEngine, QueryNFA, QueryParseError,
+    ast::Query,
+    common::{JSONPointer, PathType, TransitionLabel},
+};
 
 /// Represents a Deterministic Finite Automaton (DFA) for JSON queries. An
 /// important thing to note is that the alphabet depends on the query.
@@ -108,20 +110,30 @@ impl Display for QueryDFA {
 }
 
 impl QueryDFA {
-    /// Constructs a new `QueryDFA` from a query
+    /// Constructs a new [`QueryDFA`] from a constructed [`Query`].
     #[must_use]
     pub fn from_query(query: &Query) -> Self {
         let mut builder = DFABuilder::new();
         builder.build_dfa(query)
     }
 
-    /// Check if a given state is accepting/final
+    /// Attempt to construct a new [`QueryDFA`] from the query string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the case of an invalid query string.
+    pub fn from_query_str(query: &str) -> Result<Self, QueryParseError> {
+        let query: Query = query.parse()?;
+        Ok(Self::from_query(&query))
+    }
+
+    /// Check if a given state is accepting/final.
     #[must_use]
     pub fn is_accepting_state(&self, state: usize) -> bool {
         state < self.num_states && self.is_accepting[state]
     }
 
-    /// Get the key id for a key
+    /// Get the key id for a key.
     #[must_use]
     pub fn get_field_symbol_id(&self, field: &str) -> usize {
         let field_rc = Rc::new(field.to_string());
@@ -147,7 +159,7 @@ impl QueryDFA {
             .map_or(None, |i| Some(self.range_to_range_id[i].1))
     }
 
-    /// Get the next state given current state and symbol
+    /// Get the next state given current state and symbol.
     #[must_use]
     pub fn transition(&self, state: usize, symbol_id: usize) -> Option<usize> {
         if state < self.num_states && symbol_id < self.alphabet.len() {
@@ -560,6 +572,29 @@ impl DFAQueryEngine {
             Value::Null | Value::Bool(_) | Value::Number(_) | Value::Str(_) => {
             }
         }
+    }
+}
+
+impl DFAQueryEngine {
+    /// Search a JSON document using a pre-compiled [`QueryDFA`].
+    ///
+    /// This is useful when the same query is applied to multiple documents,
+    /// as it avoids re-compiling the DFA on each call.
+    #[must_use]
+    pub fn find_with_dfa<'a>(
+        json: &'a Value<'a>,
+        dfa: &QueryDFA,
+    ) -> Vec<JSONPointer<'a>> {
+        let mut results = Vec::new();
+        let mut path = Vec::new();
+        Self::traverse_json(
+            dfa,
+            dfa.start_state,
+            &mut path,
+            json,
+            &mut results,
+        );
+        results
     }
 }
 
@@ -1307,9 +1342,8 @@ mod tests {
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
-        let query: Query = r#""/activities""#
-            .parse()
-            .expect("failed to parse query");
+        let query: Query =
+            r#""/activities""#.parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 1);
@@ -1333,9 +1367,8 @@ mod tests {
             .with_context(|| "Failed to parse JSON")
             .unwrap();
 
-        let query: Query = r#"paths."/activities""#
-            .parse()
-            .expect("failed to parse query");
+        let query: Query =
+            r#"paths."/activities""#.parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 1);
@@ -1363,9 +1396,8 @@ mod tests {
             .unwrap();
 
         // Use ** to recursively find the key
-        let query: Query = r#"**."/activities""#
-            .parse()
-            .expect("failed to parse query");
+        let query: Query =
+            r#"**."/activities""#.parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 1);
@@ -1386,8 +1418,7 @@ mod tests {
             .unwrap();
 
         // Quoted "a.b" should match the literal key "a.b", not the path a → b
-        let query: Query =
-            r#""a.b""#.parse().expect("failed to parse query");
+        let query: Query = r#""a.b""#.parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 1);
@@ -1406,10 +1437,7 @@ mod tests {
         let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
 
         assert_eq!(matches.len(), 1);
-        assert_eq!(
-            matches[0].value,
-            &Value::Str(Cow::Borrowed("value"))
-        );
+        assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("value")));
     }
 
     #[test]

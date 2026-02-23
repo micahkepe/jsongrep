@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Criterion benchmark suite comparing `jsongrep` against `jsonpath-rust`,
+  `jmespath`, `jaq`, and `jql` across four benchmark groups (document parse,
+  query compile, query search, end-to-end)
+- XLarge benchmark tier using citylots.json (190 MB GeoJSON) for real-world
+  scale testing
+- `just bench-download` recipe to fetch `citylots.json` for XLarge benchmark
+- `just bench-publish` recipe to publish Criterion HTML reports to gh-pages
+  (orphaned branch)
+
 ## [0.6.0] - 2026-02-15
 
 ### Added
