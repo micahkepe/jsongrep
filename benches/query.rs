@@ -27,6 +27,12 @@ const LARGE_JSON: &str = include_str!(
 const DATA_SETS: &[(&str, &str)] =
     &[("small", SMALL_JSON), ("medium", MEDIUM_JSON), ("large", LARGE_JSON)];
 
+/// Try to load the xlarge GeoJSON file from disk (`just bench-download`).
+/// Returns `None` if the file is absent — xlarge benchmarks are silently skipped.
+fn load_xlarge() -> Option<String> {
+    std::fs::read_to_string("benches/data/citylots.json").ok()
+}
+
 // === Query definitions per tool ===
 
 /// jsongrep query equivalencies across tools (where applicable)
@@ -39,6 +45,8 @@ struct QueryVariants {
     jql: Option<&'static str>,
     /// Only run on medium/large (schema) documents
     schema_only: bool,
+    /// Only run on the xlarge (GeoJSON) document
+    geojson_only: bool,
 }
 
 fn all_queries() -> Vec<QueryVariants> {
@@ -52,6 +60,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".name"),
             jql: Some(r#""name""#),
             schema_only: false,
+            geojson_only: false,
         },
         QueryVariants {
             name: "nested_path",
@@ -61,6 +70,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".name.first"),
             jql: Some(r#""name""first""#),
             schema_only: false,
+            geojson_only: false,
         },
         QueryVariants {
             name: "array_index",
@@ -70,6 +80,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".hobbies[0]"),
             jql: Some(r#""hobbies"[0]"#),
             schema_only: false,
+            geojson_only: false,
         },
         QueryVariants {
             name: "wildcard_field",
@@ -79,6 +90,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".[]"),
             jql: None,
             schema_only: false,
+            geojson_only: false,
         },
         QueryVariants {
             name: "array_wildcard",
@@ -88,6 +100,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".hobbies[]"),
             jql: None,
             schema_only: false,
+            geojson_only: false,
         },
         // --- Schema-specific queries (medium + large only) ---
         QueryVariants {
@@ -98,6 +111,7 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".. | .description? // empty"),
             jql: Some(".."),
             schema_only: true,
+            geojson_only: false,
         },
         QueryVariants {
             name: "deep_nested",
@@ -107,6 +121,28 @@ fn all_queries() -> Vec<QueryVariants> {
             jaq: Some(".definitions[].properties[].type"),
             jql: None,
             schema_only: true,
+            geojson_only: false,
+        },
+        // --- GeoJSON-specific queries (xlarge only) ---
+        QueryVariants {
+            name: "geo_all_geometry_types",
+            jsongrep: "features[*].geometry.type",
+            jsonpath: Some("$.features[*].geometry.type"),
+            jmespath: Some("features[*].geometry.type"),
+            jaq: Some(".features[].geometry.type"),
+            jql: None,
+            schema_only: false,
+            geojson_only: true,
+        },
+        QueryVariants {
+            name: "geo_recursive_coords",
+            jsongrep: "(* | [*])*.coordinates",
+            jsonpath: Some("$..coordinates"),
+            jmespath: None,
+            jaq: Some(".. | .coordinates? // empty"),
+            jql: Some(".."),
+            schema_only: false,
+            geojson_only: true,
         },
     ]
 }
@@ -155,8 +191,14 @@ const fn batch_size_for(json_str: &str) -> BatchSize {
 fn bench_document_parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("document_parse");
 
-    for &(data_name, json_str) in DATA_SETS {
-        if data_name == "large" {
+    let xlarge_json = load_xlarge();
+    let mut sets: Vec<(&str, &str)> = DATA_SETS.to_vec();
+    if let Some(ref xl) = xlarge_json {
+        sets.push(("xlarge", xl));
+    }
+
+    for (data_name, json_str) in &sets {
+        if *data_name == "large" || *data_name == "xlarge" {
             group.sample_size(10);
         }
 
@@ -268,9 +310,16 @@ fn bench_query_compile(c: &mut Criterion) {
 fn bench_query_search(c: &mut Criterion) {
     let queries = all_queries();
 
-    for &(data_name, json_str) in DATA_SETS {
-        let mut group = c.benchmark_group(format!("query_search/{data_name}"));
-        if data_name == "large" {
+    let xlarge_json = load_xlarge();
+    let mut sets: Vec<(&str, &str)> = DATA_SETS.to_vec();
+    if let Some(ref xl) = xlarge_json {
+        sets.push(("xlarge", xl));
+    }
+
+    for (data_name, json_str) in &sets {
+        let mut group =
+            c.benchmark_group(format!("query_search/{data_name}"));
+        if *data_name == "large" || *data_name == "xlarge" {
             group.sample_size(10);
         }
 
@@ -284,7 +333,12 @@ fn bench_query_search(c: &mut Criterion) {
         let bs = batch_size_for(json_str);
 
         for q in &queries {
-            if q.schema_only && data_name == "small" {
+            if q.schema_only
+                && (*data_name == "small" || *data_name == "xlarge")
+            {
+                continue;
+            }
+            if q.geojson_only && *data_name != "xlarge" {
                 continue;
             }
 
@@ -382,14 +436,25 @@ fn bench_query_search(c: &mut Criterion) {
 fn bench_end_to_end(c: &mut Criterion) {
     let queries = all_queries();
 
-    for &(data_name, json_str) in DATA_SETS {
+    let xlarge_json = load_xlarge();
+    let mut sets: Vec<(&str, &str)> = DATA_SETS.to_vec();
+    if let Some(ref xl) = xlarge_json {
+        sets.push(("xlarge", xl));
+    }
+
+    for (data_name, json_str) in &sets {
         let mut group = c.benchmark_group(format!("end_to_end/{data_name}"));
-        if data_name == "large" {
+        if *data_name == "large" || *data_name == "xlarge" {
             group.sample_size(10);
         }
 
         for q in &queries {
-            if q.schema_only && data_name == "small" {
+            if q.schema_only
+                && (*data_name == "small" || *data_name == "xlarge")
+            {
+                continue;
+            }
+            if q.geojson_only && *data_name != "xlarge" {
                 continue;
             }
 

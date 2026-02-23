@@ -30,6 +30,14 @@ just bench
 
 HTML reports are generated at `target/criterion/report/index.html`.
 
+To publish the Criterion HTML reports to `gh-pages`:
+
+```sh
+just bench-publish
+```
+
+This uses `ghp-import` to push `target/criterion/` as an orphan branch.
+
 ## Benchmark Groups
 
 ### 1. `document_parse` — JSON parse time by format
@@ -57,13 +65,20 @@ Closest to real CLI usage. Nothing pre-cached.
 
 ## Test Data
 
-| Tier   | File                                                     | Size    |
-| ------ | -------------------------------------------------------- | ------- |
-| Small  | `tests/data/simple.json`                                 | 106 B   |
-| Medium | `tests/data/schemastore/.../kubernetes-definitions.json` | ~992 KB |
-| Large  | `tests/data/schemastore/.../kestra-0.19.0.json`          | ~7.6 MB |
+| Tier   | File                                                     | Size    | Loading          |
+| ------ | -------------------------------------------------------- | ------- | ---------------- |
+| Small  | `tests/data/simple.json`                                 | 106 B   | `include_str!`   |
+| Medium | `tests/data/schemastore/.../kubernetes-definitions.json` | ~992 KB | `include_str!`   |
+| Large  | `tests/data/schemastore/.../kestra-0.19.0.json`          | ~7.6 MB | `include_str!`   |
+| XLarge | `benches/data/citylots.json`                             | ~190 MB | disk (see below) |
 
-All loaded via `include_str!` for reproducibility (no disk I/O variance).
+Small–Large are loaded via `include_str!` for reproducibility (no disk I/O
+variance). XLarge is loaded from disk at runtime and silently skipped if the
+file is absent. Download it with:
+
+```sh
+just bench-download
+```
 
 ## Query Equivalence
 
@@ -83,6 +98,13 @@ All loaded via `include_str!` for reproducibility (no disk I/O variance).
 | ----------------- | --------------------------------- | ----------------------------------- | --------------------------------- | ---------------------------------- | ---- |
 | `recursive_field` | `(* \| [*])*.description`         | `$..description`                    | N/A                               | `.. \| .description? // empty`     | `..` |
 | `deep_nested`     | `definitions.*.properties.*.type` | `$.definitions.*.properties.*.type` | `definitions.*.properties.*.type` | `.definitions[].properties[].type` | N/A  |
+
+**GeoJSON-specific queries (xlarge only):**
+
+| Name                     | jsongrep                    | JSONPath                      | JMESPath                    | jq (jaq)                       | jql  |
+| ------------------------ | --------------------------- | ----------------------------- | --------------------------- | ------------------------------ | ---- |
+| `geo_all_geometry_types` | `features[*].geometry.type` | `$.features[*].geometry.type` | `features[*].geometry.type` | `.features[].geometry.type`    | N/A  |
+| `geo_recursive_coords`   | `(* \| [*])*.coordinates`   | `$..coordinates`              | N/A                         | `.. \| .coordinates? // empty` | `..` |
 
 ## Fairness Notes
 

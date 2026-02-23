@@ -13,4 +13,7 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+# Downloaded benchmark data (e.g. citylots.json)
+benches/data/
+
 # End of https://www.toptal.com/developers/gitignore/api/rust
