@@ -71,6 +71,15 @@ jobs:
       - name: Strip binary (Unix)
         if: matrix.strip
         run: strip "target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
+      - name: Generate man pages and shell completions
+        shell: bash
+        run: |
+          binary="target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
+          mkdir -p completions man
+          "$binary" generate man --output-dir man
+          for sh in bash fish zsh; do
+            "$binary" generate shell "$sh" > "completions/jg.$sh"
+          done
       - name: Create archive
         if: matrix.os != 'windows-latest'
         run: |
@@ -79,6 +88,7 @@ jobs:
           mkdir -p "$archive"
           cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
           cp README.md LICENSE "$archive/"
+          cp -r man completions "$archive/"
           tar czf "$archive.tar.gz" "$archive"
           shasum -a 256 "$archive.tar.gz" > "$archive.tar.gz.sha256"
           echo "ASSET=$archive.tar.gz" >> $GITHUB_ENV
@@ -92,6 +102,7 @@ jobs:
           mkdir -p "$archive"
           cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
           cp README.md LICENSE "$archive/"
+          cp -r man completions "$archive/"
           7z a "$archive.zip" "$archive"
           certutil -hashfile "$archive.zip" SHA256 > "$archive.zip.sha256"
           echo "ASSET=$archive.zip" >> $GITHUB_ENV
