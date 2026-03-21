@@ -49,8 +49,8 @@ jmespath = "0.5"
 jaq-core = "2"
 jaq-std = "2"
 jaq-json = { version = "1", features = ["serde_json"] }
-jql-parser = "8"
-jql-runner = "8"
+jql-parser = "8.1.2"
+jql-runner = "8.1.2"
 
 [[bin]]
 path = "src/main.rs"
