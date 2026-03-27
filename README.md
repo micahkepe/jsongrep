@@ -160,11 +160,21 @@ users.[1].name:
 
 ## Installation
 
+Installing with Cargo:
+
 ```bash
 cargo install jsongrep
 ```
 
-The `jg` binary will be installed to `~/.cargo/bin`.
+The `jg` binary installs to `~/.cargo/bin`.
+
+Alternatively, you can install `jsongrep` using Homebrew:
+
+```bash
+brew install jsongrep
+```
+
+The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel).
 
 ## CLI Usage
 
@@ -210,7 +220,7 @@ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
 
 **Piping to other tools:**
 
-By default, path headers are shown in terminals and hidden when output is piped
+By default, path headers display in terminals and hide when output is piped
 (like ripgrep's `--heading`). This makes piping to `sort`, `uniq`, etc., work
 cleanly:
 
