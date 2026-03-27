@@ -4,15 +4,25 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build against (e.g., v0.7.0)"
+        required: true
+        type: string
 
 # Permissions to create releases
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
 jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
       - name: Extract version from tag
@@ -31,6 +41,7 @@ jobs:
   publish-crates:
     name: Publish to crates.io
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +55,7 @@ jobs:
   build-release:
     name: Build Release Binaries
     needs: create-release
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -52,8 +64,17 @@ jobs:
             target: x86_64-unknown-linux-musl
             ext: ""
             strip: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            ext: ""
+            strip: true
+            cross: true
           - os: macos-latest
             target: x86_64-apple-darwin
+            ext: ""
+            strip: true
+          - os: macos-latest
+            target: aarch64-apple-darwin
             ext: ""
             strip: true
           - os: windows-latest
@@ -62,15 +83,27 @@ jobs:
             strip: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           target: ${{ matrix.target }}
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu qemu-user-static
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
       - name: Strip binary (Unix)
-        if: matrix.strip
+        if: matrix.strip && !matrix.cross
         run: strip "target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
+      - name: Strip binary (Cross-compiled)
+        if: matrix.strip && matrix.cross
+        run: aarch64-linux-gnu-strip "target/${{ matrix.target }}/release/jg${{ matrix.ext }}"
       - name: Generate man pages and shell completions
         shell: bash
         run: |
@@ -83,7 +116,7 @@ jobs:
       - name: Create archive
         if: matrix.os != 'windows-latest'
         run: |
-          version="${{ github.ref_name }}"
+          version="${{ env.RELEASE_TAG }}"
           archive="jsongrep-${version#v}-${{ matrix.target }}"
           mkdir -p "$archive"
           cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
@@ -97,7 +130,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          version="${{ github.ref_name }}"
+          version="${{ env.RELEASE_TAG }}"
           archive="jsongrep-${version#v}-${{ matrix.target }}"
           mkdir -p "$archive"
           cp "target/${{ matrix.target }}/release/jg${{ matrix.ext }}" "$archive/jg${{ matrix.ext }}"
@@ -111,4 +144,4 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.ref_name }}" "$ASSET" "$ASSET_SUM"
+        run: gh release upload "${{ env.RELEASE_TAG }}" "$ASSET" "$ASSET_SUM" --clobber
