@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-<code>jsongrep</code> is a command-line tool and Rust library for 
-<a href="https://micahkepe.com/jsongrep/end_to_end_xlarge/report/index.html">fast querying</a> 
-of JSON documents using <strong>regular path expressions</strong>.
+<code>jsongrep</code> is a command-line tool and Rust library for
+<a href="https://micahkepe.com/jsongrep/end_to_end_xlarge/report/index.html">fast querying</a>
+of JSON, YAML, TOML, JSONL, CBOR, and MessagePack documents using <strong>regular path expressions</strong>.
 </p>
 
 <p align="center">
@@ -32,17 +32,17 @@ users[*].email   # Wildcard: all emails in the users array
 (* | [*])*.name  # Any depth: match "name" through both objects and arrays
 ```
 
-This is different from tools like `jq`, which use an imperative filter pipeline.
-With `jsongrep`, you declare _what paths to match_, not _how to traverse_. The
-query compiles to a
+This is different from tools like `jq`, which use a filter pipeline to transform
+data. With `jsongrep`, you declare _what paths to match_ rather than describing
+_how to transform_. The query compiles to a
 [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that
 processes the document efficiently.
 
 ### jsongrep vs jq
 
-`jq` is a powerful tool, but its imperative filter syntax can be verbose for
-common path-matching tasks. `jsongrep` is declarative: you describe the shape of
-the paths you want, and the engine finds them.
+`jq` is a powerful tool, but its filter syntax can be verbose for common
+path-matching tasks. `jsongrep` is declarative: you describe the shape of the
+paths you want, and the engine finds them.
 
 **Find a field at any depth:**
 
@@ -158,6 +158,66 @@ users.[1].name:
 "Bob"
 ```
 
+## Multi-Format Input
+
+`jg` natively supports multiple serialization formats. Non-JSON formats are
+converted to JSON at the boundary, then queried with the same engine, so your
+queries work identically regardless of input format.
+
+**Auto-detection from file extension:**
+
+```bash
+# YAML
+$ jg 'name.first' data.yaml
+name.first:
+"John"
+
+# TOML
+$ jg 'database.port' config.toml
+database.port:
+5432
+```
+
+**Explicit format flag** (useful for stdin or non-standard extensions):
+
+```bash
+$ cat data.yaml | jg -f yaml 'name.first'
+name.first:
+"John"
+```
+
+**JSONL/NDJSON**: each line becomes an array element:
+
+```bash
+$ jg '[*].email' users.jsonl
+[0].email:
+"alice@example.com"
+[1].email:
+"bob@example.com"
+```
+
+**Binary formats** (CBOR, MessagePack):
+
+```bash
+$ jg 'name' data.cbor
+$ jg -f msgpack 'name' data.bin
+```
+
+| Format       | Extensions          | Feature flag | Notes                   |
+| ------------ | ------------------- | ------------ | ----------------------- |
+| JSON         | `.json` (default)   | —            | Always available        |
+| JSONL/NDJSON | `.jsonl`, `.ndjson` | —            | Wrapped into JSON array |
+| YAML         | `.yaml`, `.yml`     | `yaml`       | Included by default     |
+| TOML         | `.toml`             | `toml`       | Included by default     |
+| CBOR         | `.cbor`             | `cbor`       | Included by default     |
+| MessagePack  | `.msgpack`, `.mp`   | `msgpack`    | Included by default     |
+
+All format dependencies are included by default. To build without them:
+
+```bash
+cargo install jsongrep --no-default-features
+```
+
 ## Installation
 
 Installing with Cargo:
@@ -174,7 +234,8 @@ Alternatively, you can install `jsongrep` using Homebrew:
 brew install jsongrep
 ```
 
-The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel).
+The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or
+`/usr/local` (Intel).
 
 ## CLI Usage
 
@@ -256,11 +317,11 @@ feel familiar:
 | Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
 | Array index  | `[0]` or `[1:3]`     | Match specific index or slice (inclusive)                     |
 
-These queries can be arbitrarily nested as well with parentheses. For example,
+These queries can be arbitrarily nested with parentheses. For example,
 `foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.
 
-This also means you can also recursively descend **any** path with `(* | [*])*`,
-e.g., `(* | [*])*.foo` to find all matching paths that have a `foo` field at any
+This also means that you can recursively descend **any** path with `(* | [*])*`,
+e.g., `(* | [*])*.foo` to find all paths matching `foo` field at any
 depth.
 
 The query engine compiles expressions to an
@@ -303,6 +364,9 @@ More examples in the [examples](./examples) directory.
 
 ## Shell Completions
 
+> [!NOTE]
+> Installed automatically with `brew install jsongrep`.
+
 Generate completions with `jg generate shell <SHELL>`:
 
 ```bash
@@ -316,7 +380,10 @@ jg generate shell zsh > ~/.zsh/completions/_jg
 jg generate shell fish > ~/.config/fish/completions/jg.fish
 ```
 
-## Man Page
+## Man Pages
+
+> [!NOTE]
+> Installed automatically with `brew install jsongrep`.
 
 ```bash
 jg generate man -o ~/.local/share/man/man1/
