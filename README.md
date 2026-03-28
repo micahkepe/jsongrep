@@ -38,6 +38,9 @@ _how to transform_. The query compiles to a
 [DFA](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) that
 processes the document efficiently.
 
+See the [blog post](https://micahkepe.com/blog/jsongrep/) for the motivation
+and design behind jsongrep.
+
 ### jsongrep vs jq
 
 `jq` is a powerful tool, but its filter syntax can be verbose for common
