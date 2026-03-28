@@ -34,6 +34,18 @@ clap_complete = "4.5.57"
 regex = "1.12.2"
 memmap2 = "0.9.9"
 colored = "3.1.1"
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.8", optional = true }
+ciborium = { version = "0.2", optional = true }
+rmp-serde = { version = "1", optional = true }
+
+[features]
+default = ["all-formats"]
+yaml = ["dep:serde_yaml"]
+toml = ["dep:toml"]
+cbor = ["dep:ciborium"]
+msgpack = ["dep:rmp-serde"]
+all-formats = ["yaml", "toml", "cbor", "msgpack"]
 
 [lints.clippy]
 # See: <https://rust-lang.github.io/rust-clippy/master/index.html.
