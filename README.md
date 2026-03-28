@@ -280,7 +280,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-jsongrep = "0.6"
+jsongrep = "0.7"
 ```
 
 Build queries programmatically:
