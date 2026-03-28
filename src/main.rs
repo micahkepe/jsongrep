@@ -41,7 +41,7 @@ struct Args {
     /// Query string (e.g., "**.name")
     query: Option<String>,
     #[arg(value_name = "FILE")]
-    /// Optional path to JSON file. If omitted, reads from STDIN
+    /// Optional path to file. If omitted, reads from STDIN
     input: Option<PathBuf>,
     /// Case insensitive search
     #[arg(short, long, action = ArgAction::SetTrue)]

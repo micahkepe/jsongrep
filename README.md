@@ -179,7 +179,7 @@ The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or `/usr/loca
 ## CLI Usage
 
 ```
-A JSONPath-inspired query language for JSON documents
+JSONPath-inspired query language for JSON, YAML, TOML, and other serialization formats
 
 Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
 
@@ -188,19 +188,20 @@ Commands:
 
 Arguments:
   [QUERY]  Query string (e.g., "**.name")
-  [FILE]   Optional path to JSON file. If omitted, reads from STDIN
+  [FILE]   Optional path to file. If omitted, reads from STDIN
 
 Options:
-  -i, --ignore-case   Case insensitive search
-      --compact       Do not pretty-print the JSON output
-      --count         Display count of number of matches
-      --depth         Display depth of the input document
-  -n, --no-display    Do not display matched JSON values
-  -F, --fixed-string  Treat the query as a literal field name and search at any depth
-      --with-path     Always print the path header, even when output is piped
-      --no-path       Never print the path header, even in a terminal
-  -h, --help          Print help (see more with '--help')
-  -V, --version       Print version
+  -i, --ignore-case      Case insensitive search
+      --compact          Do not pretty-print the JSON output
+      --count            Display count of number of matches
+      --depth            Display depth of the input document
+  -n, --no-display       Do not display matched JSON values
+  -F, --fixed-string     Treat the query as a literal field name and search at any depth
+      --with-path        Always print the path header, even when output is piped
+      --no-path          Never print the path header, even in a terminal
+  -f, --format <FORMAT>  Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
+  -h, --help             Print help (see more with '--help')
+  -V, --version          Print version
 ```
 
 ### More CLI Examples
