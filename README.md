@@ -220,6 +220,12 @@ cargo install jsongrep --no-default-features
 
 ## Installation
 
+<p align="center">
+  <a href="https://repology.org/project/jsongrep/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/jsongrep.svg" alt="Packaging status">
+  </a>
+</p>
+
 Installing with Cargo:
 
 ```bash
