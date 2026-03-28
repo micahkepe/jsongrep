@@ -1,6 +1,9 @@
 //! Integration test suite for `jsongrep` CLI
 use assert_cmd::Command;
 
+/// Path to the `simple.json` file.
+const SIMPLE_JSON_FILEPATH: &str = "tests/data/simple/simple.json";
+
 /// Helper function to run the `main` binary with the given arguments and return a
 /// [`assert_cmd::assert::Assert`].
 fn run_main(args: &[&str]) -> assert_cmd::assert::Assert {
@@ -16,7 +19,7 @@ mod tests {
 
     #[test]
     fn nonexistent_field_simple_query() {
-        let output = run_main(&["does.not.exist", "tests/data/simple.json"])
+        let output = run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH])
             .success()
             .code(0)
             .get_output()
@@ -39,7 +42,7 @@ mod tests {
 
     #[test]
     fn invalid_query() {
-        let assert = run_main(&["unclosed\"", "tests/data/simple.json"]);
+        let assert = run_main(&["unclosed\"", SIMPLE_JSON_FILEPATH]);
         assert.failure().code(1);
     }
 
@@ -51,10 +54,9 @@ mod tests {
         //   32
         // NOTE: --with-path is needed because assert_cmd captures stdout
         // via pipe, so path headers are auto-hidden without it.
-        let assert =
-            run_main(&["age", "tests/data/simple.json", "--with-path"])
-                .success()
-                .code(0);
+        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--with-path"])
+            .success()
+            .code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
@@ -155,10 +157,9 @@ mod tests {
 
     #[test]
     fn no_path_flag_suppresses_headers() {
-        let assert =
-            run_main(&["age", "tests/data/simple.json", "--no-path"])
-                .success()
-                .code(0);
+        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--no-path"])
+            .success()
+            .code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
@@ -174,10 +175,9 @@ mod tests {
 
     #[test]
     fn with_path_flag_shows_headers() {
-        let assert =
-            run_main(&["age", "tests/data/simple.json", "--with-path"])
-                .success()
-                .code(0);
+        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--with-path"])
+            .success()
+            .code(0);
         let output_str = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
 
@@ -189,12 +189,7 @@ mod tests {
 
     #[test]
     fn path_flags_are_mutually_exclusive() {
-        run_main(&[
-            "age",
-            "tests/data/simple.json",
-            "--with-path",
-            "--no-path",
-        ])
-        .failure();
+        run_main(&["age", SIMPLE_JSON_FILEPATH, "--with-path", "--no-path"])
+            .failure();
     }
 }

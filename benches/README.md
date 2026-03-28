@@ -67,7 +67,7 @@ Closest to real CLI usage. Nothing pre-cached.
 
 | Tier   | File                                                     | Size    | Loading          |
 | ------ | -------------------------------------------------------- | ------- | ---------------- |
-| Small  | `tests/data/simple.json`                                 | 106 B   | `include_str!`   |
+| Small  | `tests/data/simple/simple.json`                          | 106 B   | `include_str!`   |
 | Medium | `tests/data/schemastore/.../kubernetes-definitions.json` | ~992 KB | `include_str!`   |
 | Large  | `tests/data/schemastore/.../kestra-0.19.0.json`          | ~7.6 MB | `include_str!`   |
 | XLarge | `benches/data/citylots.json`                             | ~190 MB | disk (see below) |
