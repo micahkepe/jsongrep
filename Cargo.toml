@@ -7,7 +7,7 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/micahkepe/jsongrep"
 homepage = "https://github.com/micahkepe/jsongrep"
-description = "A JSONPath-inspired query language for JSON documents"
+description = "JSONPath-inspired query language for JSON, YAML, TOML, and other serialization formats"
 categories = ["command-line-utilities", "text-processing"]
 exclude = [
   ".github/",
