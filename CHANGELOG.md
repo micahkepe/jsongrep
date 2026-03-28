@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-28
+
+### Added
+
+- Multi-format input support via `-f` / `--format` flag: YAML, TOML,
+  JSONL/NDJSON, CBOR, and MessagePack
+- Auto-detection of input format from file extension (`.yaml`, `.yml`, `.toml`,
+  `.jsonl`, `.ndjson`, `.cbor`, `.msgpack`, `.mp`)
+- Feature flags for optional format dependencies (`yaml`, `toml`, `cbor`,
+  `msgpack`), all enabled by default via `all-formats`
+- JSONL/NDJSON support with no extra dependencies &rarr; lines are wrapped into a
+  JSON array where array indices map to line numbers
+- `Display` impl for `Format` enum for user-facing error messages
+- Homebrew formula auto-bump workflow on release
+- CI: `--no-default-features` build check and `cargo fmt --check`
+
+### Changed
+
+- Project description updated to reflect multi-format support
+- `all-formats` is now the default feature set &rarr; `cargo install jsongrep`
+  includes all format support out of the box
+- README rewritten: added Multi-Format Input section, fixed `jq` comparison
+  wording, noted Homebrew auto-installs completions and man pages
+
 ## [0.7.0] - 2026-02-22
 
 ### Added
@@ -171,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/micahkepe/jsongrep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/micahkepe/jsongrep/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/micahkepe/jsongrep/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/micahkepe/jsongrep/compare/v0.5.0...v0.5.1
