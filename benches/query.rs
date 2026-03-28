@@ -16,7 +16,7 @@ use jsongrep::query::{DFAQueryEngine, QueryDFA};
 
 // === Test data (embedded at compile time -- no disk I/O variance) ===
 
-const SMALL_JSON: &str = include_str!("../tests/data/simple.json");
+const SMALL_JSON: &str = include_str!("../tests/data/simple/simple.json");
 const MEDIUM_JSON: &str = include_str!(
     "../tests/data/schemastore/src/schemas/json/kubernetes-definitions.json"
 );

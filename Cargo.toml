@@ -7,7 +7,7 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/micahkepe/jsongrep"
 homepage = "https://github.com/micahkepe/jsongrep"
-description = "A JSONPath-inspired query language for JSON documents"
+description = "JSONPath-inspired query language for JSON, YAML, TOML, and other serialization formats"
 categories = ["command-line-utilities", "text-processing"]
 exclude = [
   ".github/",
@@ -34,6 +34,18 @@ clap_complete = "4.5.57"
 regex = "1.12.2"
 memmap2 = "0.9.9"
 colored = "3.1.1"
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.8", optional = true }
+ciborium = { version = "0.2", optional = true }
+rmp-serde = { version = "1", optional = true }
+
+[features]
+default = ["all-formats"]
+yaml = ["dep:serde_yaml"]
+toml = ["dep:toml"]
+cbor = ["dep:ciborium"]
+msgpack = ["dep:rmp-serde"]
+all-formats = ["yaml", "toml", "cbor", "msgpack"]
 
 [lints.clippy]
 # See: <https://rust-lang.github.io/rust-clippy/master/index.html.
@@ -51,6 +63,9 @@ jaq-std = "2"
 jaq-json = { version = "1", features = ["serde_json"] }
 jql-parser = "8.1.2"
 jql-runner = "8.1.2"
+tempfile = "3.27.0"
+ciborium = "0.2.2"
+rmp-serde = "1.3.1"
 
 [[bin]]
 path = "src/main.rs"

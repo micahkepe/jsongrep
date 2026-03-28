@@ -41,7 +41,7 @@ struct Args {
     /// Query string (e.g., "**.name")
     query: Option<String>,
     #[arg(value_name = "FILE")]
-    /// Optional path to JSON file. If omitted, reads from STDIN
+    /// Optional path to file. If omitted, reads from STDIN
     input: Option<PathBuf>,
     /// Case insensitive search
     #[arg(short, long, action = ArgAction::SetTrue)]
@@ -69,6 +69,9 @@ struct Args {
     /// Never print the path header, even in a terminal.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
     no_path: bool,
+    /// Input format (auto-detects from file extension if omitted)
+    #[arg(short = 'f', long, default_value = "auto")]
+    format: Format,
 }
 
 /// Available subcommands for `jg`
@@ -108,6 +111,110 @@ impl Input {
             Self::File(mmap) => str::from_utf8(mmap),
         }
     }
+
+    fn to_bytes(&self) -> &[u8] {
+        match self {
+            Self::Stdin(buf) => buf.as_bytes(),
+            Self::File(mmap) => mmap.as_ref(),
+        }
+    }
+
+    fn to_json_string(&self, format: Format) -> Result<String> {
+        match format {
+            Format::Jsonl => {
+                let text = self.to_str().map_err(|_| {
+                    anyhow::anyhow!("JSONL input is not valid UTF-8")
+                })?;
+                let mut buf = String::from("[");
+                let mut first = true;
+                for line in text.lines() {
+                    let line = line.trim();
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if !first {
+                        buf.push(',');
+                    }
+                    buf.push_str(line);
+                    first = false;
+                }
+                buf.push(']');
+                Ok(buf)
+            }
+
+            // YAML
+            #[cfg(feature = "yaml")]
+            Format::Yaml => {
+                let text = self.to_str().map_err(|_| {
+                    anyhow::anyhow!("YAML input is not valid UTF-8")
+                })?;
+                let value: serde_json::Value =
+                    serde_yaml::from_str(text).context("parse YAML input")?;
+                serde_json::to_string(&value).context("serialize YAML as JSON")
+            }
+            #[cfg(not(feature = "yaml"))]
+            Format::Yaml => {
+                anyhow::bail!(
+                    "YAML support not enabled. Rebuild with --features yaml"
+                )
+            }
+
+            // TOML
+            #[cfg(feature = "toml")]
+            Format::Toml => {
+                let text = self.to_str().map_err(|_| {
+                    anyhow::anyhow!("TOML input is not valid UTF-8")
+                })?;
+                let value: serde_json::Value =
+                    toml::from_str(text).context("parse TOML input")?;
+                serde_json::to_string(&value).context("serialize TOML as JSON")
+            }
+            #[cfg(not(feature = "toml"))]
+            Format::Toml => {
+                anyhow::bail!(
+                    "TOML support not enabled. Rebuild with --features toml"
+                )
+            }
+
+            // CBOR
+            #[cfg(feature = "cbor")]
+            Format::Cbor => {
+                let value: serde_json::Value =
+                    ciborium::from_reader(self.to_bytes())
+                        .context("parse CBOR input")?;
+                serde_json::to_string(&value).context("serialize CBOR as JSON")
+            }
+            #[cfg(not(feature = "cbor"))]
+            Format::Cbor => {
+                anyhow::bail!(
+                    "CBOR support not enabled. Rebuild with --features cbor"
+                )
+            }
+
+            // MESSAGEPACK
+            #[cfg(feature = "msgpack")]
+            Format::Msgpack => {
+                let value: serde_json::Value =
+                    rmp_serde::from_slice(self.to_bytes())
+                        .context("parse MessagePack input")?;
+                serde_json::to_string(&value)
+                    .context("serialize MessagePack as JSON")
+            }
+            #[cfg(not(feature = "msgpack"))]
+            Format::Msgpack => {
+                anyhow::bail!(
+                    "MessagePack support not enabled. Rebuild with --features msgpack"
+                )
+            }
+
+            // Unreachable, someone made an oopsie
+            Format::Auto | Format::Json => {
+                unreachable!(
+                    "to_json_string called with Auto or Json, not needed"
+                )
+            }
+        }
+    }
 }
 
 /// Parse input content
@@ -145,6 +252,53 @@ fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
         Ok(Input::Stdin(buffer))
+    }
+}
+
+/// Supported input formats beyond JSON.
+#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
+enum Format {
+    #[default]
+    Auto,
+    Json,
+    Jsonl,
+    Yaml,
+    Toml,
+    Cbor,
+    Msgpack,
+}
+
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(f, "Auto"),
+            Self::Json => write!(f, "JSON"),
+            Self::Jsonl => write!(f, "JSONL"),
+            Self::Yaml => write!(f, "YAML"),
+            Self::Toml => write!(f, "TOML"),
+            Self::Cbor => write!(f, "CBOR"),
+            Self::Msgpack => write!(f, "MessagePack"),
+        }
+    }
+}
+
+fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
+    // Use explicit if user overrode the default.
+    if !matches!(explicit, Format::Auto) {
+        return explicit;
+    }
+    let Some(path) = path else {
+        // NOTE: we don't support streaming type inference, maybe someday
+        return Format::Json;
+    };
+
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("ndjson" | "jsonl") => Format::Jsonl,
+        Some("yaml" | "yml") => Format::Yaml,
+        Some("msgpack" | "mp") => Format::Msgpack,
+        Some("toml") => Format::Toml,
+        Some("cbor") => Format::Cbor,
+        _ => Format::Json,
     }
 }
 
@@ -188,13 +342,26 @@ fn main() -> Result<()> {
                 raw_query.parse().with_context(|| "Failed to parse query")?
             };
 
+            let format = detect_format(args.input.as_ref(), args.format);
             let input_content = parse_input_content(args.input)?;
-            let json: Value = serde_json::from_str(
-                input_content
+
+            // For JSON/Auto we borrow directly from the mmap/stdin buffer,
+            // preserving the zero-copy path that serde_json_borrow provides.
+            // For other formats, we convert to an owned JSON string first
+            // and then borrow from that.
+            let json_string_owned = match format {
+                Format::Json | Format::Auto => None,
+                other => Some(input_content.to_json_string(other)?),
+            };
+            let json_str: &str = match &json_string_owned {
+                Some(s) => s.as_str(),
+                None => input_content
                     .to_str()
-                    .context("File contents are not valid utf-8")?,
-            )
-            .with_context(|| "Failed to parse JSON")?;
+                    .context("File contents are not valid UTF-8")?,
+            };
+
+            let json: Value = serde_json::from_str(json_str)
+                .with_context(|| format!("Failed to parse as {format}"))?;
             let dfa = if args.ignore_case {
                 QueryDFA::from_query_ignore_case(&query)
             } else {
