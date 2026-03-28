@@ -53,10 +53,8 @@ fn generate_subcommand_man_pages(
         // is fine here since man page generation is a one-shot operation.
         let leaked_name: &'static str =
             Box::leak(prefixed_name.clone().into_boxed_str());
-        let renamed = subcmd
-            .clone()
-            .name(leaked_name)
-            .disable_help_subcommand(true);
+        let renamed =
+            subcmd.clone().name(leaked_name).disable_help_subcommand(true);
         let subcmd_man = clap_mangen::Man::new(renamed);
 
         let file_name = format!("{prefixed_name}.1");
@@ -73,11 +71,7 @@ fn generate_subcommand_man_pages(
         subcmd_man.render(&mut subcmd_file)?;
         println!("Generated: {}", man_path.display());
         if subcmd.has_subcommands() {
-            generate_subcommand_man_pages(
-                subcmd,
-                output_dir,
-                &prefixed_name,
-            )?;
+            generate_subcommand_man_pages(subcmd, output_dir, &prefixed_name)?;
         }
     }
 
