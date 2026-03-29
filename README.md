@@ -167,26 +167,25 @@ users.[1].name:
 converted to JSON at the boundary, then queried with the same engine, so your
 queries work identically regardless of input format.
 
-**Auto-detection from file extension:**
+**Query your Cargo.toml:**
 
 ```bash
-# YAML
-$ jg 'name.first' data.yaml
-name.first:
-"John"
-
-# TOML
-$ jg 'database.port' config.toml
-database.port:
-5432
+$ jg 'dependencies.*.version' Cargo.toml
+dependencies.clap.version:
+"4.5.43"
+dependencies.serde.version:
+"1.0.219"
+...
 ```
 
-**Explicit format flag** (useful for stdin or non-standard extensions):
+**Query a docker-compose.yml:**
 
 ```bash
-$ cat data.yaml | jg -f yaml 'name.first'
-name.first:
-"John"
+$ jg 'services.*.image' docker-compose.yml
+services.web.image:
+"nginx:latest"
+services.db.image:
+"postgres:16"
 ```
 
 **JSONL/NDJSON**: each line becomes an array element:
@@ -197,6 +196,14 @@ $ jg '[*].email' users.jsonl
 "alice@example.com"
 [1].email:
 "bob@example.com"
+```
+
+**Explicit format flag** (useful for stdin or non-standard extensions):
+
+```bash
+$ cat config.yaml | jg -f yaml 'database.host'
+database.host:
+"localhost"
 ```
 
 **Binary formats** (CBOR, MessagePack):
