@@ -16,6 +16,7 @@ fn main() {
         .field("foo")
         .range(2..5)
         .field_wildcard()
+        .kleene_star()
         .array_wildcard()
         .build();
     let query =
