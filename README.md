@@ -361,18 +361,30 @@ Add to your `Cargo.toml`:
 jsongrep = "0.8"
 ```
 
-Build queries programmatically:
+Parse a query string, build a DFA, and search:
 
 ```rust
-use jsongrep::query::engine::QueryBuilder;
+use jsongrep::{Value, query::{DFAQueryEngine, QueryDFA}};
 
-// Construct the query "foo[0].bar.*.baz"
+let json: Value = serde_json::from_str(r#"{"users": [{"name": "Alice"}]}"#)?;
+
+let dfa = QueryDFA::from_query_str("users[*].name")?;
+let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+
+for result in &results {
+    println!("{:?}: {}", result.path, result.value);
+}
+```
+
+Build queries programmatically with `QueryBuilder`:
+
+```rust
+use jsongrep::query::QueryBuilder;
+
 let query = QueryBuilder::new()
-    .field("foo")
-    .index(0)
-    .field("bar")
-    .field_wildcard()
-    .field("baz")
+    .field("users")
+    .array_wildcard()
+    .field("name")
     .build();
 ```
 

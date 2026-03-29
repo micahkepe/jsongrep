@@ -1,10 +1,28 @@
 #![allow(rustdoc::private_intra_doc_links)]
 /*!
-This crate provides a query language for JSON data that can be used to search
-for matching **regular** paths in the JSON tree, using a derivation of [regular
-expressions].
+A query language for JSON data that searches for matching **regular** paths in
+the JSON tree, using a derivation of [regular expressions].
 
 [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression
+
+# Quick Start
+
+```
+use jsongrep::{Value, query::{DFAQueryEngine, QueryDFA}};
+
+let input = r#"{"users": [{"name": "Alice"}, {"name": "Bob"}]}"#;
+let json: Value = serde_json::from_str(input).unwrap();
+
+let dfa = QueryDFA::from_query_str("users[*].name").unwrap();
+let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+
+assert_eq!(results.len(), 2);
+assert_eq!(results[0].value.to_string(), r#""Alice""#);
+assert_eq!(results[1].value.to_string(), r#""Bob""#);
+```
+
+For more examples, see the [`examples`](https://github.com/micahkepe/jsongrep/tree/main/examples)
+directory in the repository.
 
 # Overview
 
@@ -50,7 +68,7 @@ to support JSON.
 The grammar for the query language is defined in the `query.pest` file in the
 `grammar` directory.
 
-# Examples
+# Query Syntax Examples
 
 Here are some example queries and their meanings:
 
@@ -80,3 +98,7 @@ Finally, we can use wildcards to match any field or index:
 pub mod commands;
 pub mod query;
 pub mod utils;
+
+/// Re-export [`serde_json_borrow::Value`] so downstream users don't need to
+/// depend on `serde_json_borrow` directly.
+pub use serde_json_borrow::Value;

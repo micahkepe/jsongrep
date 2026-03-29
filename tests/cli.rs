@@ -476,7 +476,7 @@ mod tests {
 
     // ---------- MessagePack ----------
 
-    /// Generate a MessagePack temp file from the canonical simple.json.
+    /// Generate a `MessagePack` temp file from the canonical simple.json.
     fn msgpack_temp(suffix: &str) -> tempfile::NamedTempFile {
         let value: serde_json::Value =
             serde_json::from_str(SIMPLE_JSON_STR).expect("parse simple.json");
