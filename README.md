@@ -331,7 +331,7 @@ feel familiar:
 | Wildcards    | `*` or `[*]`         | Match any single field or array index                         |
 | Optional     | `foo?.bar`           | Optional `foo` field access                                   |
 | Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
-| Array index  | `[0]` or `[1:3]`     | Match specific index or slice (inclusive)                     |
+| Array index  | `[0]` or `[1:3]`     | Match specific index or slice (exclusive end)                 |
 
 These queries can be arbitrarily nested with parentheses. For example,
 `foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.
