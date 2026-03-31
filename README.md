@@ -18,6 +18,75 @@ of JSON, YAML, TOML, JSONL, CBOR, and MessagePack documents using <strong>regula
   <img src="./images/screenshot.png" alt="jsongrep colored output example" width="700"/>
 </p>
 
+## Quick Links
+
+- [Installation](#installation)
+- [Quick Example](#quick-example)
+- [Why jsongrep?](#why-jsongrep)
+  - [jsongrep vs jq](#jsongrep-vs-jq)
+- [Benchmarks](#benchmarks)
+- [Multi\-Format Input](#multi-format-input)
+- [CLI Usage](#cli-usage)
+  - [More CLI Examples](#more-cli-examples)
+- [Query Syntax](#query-syntax)
+- [Library Usage](#library-usage)
+- [Shell Completions](#shell-completions)
+- [Man Pages](#man-pages)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Installation
+
+<p align="center">
+  <a href="https://repology.org/project/jsongrep/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/jsongrep.svg" alt="Packaging status">
+  </a>
+</p>
+
+**via Homebrew**:
+
+```bash
+brew install jsongrep
+```
+
+**via Winget**:
+
+```bash
+winget install jsongrep
+```
+
+**via Scoop**:
+
+```bash
+scoop install jsongrep
+```
+
+**via `cargo`**:
+
+```bash
+cargo install jsongrep
+```
+
+## Quick Example
+
+```bash
+# Extract all firstnames from the Nobel Prize API
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].laureates[*].firstname'
+prizes.[0].laureates.[0].firstname:
+"Susumu"
+prizes.[0].laureates.[1].firstname:
+"Richard"
+prizes.[0].laureates.[2].firstname:
+"Omar M."
+
+# Works with inline JSON too
+$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
+users.[0].name:
+"Alice"
+users.[1].name:
+"Bob"
+```
+
 ## Why jsongrep?
 
 JSON documents are trees: objects and arrays branch into nested values, with
@@ -141,26 +210,6 @@ skipped rather than faked.
 [Interactive Criterion reports](https://micahkepe.com/jsongrep/report/index.html)
 &nbsp;|&nbsp; [Benchmark source and methodology](./benches/README.md)
 
-## Quick Example
-
-```bash
-# Extract all firstnames from the Nobel Prize API
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].laureates[*].firstname'
-prizes.[0].laureates.[0].firstname:
-"Susumu"
-prizes.[0].laureates.[1].firstname:
-"Richard"
-prizes.[0].laureates.[2].firstname:
-"Omar M."
-
-# Works with inline JSON too
-$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
-users.[0].name:
-"Alice"
-users.[1].name:
-"Bob"
-```
-
 ## Multi-Format Input
 
 `jg` natively supports multiple serialization formats. Non-JSON formats are
@@ -226,35 +275,6 @@ All format dependencies are included by default. To build without them:
 
 ```bash
 cargo install jsongrep --no-default-features
-```
-
-## Installation
-
-<p align="center">
-  <a href="https://repology.org/project/jsongrep/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/jsongrep.svg" alt="Packaging status">
-  </a>
-</p>
-
-Installing with Cargo:
-
-```bash
-cargo install jsongrep
-```
-
-The `jg` binary installs to `~/.cargo/bin`.
-
-Alternatively, you can install `jsongrep` using Homebrew:
-
-```bash
-brew install jsongrep
-```
-
-On Windows, you can install `jsongrep` using
-[winget](https://github.com/microsoft/winget-cli):
-
-```bash
-winget install jsongrep
 ```
 
 ## CLI Usage
@@ -397,7 +417,7 @@ More examples in the [examples](./examples) directory.
 ## Shell Completions
 
 > [!NOTE]
-> Installed automatically with `brew install jsongrep`.
+> Installed automatically with most package managers.
 
 Generate completions with `jg generate shell <SHELL>`:
 
@@ -415,7 +435,7 @@ jg generate shell fish > ~/.config/fish/completions/jg.fish
 ## Man Pages
 
 > [!NOTE]
-> Installed automatically with `brew install jsongrep`.
+> Installed automatically with most package managers.
 
 ```bash
 jg generate man -o ~/.local/share/man/man1/
