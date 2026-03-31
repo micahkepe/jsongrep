@@ -257,9 +257,6 @@ On Windows, you can install `jsongrep` using
 winget install jsongrep
 ```
 
-The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or
-`/usr/local` (Intel).
-
 ## CLI Usage
 
 ```
