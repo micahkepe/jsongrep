@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-03-30
+
+### Fixed
+
+- Range query upper bound silently ignored &rarr; `[1:3]` behaved as `[1:]`
+  ([#27](https://github.com/micahkepe/jsongrep/issues/27))
+- `[:n]` range queries parsed incorrectly due to ambiguous pest grammar;
+  replaced with explicit `range_start`/`range_end` sub-rules
+- Missing Kleene star in `QueryBuilder` example
+
+### Added
+
+- winget installation instructions (`winget install jsongrep`)
+- Parser tests for all range query variants (`[m:n]`, `[m:]`, `[:n]`, `[:]`)
+
+### Changed
+
+- `documentation` and `keywords` entries added to `Cargo.toml` metadata
+
 ## [0.8.0] - 2026-03-28
 
 ### Added
@@ -195,7 +214,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/micahkepe/jsongrep/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/micahkepe/jsongrep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/micahkepe/jsongrep/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/micahkepe/jsongrep/compare/v0.5.1...v0.6.0

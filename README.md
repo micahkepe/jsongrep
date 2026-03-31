@@ -365,7 +365,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-jsongrep = "0.8"
+jsongrep = "0.8.1"
 ```
 
 Parse a query string, build a DFA, and search:
