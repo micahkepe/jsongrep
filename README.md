@@ -250,6 +250,13 @@ Alternatively, you can install `jsongrep` using Homebrew:
 brew install jsongrep
 ```
 
+On Windows, you can install `jsongrep` using
+[winget](https://github.com/microsoft/winget-cli):
+
+```bash
+winget install jsongrep
+```
+
 The `jg` binary installs to either `/opt/homebrew` (Apple Silicon) or
 `/usr/local` (Intel).
 
