@@ -412,30 +412,26 @@ fn parse_range(
         )));
     }
 
-    let mut inner = pair.into_inner();
+    let inner = pair.into_inner();
 
-    // Starting integer
-    let start = inner
-        .next()
-        .map(|p| {
-            p.as_str().parse::<usize>().map_err(|_| {
-                QueryParseError::UnexpectedToken(p.as_str().to_string())
-            })
-        })
-        .transpose()?;
+    let mut start: Option<usize> = None;
+    let mut end: Option<usize> = None;
 
-    // Colon (skip)
-    let _ = inner.next();
-
-    // Ending integer
-    let end = inner
-        .next()
-        .map(|p| {
-            p.as_str().parse::<usize>().map_err(|_| {
-                QueryParseError::UnexpectedToken(p.as_str().to_string())
-            })
-        })
-        .transpose()?;
+    for p in inner {
+        match p.as_rule() {
+            Rule::range_start => {
+                start = Some(p.as_str().parse::<usize>().map_err(|_| {
+                    QueryParseError::UnexpectedToken(p.as_str().to_string())
+                })?);
+            }
+            Rule::range_end => {
+                end = Some(p.as_str().parse::<usize>().map_err(|_| {
+                    QueryParseError::UnexpectedToken(p.as_str().to_string())
+                })?);
+            }
+            _ => {}
+        }
+    }
 
     match (start, end) {
         (None, None) => Ok(Query::ArrayWildcard),
@@ -633,6 +629,67 @@ mod tests {
     fn parse_invalid_key_with_reserved_chars() {
         let result = parse_query(r"][");
         assert!(matches!(result, Err(QueryParseError::UnexpectedToken(_))));
+    }
+
+    // ==============================================================================
+    // Range parsing tests
+    // ==============================================================================
+
+    #[test]
+    fn parse_range_both_bounds() {
+        let result = parse_query("[1:3]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Range(Some(1), Some(3))]),
+        );
+        assert_eq!("[1:3]", result.to_string());
+    }
+
+    #[test]
+    fn parse_range_start_only() {
+        let result = parse_query("[2:]").unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::RangeFrom(2)]));
+        assert_eq!("[2:]", result.to_string());
+    }
+
+    #[test]
+    fn parse_range_end_only() {
+        let result = parse_query("[:3]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Range(Some(0), Some(3))]),
+        );
+        assert_eq!("[0:3]", result.to_string());
+    }
+
+    #[test]
+    fn parse_range_unbounded() {
+        let result = parse_query("[:]").unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::ArrayWildcard]));
+        assert_eq!("[*]", result.to_string());
+    }
+
+    #[test]
+    fn parse_range_zero_start() {
+        let result = parse_query("[0:5]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Range(Some(0), Some(5))]),
+        );
+        assert_eq!("[0:5]", result.to_string());
+    }
+
+    #[test]
+    fn parse_range_on_field() {
+        let result = parse_query("foo[1:3]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Range(Some(1), Some(3)),
+            ])]),
+        );
+        assert_eq!("foo[1:3]", result.to_string());
     }
 
     // ==============================================================================

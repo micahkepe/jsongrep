@@ -61,7 +61,9 @@ field           = @{
 index           = { "[" ~ number ~ "]" }
 
 /// Range access from [start:end)
-range           = { "[" ~ (number)? ~ ":" ~ (number)? ~ "]" }
+range           = { "[" ~ range_start? ~ ":" ~ range_end? ~ "]" }
+range_start     = { number }
+range_end       = { number }
 
 /// Access on all members of a JSON array
 array_wildcard  = { "[" ~ "*" ~ "]" }
