@@ -32,7 +32,7 @@ const SYNTAX_ROWS: [string, string, string][] = [
 export function Playground() {
   const [data, setData] = useState(DEFAULT_DATA);
   const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [results, setResults] = useState<[string, string][]>([]);
+  const [results, setResults] = useState<[string, string][] | null>(null);
   const [error, setError] = useState("");
   const [compileTiming, setCompileTiming] = useState("0");
   const [queryTiming, setQueryTiming] = useState("0");
@@ -87,7 +87,7 @@ export function Playground() {
 
     if (!data) {
       setError("Please provide data (JSON/YAML).");
-      setResults([]);
+      setResults(null);
       return;
     }
 
@@ -95,7 +95,7 @@ export function Playground() {
       setError(
         `Input too large (${(data.length / 1_000_000).toFixed(1)} MB, max 1 MB).`,
       );
-      setResults([]);
+      setResults(null);
       return;
     }
 
@@ -133,7 +133,7 @@ export function Playground() {
       if (typeof err === "string") message = err;
       else if (err instanceof Error) message = err.message;
       setError(message);
-      setResults([]);
+      setResults(null);
     }
   };
 
@@ -185,7 +185,11 @@ export function Playground() {
           <output className={`output-box${flash ? " flash" : ""}`} ref={outputRef}>
             {error ? (
               <samp className="output-error">{error}</samp>
-            ) : results.length > 0 ? (
+            ) : results === null ? (
+              <p className="output-placeholder">Results will appear here...</p>
+            ) : results.length === 0 ? (
+              <p className="output-placeholder">No results found matching the query.</p>
+            ) : (
               <dl className="result-list">
                 {results.map(([path, value], i) => (
                   <div className="result-entry" key={i}>
@@ -194,8 +198,6 @@ export function Playground() {
                   </div>
                 ))}
               </dl>
-            ) : (
-              <p className="output-placeholder">Results will appear here...</p>
             )}
           </output>
         </fieldset>
