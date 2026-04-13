@@ -45,6 +45,7 @@ export function Playground() {
   const formRef = useRef<HTMLFormElement>(null);
   const outputRef = useRef<HTMLOutputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const outputPanelRef = useRef<HTMLFieldSetElement>(null);
 
   useEffect(() => {
     if (runCount === 0) return;
@@ -184,27 +185,38 @@ export function Playground() {
           </footer>
         </fieldset>
 
-        <fieldset className="output-panel" aria-live="polite">
-          <legend>Results</legend>
-          <output className={`output-box${flash ? " flash" : ""}`} ref={outputRef}>
-            {error ? (
-              <samp className="output-error">{error}</samp>
-            ) : results === null ? (
-              <p className="output-placeholder">Results will appear here...</p>
-            ) : results.length === 0 ? (
-              <p className="output-placeholder">No results found matching the query.</p>
-            ) : (
-              <dl className="result-list">
-                {results.map(([path, value], i) => (
-                  <div className="result-entry" key={i}>
-                    {path && <dt>{path}:</dt>}
-                    <dd><pre>{value}</pre></dd>
-                  </div>
-                ))}
-              </dl>
+        <div className="output-wrapper">
+        <fieldset className={`output-panel${flash ? " flash" : ""}`} aria-live="polite" ref={outputPanelRef}>
+          <legend>
+            Results
+            {results !== null && (
+              <span className="match-count">
+                {results.length === 1 ? ": 1 match" : `: ${results.length} matches`}
+              </span>
             )}
-          </output>
+          </legend>
+          <div className="output-scroll-container">
+            <output className="output-box" ref={outputRef}>
+              {error ? (
+                <samp className="output-error">{error}</samp>
+              ) : results === null ? (
+                <p className="output-placeholder">Results will appear here...</p>
+              ) : results.length === 0 ? (
+                <p className="output-placeholder">No results found matching the query.</p>
+              ) : (
+                <dl className="result-list">
+                  {results.map(([path, value], i) => (
+                    <div className="result-entry" key={i}>
+                      {path && <dt>{path}:</dt>}
+                      <dd><pre>{value}</pre></dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </output>
+          </div>
         </fieldset>
+        </div>
 
         <footer className="timing-bar" aria-label="Query performance timings">
           <span>

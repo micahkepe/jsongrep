@@ -91,12 +91,23 @@
   background: var(--selection);
 }
 
+html,
+body {
+  height: 100%;
+}
+
+@media (min-width: 701px) {
+  html,
+  body {
+    overflow: hidden;
+  }
+}
+
 body {
   margin: 0;
   display: grid;
   place-items: center;
   min-width: 320px;
-  min-height: 100vh;
   background-color: var(--bg);
   color: var(--fg);
 }
@@ -114,7 +125,11 @@ a:hover {
 
 .app {
   width: min(1200px, 100vw - 4rem);
+  height: 100%;
   padding: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .app header {
@@ -177,12 +192,12 @@ a:hover {
 .api-tester {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 1.5rem;
   text-align: left;
 }
 
-.inputs-panel,
-.output-panel {
+.inputs-panel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -192,8 +207,34 @@ a:hover {
   background-color: var(--panel-bg);
 }
 
+.output-wrapper {
+  position: relative;
+}
+
+.output-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  padding: 1rem;
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--input-bg);
+}
+
+.output-scroll-container {
+  flex: 1;
+  min-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .inputs-panel > legend,
-.output-panel > legend {
+.output-panel > legend,
+.output-panel > header {
   color: var(--fg);
   font-weight: bold;
   font-size: 0.85rem;
@@ -236,19 +277,14 @@ label {
 }
 
 .output-box {
-  flex: 1;
-  min-height: 380px;
-  overflow-y: auto;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  background: var(--input-bg);
+  padding: 0;
   color: var(--output-fg);
   font-family: inherit;
   font-size: inherit;
   line-height: 1.6;
 }
 
-.output-box.flash {
+.output-panel.flash {
   border-color: var(--accent);
 }
 
@@ -438,6 +474,15 @@ body:has(dialog[open]) {
 @media (max-width: 700px) {
   .api-tester {
     grid-template-columns: 1fr;
+  }
+
+  .output-wrapper {
+    position: static;
+  }
+
+  .output-panel {
+    position: static;
+    min-height: 300px;
   }
 }
 
