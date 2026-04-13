@@ -105,3 +105,84 @@ impl Guest for JsonGrepper {
 }
 
 export!(JsonGrepper);
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_to_json;
+
+    #[test]
+    fn json_passthrough() {
+        let input = r#"{"key": "value"}"#;
+        let result = normalize_to_json(input).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn json_array() {
+        let input = r#"[1, 2, 3]"#;
+        let result = normalize_to_json(input).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn yaml_converted_to_json() {
+        let input = "key: value";
+        let result = normalize_to_json(input).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["key"], "value");
+    }
+
+    #[test]
+    fn yaml_nested() {
+        let input =
+            "users:\n  - name: Alice\n    age: 30\n  - name: Bob\n    age: 25";
+        let result = normalize_to_json(input).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["users"][0]["name"], "Alice");
+        assert_eq!(parsed["users"][1]["age"], 25);
+    }
+
+    #[test]
+    fn invalid_input_returns_error() {
+        let input = "{{{{not valid";
+        let result = normalize_to_json(input);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn empty_object() {
+        let input = "{}";
+        assert_eq!(normalize_to_json(input).unwrap(), "{}");
+    }
+
+    #[test]
+    fn empty_string_is_yaml_scalar() {
+        // Empty string is valid YAML (null)
+        let result = normalize_to_json("");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn json_with_unicode() {
+        let input = r#"{"emoji": "🦀", "cjk": "日本語"}"#;
+        let result = normalize_to_json(input).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn yaml_bool_coercion() {
+        // YAML treats "true" as a boolean -> ensure it round-trips correctly
+        let input = "flag: true";
+        let result = normalize_to_json(input).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["flag"], true);
+    }
+
+    #[test]
+    fn json_preserves_exact_string() {
+        // Valid JSON should be returned exactly as-is, not re-serialized
+        let input = r#"{"a":1,"b":2}"#;
+        assert_eq!(normalize_to_json(input).unwrap(), input);
+    }
+}
