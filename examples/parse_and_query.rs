@@ -9,7 +9,7 @@
 
 use jsongrep::{
     Value,
-    query::{DFAQueryEngine, Query, QueryDFA},
+    query::{Query, QueryDFA},
     utils::write_colored_result,
 };
 use std::io::{self, BufWriter, Write};
@@ -26,13 +26,11 @@ fn main() -> anyhow::Result<()> {
     let mut writer = BufWriter::new(io::stdout().lock());
 
     // =========================================================================
-    // Concise path: parse + build DFA in one step
+    // Simple: one-liner with jsongrep::grep
     // =========================================================================
 
-    writer.write_all(b"users[*].name results:\n")?;
-    let dfa =
-        QueryDFA::from_query_str("users[*].name").expect("valid query syntax");
-    let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+    writer.write_all(b"users[*].name results (via grep):\n")?;
+    let results = jsongrep::grep(&json, "users[*].name").expect("valid query");
 
     for result in &results {
         write_colored_result(
@@ -46,18 +44,44 @@ fn main() -> anyhow::Result<()> {
     writer.write_all(b"\n")?;
 
     // =========================================================================
-    // Explicit path: parse to AST first, then build DFA
-    //
-    // Useful when you need to inspect or transform the query before execution,
-    // e.g., programmatic rewrites or logging the parsed structure.
+    // Reusable: compile DFA once, run against multiple documents
     // =========================================================================
 
-    let query: Query = "users[*].role".parse().expect("valid query syntax");
+    let dfa = QueryDFA::from_query_str("name").expect("valid query syntax");
+
+    let docs = [
+        r#"{"name": "Alice", "age": 30}"#,
+        r#"{"name": "Bob", "age": 25}"#,
+        r#"{"name": "Charlie", "age": 35}"#,
+    ];
+
+    writer.write_all(b"Reusing compiled query across 3 documents:\n")?;
+    for doc in &docs {
+        let json: Value = serde_json::from_str(doc).expect("valid JSON");
+        let results = dfa.find(&json);
+        for result in &results {
+            write_colored_result(
+                &mut writer,
+                result.value,
+                &result.path,
+                true,
+                true,
+            )?;
+        }
+    }
+    writer.write_all(b"\n")?;
+
+    // =========================================================================
+    // Explicit: parse to AST first, then build DFA
+    //
+    // Useful when you need to inspect or transform the query before execution.
+    // =========================================================================
+
+    let query: Query = "users[*].*".parse().expect("valid query syntax");
     let dfa = QueryDFA::from_query(&query);
+    let results = dfa.find(&json);
 
-    let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
-
-    writer.write_all(b"users[*].role results:\n")?;
+    writer.write_all(b"users[*].* results (via AST):\n")?;
     for result in &results {
         write_colored_result(
             &mut writer,

@@ -1,7 +1,7 @@
 use crate::exports::jsongrep::jsongrep::jsongrep::{
     Guest, TimingResults, Timings,
 };
-use jsongrep::query::{DFAQueryEngine, QueryDFA};
+use jsongrep::query::QueryDFA;
 use wasip2::clocks::monotonic_clock;
 
 wit_bindgen::generate!(
@@ -47,7 +47,7 @@ fn run_query(input: &str, query: &str) -> Result<TimingResults, String> {
     let after_compile = monotonic_clock::now();
 
     let before_query = monotonic_clock::now();
-    let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+    let results = dfa.find(&json);
     let after_query = monotonic_clock::now();
 
     let before_serialize = monotonic_clock::now();

@@ -8,13 +8,10 @@ the JSON tree, using a derivation of [regular expressions].
 # Quick Start
 
 ```
-use jsongrep::{Value, query::{DFAQueryEngine, QueryDFA}};
-
 let input = r#"{"users": [{"name": "Alice"}, {"name": "Bob"}]}"#;
-let json: Value = serde_json::from_str(input).unwrap();
+let json: jsongrep::Value = serde_json::from_str(input).unwrap();
 
-let dfa = QueryDFA::from_query_str("users[*].name").unwrap();
-let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+let results = jsongrep::grep(&json, "users[*].name").unwrap();
 
 assert_eq!(results.len(), 2);
 assert_eq!(results[0].value.to_string(), r#""Alice""#);
@@ -102,3 +99,29 @@ pub mod utils;
 /// Re-export [`serde_json_borrow::Value`] so downstream users don't need to
 /// depend on `serde_json_borrow` directly.
 pub use serde_json_borrow::Value;
+
+/// Query a JSON document with a query string, returning all matches.
+///
+/// This is the simplest entry point for the library. For repeated queries
+/// against different documents, prefer compiling the query once with
+/// [`query::QueryDFA::from_query_str`] and calling [`query::QueryDFA::find`].
+///
+/// # Errors
+///
+/// Returns an error if the query string is invalid.
+///
+/// # Examples
+///
+/// ```
+/// let json: jsongrep::Value = serde_json::from_str(r#"{"a": 1, "b": 2}"#).unwrap();
+/// let results = jsongrep::grep(&json, "a").unwrap();
+/// assert_eq!(results.len(), 1);
+/// assert_eq!(results[0].value.to_string(), "1");
+/// ```
+pub fn grep<'a>(
+    json: &'a Value<'a>,
+    query: &str,
+) -> Result<Vec<query::JSONPointer<'a>>, query::QueryParseError> {
+    let dfa = query::QueryDFA::from_query_str(query)?;
+    Ok(dfa.find(json))
+}

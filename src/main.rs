@@ -19,7 +19,7 @@ use std::{
 
 use jsongrep::{
     commands,
-    query::{DFAQueryEngine, Query, QueryDFA},
+    query::{Query, QueryDFA},
     utils::{depth, write_colored_result},
 };
 
@@ -367,7 +367,7 @@ fn main() -> Result<()> {
             } else {
                 QueryDFA::from_query(&query)
             };
-            let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+            let results = dfa.find(&json);
 
             // NOTE: use single, locked stdout handle to avoid interleaving
             let stdout = stdout().lock();

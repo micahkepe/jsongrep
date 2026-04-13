@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::query::{
-    QueryEngine, QueryNFA, QueryParseError,
+    QueryNFA, QueryParseError,
     ast::Query,
     common::{JSONPointer, PathType, TransitionLabel},
 };
@@ -155,6 +155,28 @@ impl QueryDFA {
         let mut builder = DFABuilder::new();
         builder.case_insensitive = case_insensitive;
         builder.build_dfa(query)
+    }
+
+    /// Execute this compiled query against a JSON document, returning all
+    /// matches.
+    ///
+    /// This is the preferred way to run queries. If you need to apply the same
+    /// query to multiple documents, construct the [`QueryDFA`] once and call
+    /// this method repeatedly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jsongrep::{Value, query::QueryDFA};
+    ///
+    /// let json: Value = serde_json::from_str(r#"{"a": 1, "b": 2}"#).unwrap();
+    /// let query = QueryDFA::from_query_str("a").unwrap();
+    /// let results = query.find(&json);
+    /// assert_eq!(results.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn find<'a>(&self, json: &'a Value<'a>) -> Vec<JSONPointer<'a>> {
+        DFAQueryEngine::find_with_dfa(json, self)
     }
 
     /// Check if a given state is accepting/final.
@@ -656,41 +678,6 @@ impl DFAQueryEngine {
     }
 }
 
-impl QueryEngine for DFAQueryEngine {
-    fn find<'haystack>(
-        &self,
-        json: &'haystack Value,
-        query: &'haystack Query,
-    ) -> Vec<JSONPointer<'haystack>> {
-        // Compile the query into a DFA
-        let dfa = QueryDFA::from_query(query);
-
-        #[allow(clippy::print_stdout)]
-        #[cfg(test)]
-        {
-            println!("Constructed DFA for query: `{query}`\n{dfa}\n");
-        };
-
-        // Traverse the JSON document tree via depth-first search
-        let mut results: Vec<JSONPointer> = Vec::new();
-        let mut path = Vec::new();
-
-        // Collect matches based on the DFA transitions and acceptance states
-        Self::traverse_json(
-            &dfa,
-            dfa.start_state,
-            &mut path,
-            json,
-            &mut results,
-        );
-
-        #[cfg(test)]
-        println!("Found matches:\n{results:?}");
-
-        results
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -793,7 +780,8 @@ mod tests {
         // Query: foo.bar
         let query = QueryBuilder::new().field("foo").field("bar").build();
         let json = create_simple_test_json();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         // Expect exactly one match at path ["foo","bar"], value = "val"
         assert_eq!(matches.len(), 1);
@@ -835,7 +823,8 @@ mod tests {
         let query =
             QueryBuilder::new().disjunction(vec![query_1, query_2]).build();
         let json = create_simple_test_json();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         // Should have 2 matches
         assert_eq!(matches.len(), 2);
@@ -846,7 +835,8 @@ mod tests {
         // Query: baz[1]
         let query = QueryBuilder::new().field("baz").index(1).build();
         let json = create_simple_test_json();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Should have 1 match
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(2u64.into()));
@@ -873,7 +863,8 @@ mod tests {
         let query2 = QueryBuilder::new().field("nested").field("d").build();
         let query =
             QueryBuilder::new().disjunction(vec![query1, query2]).build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert_eq!(matches.len(), 2);
         let values: Vec<&Value> = matches.iter().map(|m| m.value).collect();
         assert!(values.contains(&&Value::Null));
@@ -886,7 +877,8 @@ mod tests {
         // Query: `baz[1:4]`
         let query: Query = QueryBuilder::new().field("baz").range(1..4).build();
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Expect [2, 3, 4]
         assert_eq!(matches.len(), 3);
         assert_eq!(matches[0].value, &Value::Number(2u64.into()));
@@ -900,7 +892,8 @@ mod tests {
         // Query: `baz[:]` => equivalent to `baz[*]`
         let query: Query = QueryBuilder::new().field("baz").range(..).build();
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Expect [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
         assert_eq!(matches[0].value, &Value::Number(1u64.into()));
@@ -916,7 +909,8 @@ mod tests {
         // Query: `baz[:2]`
         let query: Query = QueryBuilder::new().field("baz").range(..2).build();
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Expect [0, 1]
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].value, &Value::Number(1u64.into()));
@@ -929,7 +923,8 @@ mod tests {
         // Query: `baz[2:]`
         let query: Query = QueryBuilder::new().field("baz").range(2..).build();
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Expect [3, 4, 5]
         assert_eq!(matches.len(), 3);
         assert_eq!(matches[0].value, &Value::Number(3u64.into()));
@@ -943,7 +938,8 @@ mod tests {
         // Query: `baz[1:1]`
         let query: Query = QueryBuilder::new().field("baz").range(1..1).build();
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Expect empty result set
         assert!(matches.is_empty());
     }
@@ -954,7 +950,8 @@ mod tests {
 
         // Query: `baz[*]`
         let query = QueryBuilder::new().field("baz").array_wildcard().build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         // Expected [1, 2, 3, 4, 5]
         assert_eq!(matches.len(), 5);
@@ -970,7 +967,8 @@ mod tests {
         let json = create_simple_test_json();
         // Query: `other?`
         let query = QueryBuilder::new().field("other").optional().build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         // Expected [(root object), 42]
         assert_eq!(matches.len(), 2);
@@ -985,7 +983,8 @@ mod tests {
         let q1 = QueryBuilder::new().field("baz").range(..3).build();
         let q2 = QueryBuilder::new().field("baz").range(1..).build();
         let query = QueryBuilder::new().disjunction(vec![q1, q2]).build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         // Only expected matches [1, 2, 3, 4, 5]
         assert_eq!(
             5,
@@ -1049,7 +1048,8 @@ mod tests {
         let json = create_nested_test_json();
         // Query: `*.c`
         let query = QueryBuilder::new().field_wildcard().field("c").build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert!(matches.is_empty());
     }
 
@@ -1063,7 +1063,8 @@ mod tests {
             .field_wildcard()
             .field("c")
             .build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1);
@@ -1079,7 +1080,8 @@ mod tests {
             .field_wildcard()
             .field("c")
             .build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1);
@@ -1101,7 +1103,8 @@ mod tests {
 
         // Query: `c*`
         let query = QueryBuilder::new().field("c").kleene_star().build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
 
@@ -1135,7 +1138,8 @@ mod tests {
         // Query: `c.*.c`
         let query =
             QueryBuilder::new().field_wildcard().field("c").field("c").build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1);
     }
@@ -1152,7 +1156,8 @@ mod tests {
             .field("c")
             .optional()
             .build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 4);
     }
@@ -1161,7 +1166,8 @@ mod tests {
     fn empty_query() {
         let json = create_simple_test_json();
         let query = QueryBuilder::new().build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1); // identity
     }
@@ -1188,7 +1194,7 @@ mod tests {
             .kleene_star()
             .field("type")
             .build();
-        let result = DFAQueryEngine.find(&json, &query);
+        let result = QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(result.len(), 3);
     }
@@ -1205,7 +1211,8 @@ mod tests {
             .unwrap();
         let query: Query = "**.[*]".parse().expect("failed to parse query");
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 2);
@@ -1225,7 +1232,8 @@ mod tests {
             .unwrap();
         let query: Query = "*.*".parse().expect("failed to parse query");
 
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1);
@@ -1248,7 +1256,8 @@ mod tests {
         println!("Input Value:\n\t{json:?}\n");
 
         let query: Query = "*.*".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(matches.is_empty());
     }
@@ -1264,7 +1273,8 @@ mod tests {
         println!("Input Value:\n\t{json:?}\n");
 
         let query: Query = "[*]*".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
 
@@ -1291,7 +1301,8 @@ mod tests {
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
 
@@ -1311,7 +1322,8 @@ mod tests {
 
         let query: Query =
             "x.(y | z.t)".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 2);
     }
@@ -1346,7 +1358,8 @@ mod tests {
 
         let query: Query =
             "**.[*]*.[*]".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 1);
@@ -1382,7 +1395,8 @@ mod tests {
 
         let query: Query =
             "(* | [*])*.[*]".parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert!(!matches.is_empty());
         assert_eq!(matches.len(), 5);
@@ -1402,7 +1416,8 @@ mod tests {
 
         let query: Query =
             r#""/activities""#.parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(
@@ -1427,7 +1442,8 @@ mod tests {
 
         let query: Query =
             r#"paths."/activities""#.parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(
@@ -1456,7 +1472,8 @@ mod tests {
         // Use ** to recursively find the key
         let query: Query =
             r#"**."/activities""#.parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(
@@ -1477,7 +1494,8 @@ mod tests {
 
         // Quoted "a.b" should match the literal key "a.b", not the path a → b
         let query: Query = r#""a.b""#.parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(42u64.into()));
@@ -1492,7 +1510,8 @@ mod tests {
 
         let query: Query =
             r#""my key""#.parse().expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Str(Cow::Borrowed("value")));
@@ -1515,7 +1534,8 @@ mod tests {
         let query: Query = r#"paths.("/activities" | "/users")"#
             .parse()
             .expect("failed to parse query");
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 2);
     }
@@ -1630,7 +1650,8 @@ mod tests {
 
         // Case-sensitive (default) should only match exact case
         let query = QueryBuilder::new().field("foo").build();
-        let matches: Vec<JSONPointer> = DFAQueryEngine.find(&json, &query);
+        let matches: Vec<JSONPointer> =
+            QueryDFA::from_query(&query).find(&json);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(2u64.into()));

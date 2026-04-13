@@ -387,31 +387,39 @@ Add to your `Cargo.toml`:
 jsongrep = "0.8.1"
 ```
 
-Parse a query string, build a DFA, and search:
+Query with a one-liner:
 
 ```rust
-use jsongrep::{Value, query::{DFAQueryEngine, QueryDFA}};
-
-let json: Value = serde_json::from_str(r#"{"users": [{"name": "Alice"}]}"#)?;
-
-let dfa = QueryDFA::from_query_str("users[*].name")?;
-let results = DFAQueryEngine::find_with_dfa(&json, &dfa);
+let json: jsongrep::Value = serde_json::from_str(r#"{"users": [{"name": "Alice"}]}"#)?;
+let results = jsongrep::grep(&json, "users[*].name")?;
 
 for result in &results {
     println!("{:?}: {}", result.path, result.value);
 }
 ```
 
+For repeated queries, compile the DFA once and reuse it:
+
+```rust
+use jsongrep::query::QueryDFA;
+
+let dfa = QueryDFA::from_query_str("users[*].name")?;
+let results = dfa.find(&json);
+```
+
 Build queries programmatically with `QueryBuilder`:
 
 ```rust
-use jsongrep::query::QueryBuilder;
+use jsongrep::query::{QueryBuilder, QueryDFA};
 
 let query = QueryBuilder::new()
     .field("users")
     .array_wildcard()
     .field("name")
     .build();
+
+let dfa = QueryDFA::from_query(&query);
+let results = dfa.find(&json);
 ```
 
 More examples in the [examples](./examples) directory.

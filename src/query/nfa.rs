@@ -16,8 +16,7 @@ For reference:
 */
 use std::{fmt::Display, rc::Rc};
 
-use crate::query::ast::Query;
-use crate::query::common::TransitionLabel;
+use crate::query::{ast::Query, common::TransitionLabel};
 
 /// Represents a Non-Deterministic Finite Automaton (NFA) for JSON queries.
 /// Importantly, the alphabet depends on the query.

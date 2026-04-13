@@ -11,6 +11,10 @@ pub mod parser;
 use serde_json_borrow::Value;
 
 /// Interface for query engine implementations.
+#[deprecated(
+    since = "0.9.0",
+    note = "Use `QueryDFA::find` directly. This trait will be removed in a future release."
+)]
 pub trait QueryEngine {
     /// Finds all JSON pointers in the given JSON document that match the
     /// specified query.
