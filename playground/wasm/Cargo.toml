@@ -1,0 +1,21 @@
+[package]
+name = "jsongrep-wasm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.55.0"
+jsongrep = {path = "../.."}
+serde_json = "1.0.149"
+serde_yaml = "0.9.34"
+wasip2 = "1.0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+

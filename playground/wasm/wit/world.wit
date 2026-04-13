@@ -1,0 +1,30 @@
+package jsongrep:jsongrep@0.1.0;
+
+interface jsongrep {
+    record timings {
+        compile-ns: u64,
+        query-ns: u64,
+        parsing-ns: u64,
+        stringify-ns: u64,
+    }
+    record timing-results {
+        timings: timings,
+        results: list<tuple<string, string>>
+    }
+
+    /// returns a list of matches and the corresponding key and the metrics about the query compile and query run time
+    query-with-timings: func(input: string, query: string) -> result<timing-results, string>;
+
+    /// returns a list of matches and the corresponding key
+    query-with-path: func(input: string, query: string) -> result<list<tuple<string, string>>, string>;
+    /// returns only a list of matches
+    query: func(input: string, query: string) -> result<list<string>, string>;
+    /// returns only the first match
+    query-first: func(input: string, query: string) -> result<string, string>;
+}
+
+world main {
+    import wasi:clocks/monotonic-clock@0.2.6;
+
+    export jsongrep;
+}

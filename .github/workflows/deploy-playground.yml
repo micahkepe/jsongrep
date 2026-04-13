@@ -1,0 +1,62 @@
+name: Deploy playground to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'playground/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/deploy-playground.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "playground-deploy"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-wasip2
+          cache: true
+          cache-directories: playground/wasm/target
+      - name: Install & Build
+        working-directory: playground
+        run: |
+          bun install
+          bun run build
+      - name: Deploy to gh-pages branch
+        run: |
+          cp -r playground/dist /tmp/playground-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Use existing gh-pages branch, or create an orphan if it doesn't exist
+          if git fetch origin gh-pages 2>/dev/null; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf .
+          fi
+
+          rm -rf playground
+          cp -r /tmp/playground-dist playground
+          git add playground
+          git commit -m "Deploy playground from ${{ github.sha }}" || echo "No changes to commit"
+          git push origin gh-pages
