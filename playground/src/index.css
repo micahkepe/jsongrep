@@ -220,6 +220,10 @@ label {
     line-height: 1.6;
 }
 
+.output-box.flash {
+    border-color: var(--accent);
+}
+
 .output-placeholder {
     color: var(--fg-faint);
     margin: 0;

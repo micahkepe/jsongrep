@@ -1,7 +1,10 @@
-import { useState, useId, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useId, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
 import { jsongrep } from "generated/jsongrep_wasm";
 
 const MAX_INPUT_SIZE = 1_000_000;
+const IS_MAC =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+const MOD_KEY = IS_MAC ? "\u2318" : "Ctrl";
 
 const DEFAULT_DATA = `{
   "users": [
@@ -20,10 +23,20 @@ export function Playground() {
   const [error, setError] = useState("");
   const [compileTiming, setCompileTiming] = useState("0");
   const [queryTiming, setQueryTiming] = useState("0");
+  const [runCount, setRunCount] = useState(0);
+  const [flash, setFlash] = useState(false);
 
   const queryId = useId();
   const dataId = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const outputRef = useRef<HTMLOutputElement>(null);
+
+  useEffect(() => {
+    if (runCount === 0) return;
+    setFlash(true);
+    const id = setTimeout(() => setFlash(false), 150);
+    return () => clearTimeout(id);
+  }, [runCount]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -51,6 +64,7 @@ export function Playground() {
 
     try {
       setError("");
+      setRunCount((c) => c + 1);
       const beforeRoundtrip = performance.now();
       const resultsWithTimings: jsongrep.TimingResults =
         jsongrep.queryWithTimings(data, query);
@@ -61,6 +75,7 @@ export function Playground() {
         console.log({ timings: resultsWithTimings.timings, roundtrip });
       }
       setResults(resultsWithTimings.results);
+      outputRef.current?.scrollTo(0, 0);
 
       if (resultsWithTimings.timings.compileNs === 0n) {
         setCompileTiming("< 1");
@@ -121,15 +136,15 @@ export function Playground() {
           <button type="submit" className="run-button" aria-label="Run query">
             Run Query
           </button>
-          <kbd aria-label="Keyboard shortcut: Command or Control plus Enter">
-            Cmd+Enter
+          <kbd aria-label={`Keyboard shortcut: ${MOD_KEY} plus Enter`}>
+            {MOD_KEY} + Enter
           </kbd>
         </footer>
       </fieldset>
 
       <fieldset className="output-panel" aria-live="polite">
         <legend>Results</legend>
-        <output className="output-box">
+        <output className={`output-box${flash ? " flash" : ""}`} ref={outputRef}>
           {error ? (
             <samp className="output-error">{error}</samp>
           ) : results.length > 0 ? (
