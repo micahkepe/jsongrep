@@ -16,6 +16,58 @@ const DEFAULT_DATA = `{
 
 const DEFAULT_QUERY = "users[*].name";
 
+function encodeHash(data: string, query: string): string {
+  return btoa(encodeURIComponent(JSON.stringify({ d: data, q: query })));
+}
+
+function decodeHash(): { data: string; query: string } | null {
+  try {
+    const raw = location.hash.slice(1);
+    if (!raw) return null;
+    const { d, q } = JSON.parse(decodeURIComponent(atob(raw)));
+    if (typeof d === "string") return { data: d, query: typeof q === "string" ? q : "" };
+  } catch { /* invalid hash */ }
+  return null;
+}
+
+function getInitialState(): { data: string; query: string } {
+  return decodeHash() ?? { data: DEFAULT_DATA, query: DEFAULT_QUERY };
+}
+
+interface Example {
+  label: string;
+  data: string;
+  query: string;
+}
+
+const EXAMPLES: Example[] = [
+  {
+    label: "nested fields",
+    data: `{\n  "users": [\n    { "name": "Alice", "age": 30, "role": "admin" },\n    { "name": "Bob", "age": 25, "role": "user" },\n    { "name": "Charlie", "age": 35, "role": "user" }\n  ]\n}`,
+    query: "users[*].name",
+  },
+  {
+    label: "array slicing",
+    data: `{\n  "items": ["a", "b", "c", "d", "e", "f"]\n}`,
+    query: "items[1:4]",
+  },
+  {
+    label: "wildcards",
+    data: `{\n  "server": { "host": "localhost", "port": 8080 },\n  "database": { "host": "db.local", "port": 5432 }\n}`,
+    query: "*.host",
+  },
+  {
+    label: "deep descent",
+    data: `{\n  "a": { "b": { "target": 1 } },\n  "c": [{ "target": 2 }, { "d": { "target": 3 } }]\n}`,
+    query: "(* | [*])*.target",
+  },
+  {
+    label: "disjunction",
+    data: `{\n  "name": "jsongrep",\n  "version": "0.8.1",\n  "license": "MIT",\n  "author": "Micah Kepe"\n}`,
+    query: "name | version | license",
+  },
+];
+
 const SYNTAX_ROWS: [string, string, string][] = [
   ["Sequence", "foo.bar.baz", "Concatenation: match path foo \u2192 bar \u2192 baz"],
   ["Disjunction", "foo | bar", "Union: match either foo or bar"],
@@ -30,8 +82,9 @@ const SYNTAX_ROWS: [string, string, string][] = [
 ];
 
 export function Playground() {
-  const [data, setData] = useState(DEFAULT_DATA);
-  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const initial = getInitialState();
+  const [data, setData] = useState(initial.data);
+  const [query, setQuery] = useState(initial.query);
   const [results, setResults] = useState<[string, string][] | null>(null);
   const [error, setError] = useState("");
   const [compileTiming, setCompileTiming] = useState("0");
@@ -46,6 +99,11 @@ export function Playground() {
   const outputRef = useRef<HTMLOutputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const outputPanelRef = useRef<HTMLFieldSetElement>(null);
+
+  useEffect(() => {
+    const hash = encodeHash(data, query);
+    history.replaceState(null, "", "#" + hash);
+  }, [data, query]);
 
   useEffect(() => {
     if (runCount === 0) return;
@@ -150,6 +208,25 @@ export function Playground() {
         ref={formRef}
         aria-label="JSONGrep query playground"
       >
+        <nav className="examples-bar" aria-label="Example queries">
+          <span className="examples-label">try:</span>
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex.label}
+              type="button"
+              className="example-link"
+              onClick={() => {
+                setData(ex.data);
+                setQuery(ex.query);
+                setResults(null);
+                setError("");
+              }}
+            >
+              {ex.label}
+            </button>
+          ))}
+        </nav>
+
         <fieldset className="inputs-panel">
           <legend>Input</legend>
 
@@ -186,36 +263,36 @@ export function Playground() {
         </fieldset>
 
         <div className="output-wrapper">
-        <fieldset className={`output-panel${flash ? " flash" : ""}`} aria-live="polite" ref={outputPanelRef}>
-          <legend>
-            Results
-            {results !== null && (
-              <span className="match-count">
-                {results.length === 1 ? ": 1 match" : `: ${results.length} matches`}
-              </span>
-            )}
-          </legend>
-          <div className="output-scroll-container">
-            <output className="output-box" ref={outputRef}>
-              {error ? (
-                <samp className="output-error">{error}</samp>
-              ) : results === null ? (
-                <p className="output-placeholder">Results will appear here...</p>
-              ) : results.length === 0 ? (
-                <p className="output-placeholder">No results found matching the query.</p>
-              ) : (
-                <dl className="result-list">
-                  {results.map(([path, value], i) => (
-                    <div className="result-entry" key={i}>
-                      {path && <dt>{path}:</dt>}
-                      <dd><pre>{value}</pre></dd>
-                    </div>
-                  ))}
-                </dl>
+          <fieldset className={`output-panel${flash ? " flash" : ""}`} aria-live="polite" ref={outputPanelRef}>
+            <legend>
+              Results
+              {results !== null && (
+                <span className="match-count">
+                  {results.length === 1 ? ": 1 match" : `: ${results.length} matches`}
+                </span>
               )}
-            </output>
-          </div>
-        </fieldset>
+            </legend>
+            <div className="output-scroll-container">
+              <output className="output-box" ref={outputRef}>
+                {error ? (
+                  <samp className="output-error">{error}</samp>
+                ) : results === null ? (
+                  <p className="output-placeholder">Results will appear here...</p>
+                ) : results.length === 0 ? (
+                  <p className="output-placeholder">No results found matching the query.</p>
+                ) : (
+                  <dl className="result-list">
+                    {results.map(([path, value], i) => (
+                      <div className="result-entry" key={i}>
+                        {path && <dt>{path}:</dt>}
+                        <dd><pre>{value}</pre></dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </output>
+            </div>
+          </fieldset>
         </div>
 
         <footer className="timing-bar" aria-label="Query performance timings">
