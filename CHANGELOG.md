@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Interactive WASM playground
+  ([#31](https://github.com/micahkepe/jsongrep/pull/31)) &rarr; viewable at
+  [https://micahkepe.com/jsongrep/playground/](https://micahkepe.com/jsongrep/playground/)
+
 ## [0.8.1] - 2026-03-30
 
 ### Fixed
