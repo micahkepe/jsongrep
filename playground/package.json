@@ -8,7 +8,7 @@
     "dev": "bun run setup && bun --hot src/index.ts",
     "build": "bun run setup && bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*' && bun run wasm:move",
     "start": "NODE_ENV=production bun src/index.ts",
-    "clean": "rm -r generated dist",
+    "clean": "rm -rf generated dist",
     "wasm:build": "cd wasm && cargo build --release --target wasm32-wasip2",
     "wasm:sanity-check": "bun run wasm:build && cd wasm && sh ./sanity-check.sh",
     "wasm:move": "cp generated/*.wasm dist",
