@@ -3,7 +3,7 @@
     "JetBrains Mono", Menlo, Monaco, "Lucida Console", "Liberation Mono",
     "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace,
     serif;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   font-variant-ligatures: none;
   font-feature-settings:
@@ -313,6 +313,9 @@ kbd {
 
 .timing-bar {
   grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
   color: var(--fg);
   padding-top: 0.25rem;
@@ -324,6 +327,94 @@ kbd {
   display: inline-block;
   min-width: 5ch;
   text-align: right;
+}
+
+.help-hint {
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.help-hint:hover {
+  color: var(--fg);
+}
+
+.help-hint kbd {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* Help dialog */
+.help-dialog {
+  background: var(--panel-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 1.5rem;
+  max-width: min(800px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.help-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.help-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--fg-strong);
+}
+
+.help-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+
+.help-close:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.help-table th {
+  text-align: left;
+  color: var(--fg-muted);
+  font-weight: bold;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-table code {
+  color: var(--accent);
+  font-family: inherit;
 }
 
 @media (max-width: 700px) {
