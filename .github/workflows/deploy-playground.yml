@@ -43,14 +43,20 @@ jobs:
           bun run build
       - name: Deploy to gh-pages branch
         run: |
-          # Save built artifacts before switching branches
           cp -r playground/dist /tmp/playground-dist
-          git fetch origin gh-pages
-          git checkout gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Use existing gh-pages branch, or create an orphan if it doesn't exist
+          if git fetch origin gh-pages 2>/dev/null; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf .
+          fi
+
           rm -rf playground
           cp -r /tmp/playground-dist playground
           git add playground
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "Deploy playground from ${{ github.sha }}" || echo "No changes to commit"
           git push origin gh-pages
