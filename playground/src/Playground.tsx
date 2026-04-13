@@ -85,8 +85,8 @@ export function Playground() {
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
     e.preventDefault();
 
-    if (!data || !query) {
-      setError("Please provide both data (JSON/YAML) and a query.");
+    if (!data) {
+      setError("Please provide data (JSON/YAML).");
       setResults([]);
       return;
     }
@@ -189,7 +189,7 @@ export function Playground() {
               <dl className="result-list">
                 {results.map(([path, value], i) => (
                   <div className="result-entry" key={i}>
-                    <dt>{path}:</dt>
+                    {path && <dt>{path}:</dt>}
                     <dd><pre>{value}</pre></dd>
                   </div>
                 ))}
