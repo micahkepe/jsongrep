@@ -36,6 +36,12 @@ export function App() {
         </hgroup>
         <nav className="header-actions" aria-label="Site actions">
           <a
+            href="https://github.com/micahkepe/jsongrep#installation"
+            className="install-link"
+          >
+            install
+          </a>
+          <a
             href="https://github.com/micahkepe/jsongrep"
             className="github-link"
             aria-label="jsongrep on GitHub"
