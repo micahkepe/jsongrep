@@ -12,6 +12,8 @@
 <code>jsongrep</code> is a command-line tool and Rust library for
 <a href="https://micahkepe.com/jsongrep/end_to_end_xlarge/report/index.html">fast querying</a>
 of JSON, YAML, TOML, JSONL, CBOR, and MessagePack documents using <strong>regular path expressions</strong>.
+<br>
+<a href="https://micahkepe.com/jsongrep/playground/">Try it in your browser</a> · <a href="#installation">Install</a>
 </p>
 
 <p align="center">
