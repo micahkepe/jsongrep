@@ -1,21 +1,28 @@
-# bun-react-template
+# JSONGrep Playground
 
-To install dependencies:
+A browser-based playground for
+[jsongrep](https://github.com/micahkepe/jsongrep), powered by WebAssembly.
+
+## Prerequisites
+
+- [Bun](https://bun.sh)
+- [Rust](https://rustup.rs) with the `wasm32-wasip2` target:
+
+  ```bash
+  rustup target add wasm32-wasip2
+  ```
+
+## Development
 
 ```bash
 bun install
-```
-
-To start a development server:
-
-```bash
 bun dev
 ```
 
-To run for production:
+## Production build
 
 ```bash
-bun start
+bun run build
 ```
 
-This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+The output is written to `dist/` and can be served as a static site.
