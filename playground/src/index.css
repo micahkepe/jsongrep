@@ -5,16 +5,84 @@
         monospace, serif;
     font-size: 14px;
     line-height: 1.6;
-    color-scheme: dark;
-    color: #ccc;
-    background-color: #000;
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "calt" 0;
+
+    /* Dark theme (default) */
+    --bg: #000;
+    --fg: #ccc;
+    --fg-strong: #fff;
+    --fg-muted: rgba(255, 255, 255, 0.5);
+    --fg-faint: rgba(255, 255, 255, 0.3);
+    --border: rgba(95, 95, 95, 0.78);
+    --accent: #ff2e88;
+    --accent-hover: #b7005d;
+    --selection: #ce0068;
+    --error: #e57373;
+    --input-bg: #000;
+    --input-fg: #ccc;
+    --output-fg: #fff;
+
+    color-scheme: dark light;
+    color: var(--fg);
+    background-color: var(--bg);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #f6f7f4;
+        --fg: #333;
+        --fg-strong: #000;
+        --fg-muted: rgba(0, 0, 0, 0.7);
+        --fg-faint: rgba(0, 0, 0, 0.35);
+        --border: #ccc;
+        --accent: #ff2e88;
+        --accent-hover: #ce0068;
+        --selection: #ce0068;
+        --error: #c62c2a;
+        --input-bg: #fff;
+        --input-fg: #333;
+        --output-fg: #000;
+    }
+}
+
+[data-theme="dark"] {
+    --bg: #000;
+    --fg: #ccc;
+    --fg-strong: #fff;
+    --fg-muted: rgba(255, 255, 255, 0.5);
+    --fg-faint: rgba(255, 255, 255, 0.3);
+    --border: rgba(95, 95, 95, 0.78);
+    --accent: #ff2e88;
+    --accent-hover: #b7005d;
+    --selection: #ce0068;
+    --error: #e57373;
+    --input-bg: #000;
+    --input-fg: #ccc;
+    --output-fg: #fff;
+    color-scheme: dark;
+}
+
+[data-theme="light"] {
+    --bg: #f6f7f4;
+    --fg: #333;
+    --fg-strong: #000;
+    --fg-muted: rgba(0, 0, 0, 0.7);
+    --fg-faint: rgba(0, 0, 0, 0.35);
+    --border: #ccc;
+    --accent: #ff2e88;
+    --accent-hover: #ce0068;
+    --selection: #ce0068;
+    --error: #c62c2a;
+    --input-bg: #fff;
+    --input-fg: #333;
+    --output-fg: #000;
+    color-scheme: light;
 }
 
 ::selection {
     color: white;
-    background: #ce0068;
+    background: var(--selection);
 }
 
 body {
@@ -23,16 +91,18 @@ body {
     place-items: center;
     min-width: 320px;
     min-height: 100vh;
+    background-color: var(--bg);
+    color: var(--fg);
 }
 
 a {
-    color: #ff2e88;
+    color: var(--accent);
     text-decoration: none;
-    border-bottom: 1.5px solid #ff2e88;
+    border-bottom: 1.5px solid var(--accent);
 }
 
 a:hover {
-    background-color: #b7005d;
+    background-color: var(--accent-hover);
     color: #fff;
 }
 
@@ -41,17 +111,40 @@ a:hover {
     padding: 2rem 0;
 }
 
+.app header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
 .app h1 {
     margin: 0 0 0.25rem;
     font-size: 1.4rem;
-    color: #fff;
+    color: var(--fg-strong);
     font-weight: bold;
 }
 
 .app .subtitle {
-    margin: 0 0 1.5rem;
-    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+    color: var(--fg-muted);
     font-size: 0.85rem;
+}
+
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 /* Two-column layout: inputs left, output right */
@@ -67,14 +160,14 @@ a:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    border: 1px solid rgba(95, 95, 95, 0.78);
+    border: 1px solid var(--border);
     padding: 1rem;
     margin: 0;
 }
 
 .inputs-panel > legend,
 .output-panel > legend {
-    color: #ccc;
+    color: var(--fg);
     font-weight: bold;
     font-size: 0.85rem;
     padding: 0 0.4rem;
@@ -82,17 +175,17 @@ a:hover {
 
 label {
     font-weight: bold;
-    color: #ccc;
+    color: var(--fg);
     font-size: 0.85rem;
 }
 
 .textarea {
     width: 100%;
-    border: 1px solid rgba(95, 95, 95, 0.78);
+    border: 1px solid var(--border);
     border-radius: 0;
     padding: 0.75rem;
-    color: #ccc;
-    background: #000;
+    color: var(--input-fg);
+    background: var(--input-bg);
     font-family: inherit;
     font-size: inherit;
     line-height: 1.6;
@@ -104,7 +197,7 @@ label {
 }
 
 .textarea:focus {
-    border-color: #ff2e88;
+    border-color: var(--accent);
 }
 
 .data-box {
@@ -120,20 +213,20 @@ label {
     min-height: 380px;
     overflow-y: auto;
     padding: 0.75rem;
-    border: 1px solid rgba(95, 95, 95, 0.78);
-    color: #fff;
+    border: 1px solid var(--border);
+    color: var(--output-fg);
     font-family: inherit;
     font-size: inherit;
     line-height: 1.6;
 }
 
 .output-placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--fg-faint);
     margin: 0;
 }
 
 .output-error {
-    color: #e57373;
+    color: var(--error);
 }
 
 .result-list {
@@ -150,7 +243,7 @@ label {
 }
 
 .result-entry dt {
-    color: #ff2e88;
+    color: var(--accent);
     font-weight: bold;
     margin: 0;
 }
@@ -174,8 +267,8 @@ label {
 
 .run-button {
     background: transparent;
-    color: #ff2e88;
-    border: 1px solid #ff2e88;
+    color: var(--accent);
+    border: 1px solid var(--accent);
     padding: 0.4rem 1.4rem;
     border-radius: 0;
     font-family: inherit;
@@ -186,18 +279,18 @@ label {
 }
 
 .run-button:hover {
-    background: #b7005d;
+    background: var(--accent-hover);
     color: #fff;
-    border-color: #b7005d;
+    border-color: var(--accent-hover);
 }
 
 .run-button:active {
-    background: #ce0068;
-    border-color: #ce0068;
+    background: var(--selection);
+    border-color: var(--selection);
 }
 
 kbd {
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--fg-faint);
     font-family: inherit;
     font-size: 0.8rem;
 }
@@ -205,12 +298,12 @@ kbd {
 .timing-bar {
     grid-column: 1 / -1;
     font-size: 0.85rem;
-    color: #ccc;
+    color: var(--fg);
     padding-top: 0.25rem;
 }
 
 .timing-bar data {
-    color: #ff2e88;
+    color: var(--accent);
     font-weight: bold;
     display: inline-block;
     min-width: 5ch;
