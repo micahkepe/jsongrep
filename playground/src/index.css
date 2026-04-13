@@ -137,6 +137,24 @@ a:hover {
   font-size: 0.85rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.github-link {
+  color: var(--fg);
+  border-bottom: none;
+  display: flex;
+  transition: color 0.15s;
+}
+
+.github-link:hover {
+  color: var(--accent);
+  background: none;
+}
+
 .theme-toggle {
   background: none;
   border: 1px solid var(--border);
