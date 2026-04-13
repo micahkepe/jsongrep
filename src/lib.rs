@@ -60,13 +60,23 @@ For more details on the automaton constructions, see the [`dfa`] and
 The query language relies on regular expression syntax, with some modifications
 to support JSON.
 
-## Grammar
+| Operator     | Example              | Description                                                   |
+| ------------ | -------------------- | ------------------------------------------------------------- |
+| Sequence     | `foo.bar.baz`        | **Concatenation**: match path `foo` &rarr; `bar` &rarr; `baz` |
+| Disjunction  | `foo \| bar`         | **Union**: match either `foo` or `bar`                        |
+| Kleene star  | `**`                 | Match zero or more field accesses                             |
+| Repetition   | `foo*`               | Repeat the preceding step zero or more times                  |
+| Wildcards    | `*` or `[*]`         | Match any single field or array index                         |
+| Optional     | `foo?.bar`           | Optional `foo` field access                                   |
+| Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
+| Array index  | `[0]` or `[1:3]`     | Match specific index or slice (exclusive end)                 |
 
-The grammar for the query language is defined in the `query.pest` file in the
-`grammar` directory.
+These queries can be arbitrarily nested with parentheses. For example,
+`foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.
 
-# Query Syntax Examples
-
+This also means that you can recursively descend **any** path with `(* | [*])*`,
+e.g., `(* | [*])*.foo` to find all paths matching `foo` field at any
+depth.
 Here are some example queries and their meanings:
 
 - `name`: Matches the `name` field in the root object (e.g., ```"John Doe"```).
@@ -87,6 +97,10 @@ Finally, we can use wildcards to match any field or index:
 - `[*]`: Matches any single array index in the root array.
 - `[*].*`: Matches any field inside each element of an array.
 - `([*] | *)*`: Matches any field or index at any level of the JSON tree.
+
+## Playground
+
+You can try queries interactively in the [playground](https://micahkepe.com/jsongrep/playground/).
 
 [`nfa`]: crate::query::nfa
 [`dfa`]: crate::query::dfa
