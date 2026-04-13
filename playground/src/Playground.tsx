@@ -1,27 +1,56 @@
-import { useState, type FormEvent } from "react";
-import { useId } from "react";
+import { useState, useId, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { jsongrep } from "generated/jsongrep_wasm";
 
+const MAX_INPUT_SIZE = 1_000_000;
+
+const DEFAULT_DATA = `{
+  "users": [
+    { "name": "Alice", "age": 30, "role": "admin" },
+    { "name": "Bob", "age": 25, "role": "user" },
+    { "name": "Charlie", "age": 35, "role": "user" }
+  ]
+}`;
+
+const DEFAULT_QUERY = "users[*].name";
+
 export function Playground() {
-  const [data, setData] = useState("");
-  const [query, setQuery] = useState("");
-  const [output, setOutput] = useState("");
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const [results, setResults] = useState<[string, string][]>([]);
+  const [error, setError] = useState("");
   const [compileTiming, setCompileTiming] = useState("0");
   const [queryTiming, setQueryTiming] = useState("0");
 
   const queryId = useId();
   const dataId = useId();
-  const outputId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  };
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!data || !query) {
-      setOutput("Please provide both data (JSON/YAML) and a query.");
+      setError("Please provide both data (JSON/YAML) and a query.");
+      setResults([]);
+      return;
+    }
+
+    if (data.length > MAX_INPUT_SIZE) {
+      setError(
+        `Input too large (${(data.length / 1_000_000).toFixed(1)} MB, max 1 MB).`,
+      );
+      setResults([]);
       return;
     }
 
     try {
+      setError("");
       const beforeRoundtrip = performance.now();
       const resultsWithTimings: jsongrep.TimingResults =
         jsongrep.queryWithTimings(data, query);
@@ -31,75 +60,98 @@ export function Playground() {
       if (localStorage.getItem("JSONGREP_TIMINGS")) {
         console.log({ timings: resultsWithTimings.timings, roundtrip });
       }
-      const results: string[] = resultsWithTimings.results.map(
-        ([, value]) => value,
-      );
-      setOutput(
-        results.length > 0
-          ? results.join("\n\n---\n\n")
-          : "No results found matching the query.",
-      );
-      resultsWithTimings.timings.compileNs === 0n
-        ? setCompileTiming("< 1")
-        : setCompileTiming(
-            `${Number(resultsWithTimings.timings.compileNs) / 1e6}`,
-          );
-      resultsWithTimings.timings.queryNs === 0n
-        ? setQueryTiming("< 1")
-        : setQueryTiming(`${Number(resultsWithTimings.timings.queryNs) / 1e6}`);
-    } catch (error) {
+      setResults(resultsWithTimings.results);
+
+      if (resultsWithTimings.timings.compileNs === 0n) {
+        setCompileTiming("< 1");
+      } else {
+        setCompileTiming(
+          `${Number(resultsWithTimings.timings.compileNs / 1_000_000n)}`,
+        );
+      }
+      if (resultsWithTimings.timings.queryNs === 0n) {
+        setQueryTiming("< 1");
+      } else {
+        setQueryTiming(
+          `${Number(resultsWithTimings.timings.queryNs / 1_000_000n)}`,
+        );
+      }
+    } catch (err) {
       let message = "An unknown error occurred.";
-      if (typeof error === "string") message = error;
-      else if (error instanceof Error) message = error.message;
-      setOutput(`ERROR: ${message}`);
+      if (typeof err === "string") message = err;
+      else if (err instanceof Error) message = err.message;
+      setError(message);
+      setResults([]);
     }
   };
 
   return (
-    <div className="api-tester">
-      <div className="inputs-panel">
-        <div className="input-group">
-          <label htmlFor={dataId}>Data (JSON / YAML)</label>
-          <textarea
-            id={dataId}
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-            placeholder="Paste your JSON or YAML data here."
-            className="textarea data-box"
-          />
-        </div>
+    <form
+      className="api-tester"
+      onSubmit={handleSubmit}
+      ref={formRef}
+      aria-label="JSONGrep query playground"
+    >
+      <fieldset className="inputs-panel">
+        <legend>Input</legend>
 
-        <div className="input-group">
-          <label htmlFor={queryId}>Query</label>
-          <textarea
-            id={queryId}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. users[*].name"
-            className="textarea query-box"
-          />
-        </div>
+        <label htmlFor={dataId}>Data (JSON / YAML)</label>
+        <textarea
+          id={dataId}
+          value={data}
+          onChange={(e) => setData(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Paste your JSON or YAML data here."
+          className="textarea data-box"
+          spellCheck={false}
+        />
 
-        <form onSubmit={handleSubmit}>
-          <button type="submit" className="run-button">
+        <label htmlFor={queryId}>Query</label>
+        <textarea
+          id={queryId}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="e.g. users[*].name"
+          className="textarea query-box"
+          spellCheck={false}
+        />
+
+        <footer className="button-row">
+          <button type="submit" className="run-button" aria-label="Run query">
             Run Query
           </button>
-        </form>
-      </div>
+          <kbd aria-label="Keyboard shortcut: Command or Control plus Enter">
+            Cmd+Enter
+          </kbd>
+        </footer>
+      </fieldset>
 
-      <div className="output-panel">
-        <label htmlFor={outputId}>Results</label>
-        <textarea
-          id={outputId}
-          value={output}
-          readOnly
-          placeholder="Results will appear here…"
-          className="textarea output-box"
-        />
-      </div>
-      <div>
-        compile query: {compileTiming} ms and run query: {queryTiming} ms
-      </div>
-    </div>
+      <fieldset className="output-panel" aria-live="polite">
+        <legend>Results</legend>
+        <output className="output-box">
+          {error ? (
+            <samp className="output-error">{error}</samp>
+          ) : results.length > 0 ? (
+            <dl className="result-list">
+              {results.map(([path, value], i) => (
+                <div className="result-entry" key={i}>
+                  <dt>{path}:</dt>
+                  <dd><pre>{value}</pre></dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="output-placeholder">Results will appear here...</p>
+          )}
+        </output>
+      </fieldset>
+
+      <footer className="timing-bar" aria-label="Query performance timings">
+        compile: <data value={compileTiming}>{compileTiming} ms</data>
+        {" / "}
+        query: <data value={queryTiming}>{queryTiming} ms</data>
+      </footer>
+    </form>
   );
 }
