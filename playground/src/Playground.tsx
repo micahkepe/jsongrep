@@ -1,4 +1,4 @@
-import { useState, useId, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useId, useRef, useEffect, type FormEvent } from "react";
 import { jsongrep } from "generated/jsongrep_wasm";
 
 const MAX_INPUT_SIZE = 1_000_000;
@@ -38,12 +38,16 @@ export function Playground() {
     return () => clearTimeout(id);
   }, [runCount]);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      formRef.current?.requestSubmit();
-    }
-  };
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -115,7 +119,7 @@ export function Playground() {
           id={dataId}
           value={data}
           onChange={(e) => setData(e.target.value)}
-          onKeyDown={handleKeyDown}
+
           placeholder="Paste your JSON or YAML data here."
           className="textarea data-box"
           spellCheck={false}
@@ -126,7 +130,7 @@ export function Playground() {
           id={queryId}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
+
           placeholder="e.g. users[*].name"
           className="textarea query-box"
           spellCheck={false}

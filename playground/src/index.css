@@ -143,7 +143,9 @@ a:hover {
   color: var(--fg);
   font-family: inherit;
   font-size: 0.85rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0;
+  width: 7ch;
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.15s;
 }
