@@ -74,8 +74,12 @@ export function Playground() {
         e.preventDefault();
         setHelpOpen((open) => !open);
       }
-      if (e.key === "Escape" && helpOpen) {
-        setHelpOpen(false);
+      if (e.key === "Escape") {
+        if (helpOpen) {
+          setHelpOpen(false);
+        } else if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
       }
     };
     document.addEventListener("keydown", handler);
