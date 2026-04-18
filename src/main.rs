@@ -310,6 +310,7 @@ fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
 /// This parses the command line arguments and executes the query. If the input
 /// is piped in, it reads from STDIN. The output is printed to STDOUT, with
 /// formatting determined by the command line arguments.
+#[expect(clippy::too_many_lines, reason = "Argument parsing combinations")]
 fn main() -> Result<()> {
     let mut args = Args::parse();
 
