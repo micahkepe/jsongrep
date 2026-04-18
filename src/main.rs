@@ -50,11 +50,14 @@ struct Args {
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
     /// Display count of number of matches
-    #[arg(long, action = ArgAction::SetTrue)]
+    #[arg(long, action = ArgAction::SetTrue, conflicts_with = "depth")]
     count: bool,
     /// Display depth of the input document
-    #[arg(long, action = ArgAction::SetTrue)]
+    #[arg(long, action = ArgAction::SetTrue, conflicts_with = "count")]
     depth: bool,
+    /// Machine-readable output: strip labels and colors (useful for piping)
+    #[arg(long, action = ArgAction::SetTrue)]
+    porcelain: bool,
     /// Do not display matched JSON values
     #[arg(short, long, action = ArgAction::SetTrue)]
     no_display: bool,
@@ -308,7 +311,7 @@ fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
 /// is piped in, it reads from STDIN. The output is printed to STDOUT, with
 /// formatting determined by the command line arguments.
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     match args.command {
         Some(Commands::Generate(cmd)) => match cmd {
@@ -384,23 +387,35 @@ fn main() -> Result<()> {
 
             let mut writer = BufWriter::new(stdout);
 
+            if args.count || args.depth {
+                args.no_display = true;
+            }
+
             if args.count {
-                writeln!(
-                    writer,
-                    "{} {}",
-                    "Found matches:".bold().blue(),
-                    results.len()
-                )
-                .with_context(|| "Failed to write to stdout")?;
+                if args.porcelain {
+                    writeln!(writer, "{}", results.len())?;
+                } else {
+                    writeln!(
+                        writer,
+                        "{} {}",
+                        "Found matches:".bold().blue(),
+                        results.len()
+                    )
+                    .with_context(|| "Failed to write to stdout")?;
+                }
             }
 
             if args.depth {
-                writeln!(
-                    writer,
-                    "{} {}",
-                    "Depth:".bold().blue(),
-                    depth(&json)
-                )?;
+                if args.porcelain {
+                    writeln!(writer, "{}", depth(&json))?;
+                } else {
+                    writeln!(
+                        writer,
+                        "{} {}",
+                        "Depth:".bold().blue(),
+                        depth(&json)
+                    )?;
+                }
             }
 
             if !args.no_display {

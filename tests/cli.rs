@@ -559,4 +559,43 @@ mod tests {
         let tmp = temp_file_with(".msgpack", b"\x85");
         run_main(&["age", tmp.path().to_str().expect("temp path")]).failure();
     }
+
+    #[test]
+    fn count_suppresses_match_output() {
+        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--count"])
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(!output.contains("32"), "--count should suppress match values");
+    }
+
+    #[test]
+    fn depth_outputs_labeled_number() {
+        let assert =
+            run_main(&["", SIMPLE_JSON_FILEPATH, "--depth"]).success().code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            output.contains("Depth:") && output.contains('3'),
+            "Expected 'Depth: 3', got: {output:?}"
+        );
+    }
+
+    #[test]
+    fn depth_porcelain_outputs_bare_number() {
+        let assert =
+            run_main(&["", SIMPLE_JSON_FILEPATH, "--depth", "--porcelain"])
+                .success()
+                .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), "3");
+    }
+
+    #[test]
+    fn count_and_depth_are_mutually_exclusive() {
+        run_main(&["age", SIMPLE_JSON_FILEPATH, "--count", "--depth"])
+            .failure();
+    }
 }
