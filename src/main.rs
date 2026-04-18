@@ -328,6 +328,52 @@ fn main() -> Result<()> {
             }
         },
         None => {
+            // NOTE: use single, locked stdout handle to avoid interleaving
+            let stdout = stdout().lock();
+            // Path headers follow ripgrep conventions: shown in terminals,
+            // hidden when piped, with explicit overrides.
+            let show_path = if args.with_path {
+                true
+            } else if args.no_path {
+                false
+            } else {
+                stdout.is_terminal()
+            };
+            let mut writer = BufWriter::new(stdout);
+
+            // --depth without a query: sole positional argument is the file
+            if args.depth && args.query.is_some() && args.input.is_none() {
+                args.input = args.query.take().map(PathBuf::from);
+            }
+            // short circuit to only perform the depth computation
+            if args.depth && args.input.is_some() {
+                let format = detect_format(args.input.as_ref(), args.format);
+                let input_content = parse_input_content(args.input)?;
+                let json_string_owned = match format {
+                    Format::Auto | Format::Json => None,
+                    other => Some(input_content.to_json_string(other)?),
+                };
+                let json_str: &str = match &json_string_owned {
+                    Some(s) => s.as_str(),
+                    None => input_content
+                        .to_str()
+                        .context("File contents are not valid UTF-8")?,
+                };
+                let json: Value = serde_json::from_str(json_str)
+                    .with_context(|| format!("Failed to parse as {format}"))?;
+                if args.porcelain {
+                    writeln!(writer, "{}", depth(&json))?;
+                } else {
+                    writeln!(
+                        writer,
+                        "{} {}",
+                        "Depth:".bold().blue(),
+                        depth(&json)
+                    )?;
+                }
+                return Ok(());
+            }
+
             let raw_query = args.query.ok_or_else(|| {
                 anyhow::anyhow!("Query string required unless using subcommand")
             })?;
@@ -372,21 +418,6 @@ fn main() -> Result<()> {
                 QueryDFA::from_query(&query)
             };
             let results = dfa.find(&json);
-
-            // NOTE: use single, locked stdout handle to avoid interleaving
-            let stdout = stdout().lock();
-
-            // Path headers follow ripgrep conventions: shown in terminals,
-            // hidden when piped, with explicit overrides.
-            let show_path = if args.with_path {
-                true
-            } else if args.no_path {
-                false
-            } else {
-                stdout.is_terminal()
-            };
-
-            let mut writer = BufWriter::new(stdout);
 
             if args.count || args.depth {
                 args.no_display = true;
