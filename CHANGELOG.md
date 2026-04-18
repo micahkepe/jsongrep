@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive WASM playground
   ([#31](https://github.com/micahkepe/jsongrep/pull/31)) &rarr; viewable at
   [https://micahkepe.com/jsongrep/playground/](https://micahkepe.com/jsongrep/playground/)
+- `--porcelain` flag &rarr; outputs explicit machine-readable output (mimics
+  `git` convention) (#32)
+
+### Changed
+
+- make `--count`/ `--depth` mutually exclusive
+  - Previously, either could be used in combination, but with the addition of
+    `--porcelain`, which strips the "Found matches"/"Depth" prefixes from the
+    output, the bare count/depth results would be indistinguishable
+  - Explicitly makes these options mutually exclusive via `clap`'s
+    `conflicts_with` attribute
+    provided, then the input must be the sole positional argument and is treated
+    as such. No user-facing changes, old invocation still works.
+- `--count`/ `--depth` now imply `--no-display` &rarr; these options are solely
+  for matches and document analysis, do not need display of the results,
+  especially for `--depth`, which now doe not need a query string.
+
+### Breaking
+
+- BREAKING CHANGE: `--count`/ `--depth` are now **mutually exclusive**
+- BREAKING CHANGE: `jsongrep::query::QueryEngine` marked as deprecated, prefer
+  `QueryDFA::find` directly.
 
 ## [0.8.1] - 2026-03-30
 
