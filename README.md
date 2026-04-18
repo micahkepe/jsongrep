@@ -71,18 +71,28 @@ cargo install jsongrep
 
 ## Quick Example
 
+Extract all first names from the Nobel Prize API:
+
 ```bash
-# Extract all firstnames from the Nobel Prize API
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].laureates[*].firstname'
+curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].laureates[*].firstname'
+```
+
+```
 prizes.[0].laureates.[0].firstname:
 "Susumu"
 prizes.[0].laureates.[1].firstname:
 "Richard"
 prizes.[0].laureates.[2].firstname:
 "Omar M."
+```
 
-# Works with inline JSON too
-$ echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
+Works with inline JSON too:
+
+```bash
+echo '{"users": [{"name": "Alice"}, {"name": "Bob"}]}' | jg 'users.[*].name'
+```
+
+```
 users.[0].name:
 "Alice"
 users.[1].name:
@@ -120,18 +130,28 @@ paths you want, and the engine finds them.
 
 **Find a field at any depth:**
 
+`jsongrep`: `-F` treats the query as a literal field name at any depth:
+
 ```bash
-# jsongrep: -F treats the query as a literal field name at any depth
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | head -6
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | head -6
+```
+
+```
 prizes.[0].laureates.[0].firstname:
 "Susumu"
 prizes.[0].laureates.[1].firstname:
 "Richard"
 prizes.[0].laureates.[2].firstname:
 "Omar M."
+```
 
-# jq: requires a recursive descent operator and null suppression
-$ curl -s https://api.nobelprize.org/v1/prize.json | jq '.. | .firstname? // empty' | head -3
+`jq`: requires a recursive descent operator and null suppression:
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jq '.. | .firstname? // empty' | head -3
+```
+
+```
 "Susumu"
 "Richard"
 "Omar M."
@@ -144,36 +164,59 @@ show terminal output; when piped, path headers are hidden by default. See
 
 **Select multiple fields at once:**
 
+`jsongrep`: disjunction with `(year|category)`:
+
 ```bash
-# jsongrep: disjunction with (year|category)
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].(year|category)'
+curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[0].(year|category)'
+```
+
+```
 prizes.[0].year:
 "2025"
 prizes.[0].category:
 "chemistry"
+```
 
-# jq: requires listing each field separately
-$ curl -s https://api.nobelprize.org/v1/prize.json | jq '.prizes[0] | .year, .category'
+`jq`: requires listing each field separately:
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jq '.prizes[0] | .year, .category'
+```
+
+```
 "2025"
 "chemistry"
 ```
 
 **Count matches:**
 
-```bash
-# jsongrep
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count
-Found matches: 1026
+`jsongrep`:
 
-# jq
-$ curl -s https://api.nobelprize.org/v1/prize.json | jq '[.. | .firstname? // empty] | length'
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count
+```
+
+```
+Found matches: 1026
+```
+
+`jq`:
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jq '[.. | .firstname? // empty] | length'
+```
+
+```
 1026
 ```
 
 **Pretty-print JSON** (like `jq '.'`):
 
 ```bash
-$ echo '{"name":"Ada","age":36}' | jg ''
+echo '{"name":"Ada","age":36}' | jg ''
+```
+
+```json
 {
   "name": "Ada",
   "age": 36
@@ -221,7 +264,10 @@ queries work identically regardless of input format.
 **Query your Cargo.toml:**
 
 ```bash
-$ jg 'dependencies.*.version' Cargo.toml
+jg 'dependencies.*.version' Cargo.toml
+```
+
+```
 dependencies.clap.version:
 "4.5.43"
 dependencies.serde.version:
@@ -232,7 +278,10 @@ dependencies.serde.version:
 **Query a docker-compose.yml:**
 
 ```bash
-$ jg 'services.*.image' docker-compose.yml
+jg 'services.*.image' docker-compose.yml
+```
+
+```
 services.web.image:
 "nginx:latest"
 services.db.image:
@@ -242,7 +291,10 @@ services.db.image:
 **JSONL/NDJSON**: each line becomes an array element:
 
 ```bash
-$ jg '[*].email' users.jsonl
+jg '[*].email' users.jsonl
+```
+
+```
 [0].email:
 "alice@example.com"
 [1].email:
@@ -252,7 +304,10 @@ $ jg '[*].email' users.jsonl
 **Explicit format flag** (useful for stdin or non-standard extensions):
 
 ```bash
-$ cat config.yaml | jg -f yaml 'database.host'
+cat config.yaml | jg -f yaml 'database.host'
+```
+
+```
 database.host:
 "localhost"
 ```
@@ -260,8 +315,8 @@ database.host:
 **Binary formats** (CBOR, MessagePack):
 
 ```bash
-$ jg 'name' data.cbor
-$ jg -f msgpack 'name' data.bin
+jg 'name' data.cbor
+jg -f msgpack 'name' data.bin
 ```
 
 | Format       | Extensions          | Feature flag | Notes                   |
@@ -316,11 +371,24 @@ Options:
 curl -s https://api.nobelprize.org/v1/prize.json | jg -F motivation | head -4
 ```
 
-**Count matches without displaying them:**
+**Count matches:**
 
 ```bash
 curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count
-# Found matches: 1026
+```
+
+```
+Found matches: 1026
+```
+
+**Machine-readable count (pipe-friendly):**
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count --porcelain
+```
+
+```
+1026
 ```
 
 **Piping to other tools:**
@@ -330,14 +398,22 @@ By default, path headers display in terminals and hide when output is piped
 cleanly:
 
 ```bash
-# Piped: values only, ready for sort/uniq/wc
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | sort | head -3
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname | sort | head -3
+```
+
+```
 "A. Michael"
 "Aage N."
 "Aaron"
+```
 
-# Force path headers when piped
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --with-path | head -4
+**Force path headers when piped:**
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --with-path | head -4
+```
+
+```
 prizes.[0].laureates.[0].firstname:
 "Susumu"
 prizes.[0].laureates.[1].firstname:
