@@ -162,7 +162,7 @@ $ curl -s https://api.nobelprize.org/v1/prize.json | jq '.prizes[0] | .year, .ca
 
 ```bash
 # jsongrep
-$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
+$ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count
 Found matches: 1026
 
 # jq
@@ -298,6 +298,7 @@ Options:
       --compact          Do not pretty-print the JSON output
       --count            Display count of number of matches
       --depth            Display depth of the input document
+      --porcelain        Machine-readable output: strip labels and colors (useful for piping)
   -n, --no-display       Do not display matched JSON values
   -F, --fixed-string     Treat the query as a literal field name and search at any depth
       --with-path        Always print the path header, even when output is piped
@@ -318,7 +319,7 @@ curl -s https://api.nobelprize.org/v1/prize.json | jg -F motivation | head -4
 **Count matches without displaying them:**
 
 ```bash
-curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count -n
+curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count
 # Found matches: 1026
 ```
 
