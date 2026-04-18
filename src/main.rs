@@ -305,6 +305,33 @@ fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
     }
 }
 
+/// Parses the input and invokes `f` with a borrowed [`Value`] to preserve zero-copy path for
+/// JSON/Auto `Format`s.
+fn with_json<F, T>(input: Option<PathBuf>, format: Format, f: F) -> Result<T>
+where
+    F: FnOnce(&Value) -> Result<T>,
+{
+    let input_content = parse_input_content(input)?;
+
+    // For JSON/Auto we borrow directly from the mmap/stdin buffer,
+    // preserving the zero-copy path that serde_json_borrow provides.
+    // For other formats, we convert to an owned JSON string first
+    // and then borrow from that.
+    let json_string_owned = match format {
+        Format::Json | Format::Auto => None,
+        other => Some(input_content.to_json_string(other)?),
+    };
+    let json_str: &str = match &json_string_owned {
+        Some(s) => s.as_str(),
+        None => input_content
+            .to_str()
+            .context("File contents are not valid UTF-8")?,
+    };
+    let json: Value = serde_json::from_str(json_str)
+        .with_context(|| format!("Failed to parse as {format}"))?;
+    f(&json)
+}
+
 /// Entry point for main binary.
 ///
 /// This parses the command line arguments and executes the query. If the input
@@ -348,29 +375,20 @@ fn main() -> Result<()> {
             // short circuit to only perform the depth computation
             if args.depth && args.input.is_some() {
                 let format = detect_format(args.input.as_ref(), args.format);
-                let input_content = parse_input_content(args.input)?;
-                let json_string_owned = match format {
-                    Format::Auto | Format::Json => None,
-                    other => Some(input_content.to_json_string(other)?),
-                };
-                let json_str: &str = match &json_string_owned {
-                    Some(s) => s.as_str(),
-                    None => input_content
-                        .to_str()
-                        .context("File contents are not valid UTF-8")?,
-                };
-                let json: Value = serde_json::from_str(json_str)
-                    .with_context(|| format!("Failed to parse as {format}"))?;
-                if args.porcelain {
-                    writeln!(writer, "{}", depth(&json))?;
-                } else {
-                    writeln!(
-                        writer,
-                        "{} {}",
-                        "Depth:".bold().blue(),
-                        depth(&json)
-                    )?;
-                }
+                with_json(args.input, format, |json| {
+                    if args.porcelain {
+                        writeln!(writer, "{}", depth(json))?;
+                    } else {
+                        writeln!(
+                            writer,
+                            "{} {}",
+                            "Depth:".bold().blue(),
+                            depth(json)
+                        )?;
+                    }
+                    Ok(())
+                })?;
+
                 return Ok(());
             }
 
@@ -393,75 +411,60 @@ fn main() -> Result<()> {
             };
 
             let format = detect_format(args.input.as_ref(), args.format);
-            let input_content = parse_input_content(args.input)?;
-
-            // For JSON/Auto we borrow directly from the mmap/stdin buffer,
-            // preserving the zero-copy path that serde_json_borrow provides.
-            // For other formats, we convert to an owned JSON string first
-            // and then borrow from that.
-            let json_string_owned = match format {
-                Format::Json | Format::Auto => None,
-                other => Some(input_content.to_json_string(other)?),
-            };
-            let json_str: &str = match &json_string_owned {
-                Some(s) => s.as_str(),
-                None => input_content
-                    .to_str()
-                    .context("File contents are not valid UTF-8")?,
-            };
-
-            let json: Value = serde_json::from_str(json_str)
-                .with_context(|| format!("Failed to parse as {format}"))?;
-            let dfa = if args.ignore_case {
-                QueryDFA::from_query_ignore_case(&query)
-            } else {
-                QueryDFA::from_query(&query)
-            };
-            let results = dfa.find(&json);
-
-            if args.count || args.depth {
-                args.no_display = true;
-            }
-
-            if args.count {
-                if args.porcelain {
-                    writeln!(writer, "{}", results.len())?;
+            with_json(args.input, format, |json| {
+                let dfa = if args.ignore_case {
+                    QueryDFA::from_query_ignore_case(&query)
                 } else {
-                    writeln!(
-                        writer,
-                        "{} {}",
-                        "Found matches:".bold().blue(),
-                        results.len()
-                    )
-                    .with_context(|| "Failed to write to stdout")?;
-                }
-            }
+                    QueryDFA::from_query(&query)
+                };
+                let results = dfa.find(json);
 
-            if args.depth {
-                if args.porcelain {
-                    writeln!(writer, "{}", depth(&json))?;
-                } else {
-                    writeln!(
-                        writer,
-                        "{} {}",
-                        "Depth:".bold().blue(),
-                        depth(&json)
-                    )?;
+                if args.count || args.depth {
+                    args.no_display = true;
                 }
-            }
 
-            if !args.no_display {
-                let pretty = !args.compact;
-                for result in &results {
-                    write_colored_result(
-                        &mut writer,
-                        result.value,
-                        &result.path,
-                        pretty,
-                        show_path,
-                    )?;
+                if args.count {
+                    if args.porcelain {
+                        writeln!(writer, "{}", results.len())?;
+                    } else {
+                        writeln!(
+                            writer,
+                            "{} {}",
+                            "Found matches:".bold().blue(),
+                            results.len()
+                        )
+                        .with_context(|| "Failed to write to stdout")?;
+                    }
                 }
-            }
+
+                if args.depth {
+                    if args.porcelain {
+                        writeln!(writer, "{}", depth(json))?;
+                    } else {
+                        writeln!(
+                            writer,
+                            "{} {}",
+                            "Depth:".bold().blue(),
+                            depth(json)
+                        )?;
+                    }
+                }
+
+                if !args.no_display {
+                    let pretty = !args.compact;
+                    for result in &results {
+                        write_colored_result(
+                            &mut writer,
+                            result.value,
+                            &result.path,
+                            pretty,
+                            show_path,
+                        )?;
+                    }
+                }
+
+                Ok(())
+            })?;
 
             match writer.flush() {
                 Ok(()) => {}
