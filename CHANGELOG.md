@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-18
+
 ### Added
 
 - Interactive WASM playground
@@ -17,17 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- make `--count`/ `--depth` mutually exclusive
+- `--count`/ `--depth` are now mutually exclusive
   - Previously, either could be used in combination, but with the addition of
     `--porcelain`, which strips the "Found matches"/"Depth" prefixes from the
     output, the bare count/depth results would be indistinguishable
   - Explicitly makes these options mutually exclusive via `clap`'s
     `conflicts_with` attribute
-    provided, then the input must be the sole positional argument and is treated
-    as such. No user-facing changes, old invocation still works.
+    provided
 - `--count`/ `--depth` now imply `--no-display` &rarr; these options are solely
   for matches and document analysis, do not need display of the results,
-  especially for `--depth`, which now doe not need a query string.
+  especially for `--depth`, which now does not need a query string.
+- `--depth` no longer requires a query string &rarr; sole positional argument is
+  treated as the file, e.g., `jg --depth foo.json`
+
+  > [!NOTE]
+  > Still maintains backwards compatibility with old invocation `jg --depth "<query>" foo.json`
 
 ### Breaking
 
@@ -242,7 +248,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/micahkepe/jsongrep/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/micahkepe/jsongrep/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/micahkepe/jsongrep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/micahkepe/jsongrep/compare/v0.6.0...v0.7.0
