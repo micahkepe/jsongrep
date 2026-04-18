@@ -571,9 +571,33 @@ mod tests {
     }
 
     #[test]
-    fn depth_outputs_labeled_number() {
+    fn count_outputs_labeled_number() {
+        let assert = run_main(&["name", SIMPLE_JSON_FILEPATH, "--count"])
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            output.contains("Found matches:") && output.contains('1'),
+            "Expected 'Found matches: 1', got: {output:?}"
+        );
+    }
+
+    #[test]
+    fn count_porcelain_outputs_bare_number() {
         let assert =
-            run_main(&["", SIMPLE_JSON_FILEPATH, "--depth"]).success().code(0);
+            run_main(&["name", SIMPLE_JSON_FILEPATH, "--count", "--porcelain"])
+                .success()
+                .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), "1");
+    }
+
+    #[test]
+    fn depth_outputs_labeled_number_without_query() {
+        let assert =
+            run_main(&[SIMPLE_JSON_FILEPATH, "--depth"]).success().code(0);
         let output = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
         assert!(
@@ -583,9 +607,20 @@ mod tests {
     }
 
     #[test]
+    fn depth_suppresses_match_output() {
+        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--depth"])
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(!output.contains("32"), "--depth should suppress match values");
+        assert!(output.contains('3'), "--depth should still output depth");
+    }
+
+    #[test]
     fn depth_porcelain_outputs_bare_number() {
         let assert =
-            run_main(&["", SIMPLE_JSON_FILEPATH, "--depth", "--porcelain"])
+            run_main(&[SIMPLE_JSON_FILEPATH, "--depth", "--porcelain"])
                 .success()
                 .code(0);
         let output = String::from_utf8(assert.get_output().stdout.clone())
