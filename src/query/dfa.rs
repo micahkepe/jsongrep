@@ -376,7 +376,7 @@ impl DFABuilder {
 
         // Ensure that `range_to_range_id` is sorted for binary search on each
         // range's start value
-        self.range_to_range_id.sort_by(|a, b| a.0.start.cmp(&b.0.start));
+        self.range_to_range_id.sort_by_key(|a| a.0.start);
     }
 
     /// Use subset construction to convert the constructed epsilon-free NFA to a DFA,
