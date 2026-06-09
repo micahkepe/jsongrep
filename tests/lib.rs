@@ -1,2 +1,2 @@
-//! Integration test suite for `rq`
+//! Integration test suite for `rq`.
 mod cli;

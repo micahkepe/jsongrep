@@ -1,4 +1,4 @@
-//! Integration test suite for `jsongrep` CLI
+//! Integration test suite for `jsongrep` CLI.
 use assert_cmd::Command;
 use std::io::Write as _;
 

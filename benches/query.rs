@@ -35,7 +35,7 @@ fn load_xlarge() -> Option<String> {
 
 // === Query definitions per tool ===
 
-/// jsongrep query equivalencies across tools (where applicable)
+/// jsongrep query equivalencies across tools (where applicable).
 struct QueryVariants {
     name: &'static str,
     jsongrep: &'static str,
@@ -43,9 +43,9 @@ struct QueryVariants {
     jmespath: Option<&'static str>,
     jaq: Option<&'static str>,
     jql: Option<&'static str>,
-    /// Only run on medium/large (schema) documents
+    /// Only run on medium/large (schema) documents.
     schema_only: bool,
-    /// Only run on the xlarge (`GeoJSON`) document
+    /// Only run on the xlarge (`GeoJSON`) document.
     geojson_only: bool,
 }
 
@@ -307,7 +307,7 @@ fn bench_query_compile(c: &mut Criterion) {
 // Group 3: query_search -- Search with pre-compiled queries + pre-parsed docs
 // ==========================================================================
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines, reason = "Solely for benchmarking.")]
 fn bench_query_search(c: &mut Criterion) {
     let queries = all_queries();
 

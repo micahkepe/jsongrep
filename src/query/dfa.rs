@@ -32,21 +32,21 @@ use crate::query::{
 /// Represents a Deterministic Finite Automaton (DFA) for JSON queries. An
 /// important thing to note is that the alphabet depends on the query.
 #[non_exhaustive]
+#[derive(Debug)]
 pub struct QueryDFA {
-    /// The number of states in the DFA
+    /// The number of states in the DFA.
     pub num_states: usize,
 
-    /// The starting state of the DFA
+    /// The starting state of the DFA.
     pub start_state: usize,
 
-    /// Bitmap of accepting states
+    /// Bitmap of accepting states.
     pub is_accepting: Vec<bool>,
 
-    /// Transition table: transitions\[state\]\[`symbol_index`\] -> Option<`next_state`>
+    /// Transition table: transitions\[state\]\[`symbol_index`\] -> Option<`next_state`>.
     pub transitions: Vec<Vec<Option<usize>>>,
 
-    /// Alphabet symbols for this DFA. The alphabet is necessarily finite and
-    /// disjoint. The alphabet is determined from the input query.
+    /// The finite alphabet gathered from the input query.
     pub alphabet: Vec<TransitionLabel>,
 
     /// Mapping of field names to symbol indices in alphabet. Uses a reference
@@ -195,7 +195,10 @@ impl QueryDFA {
             field.to_owned()
         };
         let field_rc = Rc::new(normalized);
-        self.key_to_key_id.get(&field_rc).copied().unwrap_or(0) // default to "other"
+        self.key_to_key_id
+            .get(&field_rc)
+            .copied()
+            .unwrap_or(TransitionLabel::other_idx())
     }
 
     /// Get the symbol index for an array index by performing a binary search
@@ -310,14 +313,16 @@ impl DFABuilder {
                 self.collected_ranges.push((*idx, *idx + 1));
             }
             Query::Range(s, e) => {
-                self.collected_ranges
-                    .push(((*s).unwrap_or(0), (*e).unwrap_or(usize::MAX)));
+                self.collected_ranges.push((
+                    (*s).unwrap_or(usize::MIN),
+                    (*e).unwrap_or(usize::MAX),
+                ));
             }
             Query::RangeFrom(s) => self.collected_ranges.push((*s, usize::MAX)),
             Query::ArrayWildcard => {
                 // Treat array wildcard as unbounded range query, as they are
                 // equivalent
-                self.collected_ranges.push((0, usize::MAX));
+                self.collected_ranges.push((usize::MIN, usize::MAX));
             }
             Query::Disjunction(queries) | Query::Sequence(queries) => {
                 for q in queries {
@@ -382,11 +387,11 @@ impl DFABuilder {
     /// Use subset construction to convert the constructed epsilon-free NFA to a DFA,
     /// producing a `QueryDFA`. For each DFA state, we map it to a set of NFA
     /// states.
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn determinize_nfa(&mut self, nfa: &QueryNFA) -> QueryDFA {
         // Use a HashMap to map sets of currently reachable NFA states to DFA
         // state indices
-        // curr_nfa_states_to_dfa_state[NFA states bitmap] -> DFA state index
+        // `curr_nfa_states_to_dfa_state[NFA states bitmap]` -> DFA state index
         let mut nfa_states_to_dfa_state: HashMap<Vec<bool>, usize> =
             HashMap::new();
 
@@ -464,7 +469,10 @@ impl DFABuilder {
                                     TransitionLabel::Field(_),
                                 )
                                 | (
-                                    TransitionLabel::Range(0, usize::MAX),
+                                    TransitionLabel::Range(
+                                        usize::MIN,
+                                        usize::MAX,
+                                    ),
                                     TransitionLabel::Range(_, _),
                                 ) => {
                                     next_nfa_states[dest_state] = true;
@@ -581,6 +589,7 @@ impl DFABuilder {
 
 /// A query engine that uses a DFA to find matches in a JSON document based on
 /// the provided query.
+#[derive(Debug)]
 pub struct DFAQueryEngine;
 
 impl DFAQueryEngine {
@@ -679,7 +688,7 @@ impl DFAQueryEngine {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "Unit testing.")]
 mod tests {
     use anyhow::Context;
     use std::borrow::Cow;

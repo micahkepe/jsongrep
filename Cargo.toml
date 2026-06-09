@@ -52,9 +52,10 @@ all-formats = ["yaml", "toml", "cbor", "msgpack"]
 
 [lints.clippy]
 # See: <https://rust-lang.github.io/rust-clippy/master/index.html.
-all = { level = "warn" }
 pedantic = { level = "warn" }
-nursery = { level = "warn" }
+nursery = { level = "warn", priority = -1 }
+doc_paragraphs_missing_punctuation = { level = "warn"}
+allow_attributes = "warn"
 
 [dev-dependencies]
 assert_cmd = "2.0"

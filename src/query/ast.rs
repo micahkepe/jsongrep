@@ -34,36 +34,38 @@ use std::{
 
 use super::{QueryParseError, parse_query};
 
-/// The `Query` enum represents the different types of queries that can be
-/// constructed
+/// The `Query` enum represents the different types of queries that can be constructed.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Query {
-    /// Field access by exact name, e.g., "foo"
+    /// Field access by exact name, e.g., "foo".
     Field(String),
-    /// Array index access (0-based), e.g, "\[3\]")
+    /// Array index access (0-based), e.g, "\[3\]").
     Index(usize),
-    /// Array range access with start and end: "\[3:5\]"
+    /// Array range access with start and end: "\[3:5\]".
     ///
     /// NOTE: The end index is exclusive, so the range is `start..end`.
     Range(Option<usize>, Option<usize>),
-    /// Array range access from a starting index, e.g., "foo\[3:\]"
+    /// Array range access from a starting index, e.g., "foo\[3:\]".
     RangeFrom(usize),
     /// Wildcard field access, e.g., "foo.*". Represents a single-level field
     /// wildcard access and not a recursive descent.
     FieldWildcard,
-    /// Wildcard array access, e.g., "foo\[*\]"
+    /// Wildcard array access, e.g., "foo\[*\]".
     ArrayWildcard,
-    /// Regex access, e.g., "/regex/"
+    /// Regex access, e.g., "/regex/".
     Regex(String),
-    /// Optional access, e.g., "?"
+    /// Optional access, e.g., "?".
+    ///
     /// This represents an optional query that may or may not match.
     Optional(Box<Self>),
-    /// Kleene star, e.g., "foo*"
+    /// Kleene star, e.g., "foo*".
     KleeneStar(Box<Self>),
-    /// Disjunction, e.g., "foo | bar"
+    /// Disjunction, e.g., "foo | bar".
+    ///
     /// This represents a logical OR between an arbitrary number of queries.
     Disjunction(Vec<Self>),
-    /// Sequence, e.g., "foo.bar"
+    /// Sequence, e.g., "foo.bar".
+    ///
     /// A wrapper for a sequence of queries that can be executed in order.
     Sequence(Vec<Self>),
 }
@@ -86,9 +88,22 @@ impl Query {
         }
     }
 
-    /// Helper for ergonomic construction of field queries
+    /// Helper for ergonomic construction of field queries.
     pub fn field<T: Into<String>>(name: T) -> Self {
         Self::Field(name.into())
+    }
+
+    /// Envelopes the fixed query string with a recursive depth "(* | [*])" prelude.
+    ///
+    /// NOTE: Used mainly for `-F`/ `--fixed-string` CLI flag.
+    pub fn recursive_depth_fixed_string<T: Into<String>>(fixed: T) -> Self {
+        Self::Sequence(vec![
+            Self::KleeneStar(Box::new(Self::Disjunction(vec![
+                Self::FieldWildcard,
+                Self::ArrayWildcard,
+            ]))),
+            Self::Field(fixed.into()),
+        ])
     }
 }
 
@@ -243,9 +258,10 @@ macro_rules! field {
     };
 }
 
-/// Builder for constructing queries
+/// Builder for constructing queries.
+#[derive(Debug)]
 pub struct QueryBuilder {
-    /// The underlying query being built
+    /// The underlying query being built.
     query: Query,
 }
 

@@ -1,4 +1,5 @@
-#![allow(rustdoc::private_intra_doc_links)]
+#![warn(missing_docs)]
+#![expect(rustdoc::private_intra_doc_links)]
 /*!
 A query language for JSON data that searches for matching **regular** paths in
 the JSON tree, using a derivation of [regular expressions].

@@ -20,6 +20,7 @@ use crate::query::{ast::Query, common::TransitionLabel};
 
 /// Represents a Non-Deterministic Finite Automaton (NFA) for JSON queries.
 /// Importantly, the alphabet depends on the query.
+#[derive(Debug)]
 pub struct QueryNFA {
     /// The number of states in the NFA.
     pub num_states: usize,
@@ -27,31 +28,31 @@ pub struct QueryNFA {
     /// Transition function for the NFA, which is an adjacency list of labeled
     /// graph, where:
     ///
-    /// transitions\[state\] -> <Vec<(`label_idx`, destination next state>>
+    /// transitions\[state\] -> <Vec<(`label_idx`, destination next state>>.
     pub transitions: Vec<Vec<(usize, usize)>>,
 
     /// Index in linearized query to atom/ predicate
-    /// `pos_to_label`\[idx\] = `TransitionLabel`
+    /// `pos_to_label`\[idx\] = `TransitionLabel`.
     pub pos_to_label: Vec<TransitionLabel>,
 
-    /// The starting state for the NFA; `0`
+    /// The starting state for the NFA.
     pub start_state: usize,
 
-    /// Bitmap of accepting/ final states
+    /// Bitmap of accepting/ final states.
     pub is_accepting: Vec<bool>,
 
-    /// Bitmap of alphabet symbols within the "first set" of the NFA; P(e')
+    /// Bitmap of alphabet symbols within the "first set" of the NFA; P(e').
     pub is_first: Vec<bool>,
 
-    /// Bitmap of alphabet symbols within the "last set" of the NFA; D(e')
+    /// Bitmap of alphabet symbols within the "last set" of the NFA; D(e').
     pub is_ending: Vec<bool>,
 
     /// The set of letter pairs that can occur in words of L(e'), i.e., the set
     /// of factors of length 2 of the words of L(e')
-    /// factors\[symbol\] = set of symbols that can follow `symbol` in a word
+    /// factors\[symbol\] = set of symbols that can follow `symbol` in a word.
     pub factors: Vec<Vec<usize>>,
 
-    /// Whether the empty word belongs to L(e')
+    /// Whether the empty word belongs to L(e').
     pub contains_empty_word: bool,
 }
 

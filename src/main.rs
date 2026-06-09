@@ -33,32 +33,32 @@ use jsongrep::{
     long_about = None,
     disable_help_subcommand = true
 )]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools, reason = "CLI flags.")]
 struct Args {
-    /// Optional subcommands
+    /// Optional subcommands.
     #[command(subcommand)]
     command: Option<Commands>,
-    /// Query string (e.g., "**.name")
+    /// Query string (e.g., "**.name").
     query: Option<String>,
     #[arg(value_name = "FILE")]
-    /// Optional path to file. If omitted, reads from STDIN
+    /// Optional path to file. If omitted, reads from STDIN.
     input: Option<PathBuf>,
-    /// Case insensitive search
+    /// Case insensitive search.
     #[arg(short, long, action = ArgAction::SetTrue)]
     ignore_case: bool,
-    /// Do not pretty-print the JSON output
+    /// Do not pretty-print the JSON output.
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
-    /// Display count of number of matches
+    /// Display count of number of matches.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "depth")]
     count: bool,
-    /// Display depth of the input document
+    /// Display depth of the input document.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "count")]
     depth: bool,
-    /// Machine-readable output: strip labels and colors (useful for piping)
+    /// Machine-readable output: strip labels and colors (useful for piping).
     #[arg(long, action = ArgAction::SetTrue)]
     porcelain: bool,
-    /// Do not display matched JSON values
+    /// Do not display matched JSON values.
     #[arg(short, long, action = ArgAction::SetTrue)]
     no_display: bool,
     /// Treat the query as a literal field name and search at any depth.
@@ -72,20 +72,20 @@ struct Args {
     /// Never print the path header, even in a terminal.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
     no_path: bool,
-    /// Input format (auto-detects from file extension if omitted)
+    /// Input format (auto-detects from file extension if omitted).
     #[arg(short = 'f', long, default_value = "auto")]
     format: Format,
 }
 
-/// Available subcommands for `jg`
+/// Available subcommands for `jg`.
 #[derive(Subcommand)]
 enum Commands {
     #[command(subcommand)]
-    /// Generate additional documentation and/or completions
+    /// Generate additional documentation and/or completions.
     Generate(GenerateCommand),
 }
 
-/// Generate shell completions and man page
+/// Generate shell completions and man page.
 #[derive(Subcommand)]
 enum GenerateCommand {
     /// Generate shell completions for the given shell to stdout.
@@ -220,14 +220,13 @@ impl Input {
     }
 }
 
-/// Parse input content
+/// Parse input content, from the input path buffer if provided, else try STDIN.
 ///
 /// # Errors
 ///
 /// Returns early with an error if the file cannot be opened or read. If the input is not a file or
 /// piped input, prints the help message and exits with an error.
 fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
-    // Parse input content
     if let Some(path) = input {
         let fd =
             OpenOptions::new().read(true).open(&path).with_context(|| {
@@ -368,7 +367,7 @@ fn main() -> Result<()> {
             };
             let mut writer = BufWriter::new(stdout);
 
-            // --depth without a query: sole positional argument is the file
+            // `--depth` without a query: sole positional argument is the file
             if args.depth && args.query.is_some() && args.input.is_none() {
                 args.input = args.query.take().map(PathBuf::from);
             }
@@ -397,15 +396,9 @@ fn main() -> Result<()> {
             })?;
 
             let query: Query = if args.fixed_string {
-                // -F/--fixed-string: treat the query as a literal field name
+                // `-F`/`--fixed-string:` treat the query as a literal field name
                 // and search at any depth, equivalent to `(* | [*])*."<literal>"`
-                Query::Sequence(vec![
-                    Query::KleeneStar(Box::new(Query::Disjunction(vec![
-                        Query::FieldWildcard,
-                        Query::ArrayWildcard,
-                    ]))),
-                    Query::Field(raw_query),
-                ])
+                Query::recursive_depth_fixed_string(raw_query)
             } else {
                 raw_query.parse().with_context(|| "Failed to parse query")?
             };

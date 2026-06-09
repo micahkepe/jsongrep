@@ -12,9 +12,9 @@ use std::rc::Rc;
 /// A JSON pointer that points to a value in a JSON document.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct JSONPointer<'a> {
-    /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\]
+    /// The path to the value in the JSON document, e.g., \["foo", "bar", "bass"\].
     pub path: Vec<PathType>,
-    /// A reference to the value in the JSON document
+    /// A reference to the value in the JSON document.
     pub value: &'a Value<'a>,
 }
 
@@ -28,9 +28,9 @@ impl std::fmt::Display for JSONPointer<'_> {
 /// Represents the type of path being explored in the query.
 #[derive(Serialize, Hash, PartialEq, Eq, Debug, Clone)]
 pub enum PathType {
-    /// Represents an index in an array, e.g., "foo\[3\]"
+    /// Represents an index in an array, e.g., "foo\[3\]".
     Index(usize),
-    /// Represents a field in an object, e.g., "foo.bar"
+    /// Represents a field in an object, e.g., "foo.bar".
     Field(Rc<String>),
 }
 
@@ -51,14 +51,20 @@ pub enum TransitionLabel {
     /// Any field that doesn't match will be lumped together in the catch-all
     /// "other" symbol, which refers to key ID `0`.
     Field(Rc<String>),
-    /// Matches any field name, e.g., "*"
+    /// Matches any field name, e.g., "*".
     FieldWildcard,
-    /// Matches a range of indices, e.g., "\[start:end\]"
+    /// Matches a range of indices, e.g., "\[start:end\]".
     Range(usize, usize),
-    /// Matches a range from a starting index, e.g., "\[start:\]"
+    /// Matches a range from a starting index, e.g., "\[start:\]".
     RangeFrom(usize),
-    /// Special symbol for keys not in the query
+    /// Special symbol for keys not in the query.
     Other,
+}
+
+impl TransitionLabel {
+    pub const fn other_idx() -> usize {
+        usize::MIN
+    }
 }
 
 impl std::fmt::Display for TransitionLabel {
