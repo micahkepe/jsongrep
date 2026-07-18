@@ -31,6 +31,11 @@ pub fn depth(json: &Value) -> usize {
 /// Silently returns `Ok(())` on broken pipe so that piping to tools like
 /// `less` or `head` exits cleanly.
 ///
+/// When `raw` is set, a matched value that is a string is written without
+/// JSON quotes or escaping (like `jq -r`), so shell pipelines get the bare
+/// text: `TOKEN=$(... | jg -r token)`. Non-string values are unaffected
+/// (their JSON form is already their raw form).
+///
 /// # Errors
 ///
 /// Returns an error if writing to `writer` fails.
@@ -40,6 +45,7 @@ pub fn write_colored_result<W: Write>(
     path: &[PathType],
     pretty: bool,
     show_path: bool,
+    raw: bool,
 ) -> anyhow::Result<()> {
     let path = path
         .iter()
@@ -51,7 +57,14 @@ pub fn write_colored_result<W: Write>(
         if show_path && !path.is_empty() {
             writeln!(writer, "{}:", path.bold().magenta())?;
         }
-        write_colored_json(writer, value, 0, pretty)?;
+        if raw && let Value::Str(s) = value {
+            // Raw output: the string's contents, not its JSON encoding.
+            // Escape sequences in the source (e.g. \n) have already been
+            // decoded by the JSON parser, so this writes real newlines etc.
+            write!(writer, "{s}")?;
+        } else {
+            write_colored_json(writer, value, 0, pretty)?;
+        }
         writeln!(writer)?;
         Ok(())
     })();

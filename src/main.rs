@@ -49,6 +49,12 @@ struct Args {
     /// Do not pretty-print the JSON output.
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
+    /// Print matched strings without JSON quotes or escaping (like `jq -r`).
+    ///
+    /// Useful in shell pipelines: `TOKEN=$(... | jg -r token)`. Non-string
+    /// values print as JSON, unchanged.
+    #[arg(short = 'r', long, action = ArgAction::SetTrue)]
+    raw_output: bool,
     /// Display count of number of matches.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "depth")]
     count: bool,
@@ -510,6 +516,7 @@ fn main() -> Result<()> {
                             &result.path,
                             pretty,
                             show_path,
+                            args.raw_output,
                         )?;
                     }
                 }

@@ -39,6 +39,7 @@ fn main() -> anyhow::Result<()> {
             &result.path,
             true,
             true,
+            false,
         )?;
     }
     writer.write_all(b"\n")?;
@@ -66,6 +67,7 @@ fn main() -> anyhow::Result<()> {
                 &result.path,
                 true,
                 true,
+                false,
             )?;
         }
     }
@@ -89,6 +91,7 @@ fn main() -> anyhow::Result<()> {
             &result.path,
             true,
             true,
+            false,
         )?;
     }
 

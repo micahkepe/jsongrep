@@ -260,6 +260,111 @@ mod tests {
     }
 
     // ==============================================================================
+    // Raw output (-r) tests
+    // ==============================================================================
+
+    #[test]
+    fn raw_output_unquotes_strings() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "name", "--no-path"])
+            .write_stdin(r#"{"name": "Ada Lovelace"}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "Ada Lovelace\n");
+    }
+
+    #[test]
+    fn raw_output_decodes_escapes() {
+        // \n and \" in the JSON source must come out as real characters.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "msg", "--no-path"])
+            .write_stdin(r#"{"msg": "line1\nline\"2\""}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "line1\nline\"2\"\n");
+    }
+
+    #[test]
+    fn raw_output_empty_string_is_bare_newline() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "s", "--no-path"])
+            .write_stdin(r#"{"s": ""}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "\n");
+    }
+
+    #[test]
+    fn raw_output_preserves_trailing_newline_plus_record_newline() {
+        // jq -r prints the string contents then its own record newline.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "s", "--no-path"])
+            .write_stdin(r#"{"s": "x\n"}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "x\n\n");
+    }
+
+    #[test]
+    fn raw_output_with_path_header() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "name", "--with-path"])
+            .write_stdin(r#"{"name": "Ada"}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "name:\nAda\n");
+    }
+
+    #[test]
+    fn raw_output_leaves_non_strings_as_json() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "*", "--no-path", "--compact"])
+            .write_stdin(r#"{"n": 42, "b": true, "o": {"k": "v"}}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "42\ntrue\n{\"k\":\"v\"}\n");
+    }
+
+    #[test]
+    fn raw_output_only_affects_top_level_strings() {
+        // A string nested inside a matched object keeps its JSON quoting.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-r", "user", "--no-path", "--compact"])
+            .write_stdin(r#"{"user": {"name": "Ada"}}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "{\"name\":\"Ada\"}\n");
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 
