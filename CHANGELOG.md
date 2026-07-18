@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Bounded DFA compilation for untrusted queries:
+  `QueryDFA::from_query_bounded`, `from_query_bounded_ignore_case`,
+  `from_query_str_bounded`, `from_query_str_bounded_ignore_case`, with new
+  error types `StateLimitExceeded` and `QueryCompileError`. Subset
+  construction is worst-case exponential; the budget turns a potential
+  memory/CPU blowup into a clean "query is too complex" error.
+- The `jg` CLI caps query compilation at 2^18 DFA states (a clean error
+  after ~0.4 s worst case instead of unbounded time/memory), and the WASM
+  playground at 2^16.
+
 ### Fixed
 
 - `/regex/` queries no longer panic: the parser now rejects them with a clean
