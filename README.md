@@ -210,6 +210,25 @@ curl -s https://api.nobelprize.org/v1/prize.json | jq '[.. | .firstname? // empt
 1026
 ```
 
+**Filter by value** (like `jq 'select()'`): a trailing comparison keeps only
+matches whose value satisfies it. Operators: `=`/`==`, `!=`, `<`, `<=`, `>`,
+`>=`; literals: strings, numbers, `true`/`false`/`null`. (Whitespace before
+the operator is required: `age = 30`, not `age=30`.)
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jg 'prizes[*].year = "2020"' --count
+```
+
+```
+Found matches: 1
+```
+
+`jq`:
+
+```bash
+curl -s https://api.nobelprize.org/v1/prize.json | jq '[.prizes[] | select(.year == "2020") | .year] | length'
+```
+
 **Pretty-print JSON** (like `jq '.'`):
 
 ```bash
@@ -447,6 +466,7 @@ feel familiar:
 | Optional     | `foo?.bar`           | Optional `foo` field access                                   |
 | Field access | `foo` or `"foo bar"` | Match a specific field (quote if spaces)                      |
 | Array index  | `[0]` or `[1:3]`     | Match specific index or slice (exclusive end)                 |
+| Value filter | `users[*].age >= 30` | Trailing predicate: keep matches whose value compares true    |
 
 These queries can be arbitrarily nested with parentheses. For example,
 `foo.(bar|baz).qux` matches `foo.bar.qux` or `foo.baz.qux`.

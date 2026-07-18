@@ -43,16 +43,22 @@ fn run_query(input: &str, query: &str) -> Result<TimingResults, String> {
     let after_parsing = monotonic_clock::now();
 
     let before_compile = monotonic_clock::now();
+    let (query_ast, predicate) =
+        jsongrep::query::parse_query_with_predicate(query)
+            .map_err(|e| e.to_string())?;
     // Bounded compilation: the playground runs untrusted queries on the
     // browser's main thread, and subset construction is worst-case
     // exponential. 2^16 states keeps adversarial queries from freezing the
     // tab while being far beyond any realistic query.
-    let dfa = QueryDFA::from_query_str_bounded(query, 1 << 16)
+    let dfa = QueryDFA::from_query_bounded(&query_ast, 1 << 16)
         .map_err(|e| e.to_string())?;
     let after_compile = monotonic_clock::now();
 
     let before_query = monotonic_clock::now();
-    let results = dfa.find(&json);
+    let mut results = dfa.find(&json);
+    if let Some(predicate) = &predicate {
+        results.retain(|result| predicate.matches(result.value));
+    }
     let after_query = monotonic_clock::now();
 
     let before_serialize = monotonic_clock::now();

@@ -7,6 +7,7 @@ pub(crate) mod common;
 pub mod dfa;
 pub(crate) mod nfa;
 pub mod parser;
+pub mod predicate;
 
 use serde_json_borrow::Value;
 
@@ -34,3 +35,4 @@ pub use common::{JSONPointer, PathType};
 pub use dfa::*;
 pub use nfa::*;
 pub use parser::*;
+pub use predicate::{CmpOp, NumLiteral, Predicate, PredicateValue};

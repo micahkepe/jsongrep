@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playground at 2^16.
 - `-r`/`--raw-output`: print matched strings without JSON quotes or escaping
   (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
+- Leaf value predicates: a query can end with a comparison that filters
+  matched values, e.g. `users[*].age >= 30`, `**.name = "Alice"`,
+  `config.*.enabled = true` (operators `=`/`==`, `!=`, `<`, `<=`, `>`,
+  `>=`; string/number/bool/null literals; whitespace required before the
+  operator after an unquoted field). Predicates are filter-only: they
+  select paths, never construct values. New library API:
+  `query::parse_query_with_predicate`, `query::Predicate` (with
+  integer-exact numeric comparisons via `NumLiteral`), supported by
+  `jsongrep::grep`, the CLI, and the WASM playground.
 
 ### Fixed
 
