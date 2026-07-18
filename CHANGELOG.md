@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
 - `-q`/`--quiet`: suppress stdout entirely; communicate via exit status
   only (errors still print to stderr).
+- Multiple file arguments: `jg 'query' a.json b.yaml ...` compiles the
+  query once and runs it against each file with per-file format
+  autodetection, ripgrep-style file headings (TTY) or `file:` prefixes on
+  counts, error-continue behaviour like grep (a bad file is reported and
+  the rest still run), and `-l`/`--files-with-matches` to list only files
+  containing at least one match.
 
 ### Fixed
 
