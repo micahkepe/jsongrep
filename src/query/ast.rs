@@ -136,26 +136,27 @@ impl Display for Query {
             Self::FieldWildcard => write!(f, "*"),
             Self::ArrayWildcard => write!(f, "[*]"),
             Self::Regex(re) => write!(f, "/{re}/"),
-            Self::Optional(q) => match &**q {
-                Self::Disjunction(queries) | Self::Sequence(queries) => {
-                    if queries.len() > 1 {
-                        write!(f, "({q})?")
-                    } else {
-                        write!(f, "{q}?")
-                    }
+            Self::Optional(q) => {
+                if displays_as_empty(q) {
+                    // Optional(empty) denotes the empty query; "()?" would
+                    // not reparse (a group cannot be empty)
+                    Ok(())
+                } else if modifier_operand_needs_parens(q) {
+                    write!(f, "({q})?")
+                } else {
+                    write!(f, "{q}?")
                 }
-                _ => write!(f, "{q}?"),
-            },
-            Self::KleeneStar(q) => match &**q {
-                Self::Disjunction(queries) | Self::Sequence(queries) => {
-                    if queries.len() > 1 {
-                        write!(f, "({q})*")
-                    } else {
-                        write!(f, "{q}*")
-                    }
+            }
+            Self::KleeneStar(q) => {
+                if displays_as_empty(q) {
+                    // KleeneStar(empty) likewise denotes the empty query
+                    Ok(())
+                } else if modifier_operand_needs_parens(q) {
+                    write!(f, "({q})*")
+                } else {
+                    write!(f, "{q}*")
                 }
-                _ => write!(f, "{q}*"),
-            },
+            }
             Self::Disjunction(queries) => {
                 let joined = queries
                     .iter()
@@ -213,6 +214,40 @@ impl Display for Query {
                 Ok(())
             }
         }
+    }
+}
+
+/// Returns `true` if a query displayed as the operand of a postfix `?`/`*`
+/// modifier needs surrounding parentheses to reparse with the same meaning.
+/// A single step never does; a multi-step sequence or disjunction does; a
+/// single-element wrapper is decided by its element (e.g. the sequence
+/// holding `foo?` inside `(foo?)*` still needs them, since `foo?*` does not
+/// parse - the grammar allows one modifier per step).
+fn modifier_operand_needs_parens(query: &Query) -> bool {
+    match query {
+        Query::Sequence(queries) | Query::Disjunction(queries) => {
+            queries.len() != 1 || modifier_operand_needs_parens(&queries[0])
+        }
+        Query::Optional(_) | Query::KleeneStar(_) => true,
+        _ => false,
+    }
+}
+
+/// Returns `true` if a query displays as the empty string (an empty
+/// sequence or nothing but nested empty wrappers). A postfix modifier on
+/// such an operand is dropped by `Display`: `Optional`/`KleeneStar` of the
+/// empty query both denote the empty query, and rendering `()?` would not
+/// reparse (a group cannot be empty). Reachable via
+/// `QueryBuilder::new().optional()`.
+fn displays_as_empty(query: &Query) -> bool {
+    match query {
+        Query::Sequence(queries) | Query::Disjunction(queries) => {
+            queries.iter().all(displays_as_empty)
+        }
+        Query::Optional(inner) | Query::KleeneStar(inner) => {
+            displays_as_empty(inner)
+        }
+        _ => false,
     }
 }
 

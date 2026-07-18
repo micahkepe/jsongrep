@@ -596,6 +596,41 @@ mod tests {
     }
 
     #[test]
+    fn modifier_on_modified_group_display_roundtrip() {
+        // Regression: these used to display without the parentheses
+        // ("foo?*", "(a | b)?*", ...), which does not reparse - the grammar
+        // allows only one modifier per step.
+        for query in ["(foo?)*", "(foo*)?", "((a | b)?)*", "((a | b)*)?"] {
+            let result = parse_query(query).unwrap();
+            assert_eq!(query, &result.to_string());
+            assert_eq!(result, parse_query(&result.to_string()).unwrap());
+        }
+    }
+
+    #[test]
+    fn modifier_on_trivial_group_normalizes() {
+        // Redundant parens around a single step still collapse
+        let result = parse_query("(foo)?").unwrap();
+        assert_eq!("foo?", result.to_string());
+    }
+
+    #[test]
+    fn modifier_on_empty_operand_displays_empty() {
+        // Optional/KleeneStar of the empty query denote the empty query;
+        // displaying "()?" (or the old bare "?") would not reparse.
+        // Reachable via QueryBuilder::new().optional().
+        let optional_empty = Query::Optional(Box::new(Query::Sequence(vec![])));
+        assert_eq!("", optional_empty.to_string());
+        assert_eq!(
+            Query::Sequence(vec![]),
+            parse_query(&optional_empty.to_string()).unwrap()
+        );
+
+        let star_empty = Query::KleeneStar(Box::new(Query::Sequence(vec![])));
+        assert_eq!("", star_empty.to_string());
+    }
+
+    #[test]
     fn parse_invalid_number() {
         let result = parse_query("foo[abc]");
         assert!(
