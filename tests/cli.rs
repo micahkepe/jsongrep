@@ -216,6 +216,50 @@ mod tests {
     }
 
     // ==============================================================================
+    // Porcelain output tests
+    // ==============================================================================
+
+    #[test]
+    fn porcelain_match_output_is_compact_json_lines() {
+        // --porcelain must imply --compact: one JSON value per line, no
+        // pretty-printing, parseable by line-oriented consumers.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["--porcelain", "--no-path", "users[*]"])
+            .write_stdin(r#"{"users": [{"a": 1}, {"b": 2}]}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "{\"a\":1}\n{\"b\":2}\n");
+        for line in output.lines() {
+            serde_json::from_str::<Value>(line)
+                .expect("each porcelain line must be valid JSON");
+        }
+    }
+
+    #[test]
+    fn porcelain_output_has_no_ansi_escapes() {
+        // Even if color would otherwise be forced on, porcelain wins.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["--porcelain", "--with-path", "a"])
+            .env("CLICOLOR_FORCE", "1")
+            .write_stdin(r#"{"a": {"nested": true}}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            !output.contains('\u{1b}'),
+            "porcelain output must not contain ANSI escapes: {output:?}"
+        );
+        assert_eq!(output, "a:\n{\"nested\":true}\n");
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 

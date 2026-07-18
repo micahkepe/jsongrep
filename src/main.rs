@@ -55,7 +55,8 @@ struct Args {
     /// Display depth of the input document.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "count")]
     depth: bool,
-    /// Machine-readable output: strip labels and colors (useful for piping).
+    /// Machine-readable output: strip labels and colors, print one JSON
+    /// value per line (implies --compact).
     #[arg(long, action = ArgAction::SetTrue)]
     porcelain: bool,
     /// Do not display matched JSON values.
@@ -383,6 +384,16 @@ where
 #[expect(clippy::too_many_lines, reason = "Argument parsing combinations")]
 fn main() -> Result<()> {
     let mut args = Args::parse();
+
+    // Porcelain means machine-parseable: force colors off (regardless of
+    // TTY detection) and one JSON value per line, so consumers can rely on
+    // the output shape. Previously only the --count/--depth labels were
+    // affected, while match output stayed colored (on a TTY) and
+    // multi-line pretty-printed.
+    if args.porcelain {
+        colored::control::set_override(false);
+        args.compact = true;
+    }
 
     match args.command {
         Some(Commands::Generate(cmd)) => match cmd {

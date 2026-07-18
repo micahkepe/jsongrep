@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Array index `[18446744073709551615]` (`usize::MAX`) no longer overflows
   (panic in debug builds, silent wrap in release); it now matches nothing,
   which is correct since an element at that index cannot exist.
+- `--porcelain` now does what its help text says for match output too:
+  colors are forced off (previously still colored on a TTY) and
+  `--compact` is implied, so output is one machine-parseable JSON value
+  per line. Previously only the `--count`/`--depth` labels were
+  affected.
 
 ### Breaking
 
