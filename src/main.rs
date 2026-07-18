@@ -84,6 +84,14 @@ struct Args {
     /// Searches for the field at any depth, equivalent to `(* | [*])*."<query>"`.
     #[arg(short = 'F', long, action = ArgAction::SetTrue)]
     fixed_string: bool,
+    /// Stop searching after NUM matches per input file.
+    ///
+    /// The limit applies to each input separately: with multiple files,
+    /// every file yields up to NUM matches. Each document's traversal
+    /// terminates as soon as its limit is reached, so `--max-count 1` on a
+    /// large document only pays for the work up to the first match.
+    #[arg(short = 'm', long, value_name = "NUM", conflicts_with = "depth")]
+    max_count: Option<usize>,
     /// Always print the path header, even when output is piped.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "no_path")]
     with_path: bool,
@@ -612,7 +620,12 @@ fn run(mut args: Args) -> Result<bool> {
                 );
 
                 let file_result = with_json(input, format, |json| {
-                    let results = dfa.find(json);
+                    // --max-count applies per input file, so the limit
+                    // resets for each document.
+                    let results = args.max_count.map_or_else(
+                        || dfa.find(json),
+                        |limit| dfa.find_limited(json, limit),
+                    );
                     if !results.is_empty() {
                         matched = true;
                     }
