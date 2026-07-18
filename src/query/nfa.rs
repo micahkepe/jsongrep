@@ -129,6 +129,12 @@ impl Display for QueryNFA {
 
 impl QueryNFA {
     /// Construct an NFA recognizing the language defined by a query.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query contains [`Query::Regex`], which the engine does
+    /// not implement yet (the query-string parser rejects `/regex/` syntax,
+    /// so only hand-constructed ASTs can reach this panic).
     #[must_use]
     pub fn from_query(query: &Query) -> Self {
         let mut temp_nfa = Self {
@@ -219,8 +225,10 @@ impl QueryNFA {
             }
             Query::Index(idx) => {
                 // Represent individual index as a single-element range
-                // [idx: idx + 1)
-                let range = TransitionLabel::Range(*idx, *idx + 1);
+                // [idx: idx + 1). Saturate on usize::MAX (see
+                // `DFABuilder::extract_symbols`): the empty range matches
+                // nothing rather than wrapping or panicking.
+                let range = TransitionLabel::Range(*idx, idx.saturating_add(1));
                 self.pos_to_label.push(range);
             }
             Query::Range(s, e) => {

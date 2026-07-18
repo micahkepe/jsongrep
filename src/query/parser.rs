@@ -70,11 +70,14 @@ pub use pest_parser::{QueryDSLParser, Rule};
 
 /// Represents errors that can occur while parsing a JSON query.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum QueryParseError {
     /// Unexpected token encountered during parsing.
     UnexpectedToken(String),
     /// The input ended unexpectedly, indicating an incomplete query.
     UnexpectedEndOfInput,
+    /// The query uses syntax that is recognized but not implemented yet.
+    UnsupportedFeature(String),
 }
 
 impl Error for QueryParseError {}
@@ -88,15 +91,14 @@ impl fmt::Display for QueryParseError {
             Self::UnexpectedEndOfInput => {
                 write!(f, "Unexpected end of input")
             }
+            Self::UnsupportedFeature(feature) => {
+                write!(f, "Unsupported feature: {feature}")
+            }
         }
     }
 }
 
 /// Parse an input query string into a [`Query`].
-///
-/// # Panics
-///
-/// Panics if the input query string is invalid.
 ///
 /// # Errors
 ///
@@ -105,8 +107,9 @@ pub fn parse_query(input: &str) -> Result<Query, QueryParseError> {
     let mut pairs = QueryDSLParser::parse(Rule::query, input)
         .map_err(|e| QueryParseError::UnexpectedToken(e.to_string()))?;
 
-    // Get and unwrap the `query` rule
-    let query = pairs.next().expect("Empty query string");
+    // Get the `query` rule. A successful pest parse always yields it, but
+    // return an error rather than panicking if that invariant ever breaks.
+    let query = pairs.next().ok_or(QueryParseError::UnexpectedEndOfInput)?;
 
     // Query rule contains disjunction
     let mut inner = query.into_inner();
@@ -452,7 +455,7 @@ fn parse_range(
     }
 }
 
-/// Parse a regex rule into a `Query::Regex`.
+/// Reject a grammar-valid `/regex/` atom with a clean "unsupported" error.
 fn parse_regex(
     pair: &pest::iterators::Pair<Rule>,
 ) -> Result<Query, QueryParseError> {
@@ -463,17 +466,16 @@ fn parse_regex(
         )));
     }
 
-    let regex_str = pair.as_str();
-    if regex_str.len() < 2
-        || !regex_str.starts_with('/')
-        || !regex_str.ends_with('/')
-    {
-        return Err(QueryParseError::UnexpectedToken(regex_str.to_string()));
-    }
-
-    let pattern = &regex_str[1..regex_str.len() - 1];
-    let unescaped_pattern = pattern.replace("\\/", "/");
-    Ok(Query::Regex(unescaped_pattern))
+    // NOTE: `/regex/` field matching parses but is not implemented by the
+    // NFA/DFA construction (which would hit `unimplemented!()` and panic).
+    // Reject it here with a clean error until the feature lands, so that no
+    // grammar-valid query string can panic the CLI, the library, or the WASM
+    // playground.
+    Err(QueryParseError::UnsupportedFeature(format!(
+        "regex field matching ({}) is not implemented yet; match literal \
+         fields, wildcards, or disjunctions instead",
+        pair.as_str()
+    )))
 }
 
 #[cfg(test)]
@@ -495,10 +497,24 @@ mod tests {
     }
 
     #[test]
-    fn parse_single_regex() {
-        let query = "/foo.bar/";
-        let result = parse_query(query).unwrap();
-        assert_eq!(query, result.to_string());
+    fn parse_regex_rejected_as_unsupported() {
+        // The grammar recognizes /regex/ but the engine cannot execute it
+        // yet; parsing must fail cleanly instead of letting DFA construction
+        // panic later.
+        let result = parse_query("/foo.bar/");
+        assert!(
+            matches!(result, Err(QueryParseError::UnsupportedFeature(_))),
+            "Actual result: {result:?}"
+        );
+    }
+
+    #[test]
+    fn parse_regex_in_sequence_rejected() {
+        let result = parse_query("users./na.*/.email");
+        assert!(
+            matches!(result, Err(QueryParseError::UnsupportedFeature(_))),
+            "Actual result: {result:?}"
+        );
     }
 
     #[test]

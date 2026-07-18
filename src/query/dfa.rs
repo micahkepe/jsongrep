@@ -114,6 +114,14 @@ impl Display for QueryDFA {
 
 impl QueryDFA {
     /// Constructs a new [`QueryDFA`] from a constructed [`Query`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query contains [`Query::Regex`], which the engine does
+    /// not implement yet. Queries obtained from the string parser can never
+    /// contain it (the parser rejects `/regex/` syntax with
+    /// [`QueryParseError::UnsupportedFeature`]); only hand-constructed ASTs
+    /// can reach this panic.
     #[must_use]
     pub fn from_query(query: &Query) -> Self {
         Self::build_from_query(query, false)
@@ -122,6 +130,11 @@ impl QueryDFA {
     /// Constructs a new case-insensitive [`QueryDFA`] from a constructed
     /// [`Query`]. Field names in the query and in JSON keys are compared
     /// after lowercasing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query contains [`Query::Regex`]; see
+    /// [`QueryDFA::from_query`].
     #[must_use]
     pub fn from_query_ignore_case(query: &Query) -> Self {
         Self::build_from_query(query, true)
@@ -309,8 +322,11 @@ impl DFABuilder {
             }
             Query::Index(idx) => {
                 // Represent individual index as a single-element range
-                // [idx: idx + 1)
-                self.collected_ranges.push((*idx, *idx + 1));
+                // [idx: idx + 1). Saturate on usize::MAX: the resulting
+                // empty range matches nothing, which is correct because an
+                // element at that index cannot exist (and it must not wrap
+                // to an inverted range or panic in debug builds).
+                self.collected_ranges.push((*idx, idx.saturating_add(1)));
             }
             Query::Range(s, e) => {
                 self.collected_ranges.push((
@@ -1637,6 +1653,40 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    #[test]
+    fn usize_max_index_matches_nothing_without_panic() {
+        // [usize::MAX] used to compute idx + 1, panicking in debug builds
+        // and silently wrapping to an inverted range in release. An element
+        // at that index cannot exist, so the query must simply match
+        // nothing.
+        let input = r#"{ "arr": [1, 2, 3] }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = format!("arr.[{}]", usize::MAX);
+        let dfa = QueryDFA::from_query_str(&query).expect("valid query");
+        assert_eq!(dfa.find(&json).len(), 0);
+
+        // Sanity: a normal index on the same document still matches.
+        let dfa = QueryDFA::from_query_str("arr.[2]").expect("valid query");
+        assert_eq!(dfa.find(&json).len(), 1);
+    }
+
+    #[test]
+    fn usize_max_index_alongside_real_range() {
+        // The empty (MAX, MAX) label must not inherit or overlap any real
+        // range symbol: only the [0:2] branch of the disjunction matches.
+        let input = r#"{ "arr": [10, 20, 30] }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = format!("arr.([{}] | [0:2])", usize::MAX);
+        let dfa = QueryDFA::from_query_str(&query).expect("valid query");
+        let matches = dfa.find(&json);
+
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].value, &Value::Number(10u64.into()));
+        assert_eq!(matches[1].value, &Value::Number(20u64.into()));
     }
 
     #[test]
