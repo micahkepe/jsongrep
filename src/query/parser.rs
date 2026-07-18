@@ -546,6 +546,78 @@ mod tests {
     }
 
     #[test]
+    fn parse_chained_array_accesses() {
+        let result = parse_query("foo[0][1]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Index(1),
+            ])])
+        );
+        // Canonical display separates subsequent accesses with '.'
+        assert_eq!("foo[0].[1]", result.to_string());
+        // ...and the canonical form is reparseable with a stable display
+        // (the reparsed AST nests differently but display is idempotent;
+        // semantic equivalence is covered by the CLI matching test)
+        let reparsed = parse_query(&result.to_string()).unwrap();
+        assert_eq!(result.to_string(), reparsed.to_string());
+    }
+
+    #[test]
+    fn parse_chained_accesses_kleene_binds_to_last() {
+        let result = parse_query("foo[0][1]*").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::KleeneStar(Box::new(Query::Index(1))),
+            ])])
+        );
+    }
+
+    #[test]
+    fn parse_access_after_modifier_rejected() {
+        // The modifier ends the step; a further access needs a '.' separator
+        let result = parse_query("foo[0]?[1]");
+        assert!(
+            matches!(result, Err(QueryParseError::UnexpectedToken(_))),
+            "Actual result: {result:?}"
+        );
+    }
+
+    #[test]
+    fn parse_chained_mixed_accesses() {
+        let result = parse_query("foo[0][1:3][*]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Range(Some(1), Some(3)),
+                Query::ArrayWildcard,
+            ])])
+        );
+    }
+
+    #[test]
+    fn parse_chained_accesses_with_modifier() {
+        // The modifier binds to the last access, matching the existing
+        // single-access behaviour of e.g. "foo[0]?"
+        let result = parse_query("foo[0][1]?").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Optional(Box::new(Query::Index(1))),
+            ])])
+        );
+    }
+
+    #[test]
     fn parse_multiple_optional() {
         let query = "c*.c?.c?";
         let result = parse_query(query).unwrap();
