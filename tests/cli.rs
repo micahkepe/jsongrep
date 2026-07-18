@@ -288,6 +288,57 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn non_regular_file_input_works() {
+        // FIFOs (and process substitution, `jg q <(...)`) cannot be mmap'd;
+        // jg must fall back to reading them.
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let fifo_path = dir.path().join("input.fifo");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&fifo_path)
+            .status()
+            .expect("run mkfifo");
+        assert!(status.success(), "mkfifo failed");
+
+        // Writing blocks until the reader (jg) opens the pipe, so write from
+        // a separate thread.
+        let writer = std::thread::spawn({
+            let fifo_path = fifo_path.clone();
+            move || {
+                std::fs::write(&fifo_path, br#"{"a": 41}"#)
+                    .expect("write to fifo");
+            }
+        });
+
+        let output = query_output(&[
+            "a",
+            fifo_path.to_str().expect("fifo path"),
+            "--no-path",
+            "--compact",
+        ]);
+        writer.join().expect("join writer thread");
+        assert_eq!(output.trim(), "41");
+    }
+
+    #[test]
+    fn large_file_takes_mmap_path() {
+        // Files at or above the mmap threshold (1 MiB) go through the
+        // memory-mapped path; verify it still parses and matches.
+        let mut big = String::from(r#"{"pad": ""#);
+        big.push_str(&"x".repeat(2 * 1024 * 1024));
+        big.push_str(r#"", "answer": 42}"#);
+        let tmp = temp_file_with(".json", big.as_bytes());
+
+        let output = query_output(&[
+            "answer",
+            tmp.path().to_str().expect("temp path"),
+            "--no-path",
+            "--compact",
+        ]);
+        assert_eq!(output.trim(), "42");
+    }
+
+    #[test]
     fn jsonl_stdin_with_format_flag() {
         let jsonl_content =
             std::fs::read_to_string(SIMPLE_JSONL_FILEPATH).expect("read jsonl");
@@ -430,6 +481,47 @@ mod tests {
         ciborium::into_writer(&value, &mut cbor_buf)
             .expect("CBOR serialization");
         temp_file_with(suffix, &cbor_buf)
+    }
+
+    #[test]
+    fn cbor_via_stdin() {
+        // Binary formats must work over stdin: input is read as raw bytes,
+        // not UTF-8 text.
+        let value: serde_json::Value =
+            serde_json::from_str(SIMPLE_JSON_STR).expect("parse simple.json");
+        let mut cbor_buf = Vec::new();
+        ciborium::into_writer(&value, &mut cbor_buf)
+            .expect("CBOR serialization");
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "cbor", "age", "--no-path", "--compact"])
+            .write_stdin(cbor_buf)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), json_reference("age").trim());
+    }
+
+    #[test]
+    fn msgpack_via_stdin() {
+        let value: serde_json::Value =
+            serde_json::from_str(SIMPLE_JSON_STR).expect("parse simple.json");
+        let msgpack_buf =
+            rmp_serde::to_vec(&value).expect("MessagePack serialization");
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "msgpack", "name.first", "--no-path", "--compact"])
+            .write_stdin(msgpack_buf)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), json_reference("name.first").trim());
     }
 
     #[test]
