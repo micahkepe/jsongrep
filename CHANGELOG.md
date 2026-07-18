@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playground at 2^16.
 - `-r`/`--raw-output`: print matched strings without JSON quotes or escaping
   (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
+- Multiple file arguments: `jg 'query' a.json b.yaml ...` compiles the
+  query once and runs it against each file with per-file format
+  autodetection, ripgrep-style file headings (TTY) or `file:` prefixes on
+  counts, error-continue behaviour like grep (a bad file is reported and
+  the rest still run), and `-l`/`--files-with-matches` to list only files
+  containing at least one match.
 
 ### Fixed
 

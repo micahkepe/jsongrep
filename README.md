@@ -339,14 +339,14 @@ cargo install jsongrep --no-default-features
 ```
 JSONPath-inspired query language for JSON, YAML, TOML, and other serialization formats
 
-Usage: jg [OPTIONS] [QUERY] [FILE] [COMMAND]
+Usage: jg [OPTIONS] [QUERY] [FILE]... [COMMAND]
 
 Commands:
   generate  Generate additional documentation and/or completions
 
 Arguments:
-  [QUERY]  Query string (e.g., "**.name")
-  [FILE]   Optional path to file. If omitted, reads from STDIN
+  [QUERY]    Query string (e.g., "**.name")
+  [FILE]...  Optional path(s) to file(s). If omitted, reads from STDIN
 
 Options:
   -i, --ignore-case      Case insensitive search
@@ -357,6 +357,7 @@ Options:
       --porcelain        Machine-readable output: strip labels and colors (useful for piping)
   -n, --no-display       Do not display matched JSON values
   -F, --fixed-string     Treat the query as a literal field name and search at any depth
+  -l, --files-with-matches  Print only the names of files containing at least one match
       --with-path        Always print the path header, even when output is piped
       --no-path          Never print the path header, even in a terminal
   -f, --format <FORMAT>  Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
@@ -401,6 +402,27 @@ echo "$TOKEN"
 
 ```
 abc123
+```
+
+**Search several files at once** (the query compiles once and runs per
+file, with per-file format autodetection and ripgrep-style headings):
+
+```bash
+jg 'services.*.image' staging/docker-compose.yml prod/docker-compose.yml
+```
+
+```
+staging/docker-compose.yml
+services.web.image:
+"nginx:1.27"
+
+prod/docker-compose.yml
+services.web.image:
+"nginx:1.26"
+```
+
+```bash
+jg -l 'services.db' */docker-compose.yml   # which files define a db service?
 ```
 
 **Piping to other tools:**
