@@ -312,7 +312,7 @@ fn parse_field(
 
     // Quoted fields: strip the surrounding double quotes and unescape
     let name = if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
-        unescape_json_string(&raw[1..raw.len() - 1])
+        unescape_json_string(&raw[1..raw.len() - 1])?
     } else {
         raw.to_string()
     };
@@ -333,7 +333,12 @@ fn parse_field(
 /// - `\r` -> carriage return (U+000D)
 /// - `\t` -> tab (U+0009)
 /// - `\uXXXX` -> the Unicode code point U+XXXX
-fn unescape_json_string(s: &str) -> String {
+///
+/// Code points outside the Basic Multilingual Plane are written as UTF-16
+/// surrogate pairs (`\uD83D\uDE00` for U+1F600), which are combined into the
+/// single code point they encode, matching `serde_json`. A surrogate half
+/// that is not part of a valid high+low pair is an error.
+fn unescape_json_string(s: &str) -> Result<String, QueryParseError> {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars();
 
@@ -349,15 +354,37 @@ fn unescape_json_string(s: &str) -> String {
                 Some('r') => result.push('\r'),
                 Some('t') => result.push('\t'),
                 Some('u') => {
-                    // Collect exactly 4 hex digits
-                    let hex: String = chars.by_ref().take(4).collect();
-                    if let Ok(code_point) = u32::from_str_radix(&hex, 16)
-                        && let Some(ch) = char::from_u32(code_point)
-                    {
-                        result.push(ch);
+                    let unit = parse_hex4(&mut chars)?;
+                    match unit {
+                        // High surrogate: must be followed by a low
+                        // surrogate escape; combine into one code point.
+                        0xD800..=0xDBFF => {
+                            if chars.next() != Some('\\')
+                                || chars.next() != Some('u')
+                            {
+                                return Err(lone_surrogate_error(unit));
+                            }
+                            let low = parse_hex4(&mut chars)?;
+                            if !(0xDC00..=0xDFFF).contains(&low) {
+                                return Err(lone_surrogate_error(unit));
+                            }
+                            let code_point = 0x10000
+                                + ((unit - 0xD800) << 10)
+                                + (low - 0xDC00);
+                            result.push(
+                                char::from_u32(code_point)
+                                    .expect("valid surrogate pair"),
+                            );
+                        }
+                        // Low surrogate with no preceding high surrogate
+                        0xDC00..=0xDFFF => {
+                            return Err(lone_surrogate_error(unit));
+                        }
+                        _ => result.push(
+                            char::from_u32(unit)
+                                .expect("non-surrogate BMP code point"),
+                        ),
                     }
-                    // Silently skip invalid code points — the pest
-                    // grammar already validates the 4-hex-digit format
                 }
                 Some(other) => {
                     // Unrecognized escape: preserve as-is
@@ -374,7 +401,33 @@ fn unescape_json_string(s: &str) -> String {
         }
     }
 
-    result
+    Ok(result)
+}
+
+/// Read exactly four hex digits of a `\uXXXX` escape from `chars`.
+///
+/// The pest grammar guarantees quoted fields contain well-formed escapes, so
+/// this only fails for strings that bypass the grammar.
+fn parse_hex4(chars: &mut std::str::Chars<'_>) -> Result<u32, QueryParseError> {
+    let hex: String = chars.by_ref().take(4).collect();
+    if hex.len() == 4
+        && let Ok(unit) = u32::from_str_radix(&hex, 16)
+    {
+        Ok(unit)
+    } else {
+        Err(QueryParseError::UnexpectedToken(format!(
+            "invalid \\u escape \"\\u{hex}\": expected 4 hex digits"
+        )))
+    }
+}
+
+/// Error for a UTF-16 surrogate half that is not part of a valid pair.
+fn lone_surrogate_error(unit: u32) -> QueryParseError {
+    QueryParseError::UnexpectedToken(format!(
+        "lone surrogate \\u{unit:04X} in quoted field: characters outside \
+         the Basic Multilingual Plane must be written as a \\uXXXX\\uXXXX \
+         high+low surrogate pair"
+    ))
 }
 
 /// Parse a group rule into a [`Query::Disjunction`].
@@ -772,6 +825,78 @@ mod tests {
         assert_eq!(result, Query::Sequence(vec![Query::Field("A".into())]));
         // 'A' has no reserved chars, so displayed unquoted
         assert_eq!("A", result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_surrogate_pair_combined() {
+        // \uD83D\uDE00 is the UTF-16 surrogate pair for 😀 (U+1F600)
+        let result = parse_query(r#""\uD83D\uDE00""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("😀".into())]));
+        // 😀 has no reserved chars, so it is displayed unquoted
+        assert_eq!("😀", result.to_string());
+    }
+
+    #[test]
+    fn quoted_field_surrogate_pair_with_surrounding_text() {
+        let result = parse_query(r#""a\uD83D\uDE00b""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("a😀b".into())]));
+    }
+
+    #[test]
+    fn quoted_field_surrogate_pair_boundaries() {
+        // Lowest surrogate pair: \uD800\uDC00 encodes U+10000
+        let result = parse_query(r#""\uD800\uDC00""#).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Field("\u{10000}".into())])
+        );
+
+        // Highest surrogate pair: \uDBFF\uDFFF encodes U+10FFFF
+        let result = parse_query(r#""\uDBFF\uDFFF""#).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Field("\u{10FFFF}".into())])
+        );
+    }
+
+    #[test]
+    fn quoted_field_consecutive_surrogate_pairs() {
+        // 😀 (U+1F600) followed by 😁 (U+1F601), both escaped
+        let result = parse_query(r#""\uD83D\uDE00\uD83D\uDE01""#).unwrap();
+        assert_eq!(result, Query::Sequence(vec![Query::Field("😀😁".into())]));
+    }
+
+    #[test]
+    fn unescape_rejects_truncated_hex() {
+        // Unreachable through parse_query (the grammar validates the
+        // 4-hex-digit format), but documents the defensive behaviour of
+        // the raw unescape path.
+        let err = unescape_json_string(r"\uD8").unwrap_err();
+        assert!(err.to_string().contains("expected 4 hex digits"), "{err}");
+    }
+
+    #[test]
+    fn quoted_field_lone_high_surrogate_rejected() {
+        let err = parse_query(r#""\uD83D""#).unwrap_err();
+        assert!(err.to_string().contains("lone surrogate"), "{err}");
+    }
+
+    #[test]
+    fn quoted_field_lone_low_surrogate_rejected() {
+        let err = parse_query(r#""\uDE00""#).unwrap_err();
+        assert!(err.to_string().contains("lone surrogate"), "{err}");
+    }
+
+    #[test]
+    fn quoted_field_high_surrogate_followed_by_non_surrogate_rejected() {
+        let err = parse_query(r#""\uD83D\u0041""#).unwrap_err();
+        assert!(err.to_string().contains("lone surrogate"), "{err}");
+    }
+
+    #[test]
+    fn quoted_field_high_surrogate_followed_by_plain_char_rejected() {
+        let err = parse_query(r#""\uD83Dx""#).unwrap_err();
+        assert!(err.to_string().contains("lone surrogate"), "{err}");
     }
 
     #[test]
