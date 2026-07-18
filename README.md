@@ -357,6 +357,8 @@ Options:
       --porcelain        Machine-readable output: strip labels and colors (useful for piping)
   -n, --no-display       Do not display matched JSON values
   -F, --fixed-string     Treat the query as a literal field name and search at any depth
+  -e, --exit-status      Exit 0 if any match, 1 if none, 2 on error (grep semantics)
+  -q, --quiet            Write nothing to stdout; communicate via the exit status only
       --with-path        Always print the path header, even when output is piped
       --no-path          Never print the path header, even in a terminal
   -f, --format <FORMAT>  Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
