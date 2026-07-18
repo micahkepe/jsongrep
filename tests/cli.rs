@@ -620,6 +620,60 @@ mod tests {
     }
 
     // ==============================================================================
+    // --max-count tests
+    // ==============================================================================
+
+    #[test]
+    fn max_count_limits_matches() {
+        let output = run_main(&[
+            "[*].id",
+            SIMPLE_JSONL_FILEPATH,
+            "--max-count",
+            "2",
+            "--count",
+            "--no-display",
+            "--porcelain",
+        ])
+        .success()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+        let output_str =
+            String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(
+            output_str.trim(),
+            "2",
+            "--max-count 2 should cap matches at 2"
+        );
+    }
+
+    #[test]
+    fn max_count_larger_than_matches_returns_all() {
+        let output = run_main(&[
+            "[*].id",
+            SIMPLE_JSONL_FILEPATH,
+            "-m",
+            "100",
+            "--count",
+            "--no-display",
+            "--porcelain",
+        ])
+        .success()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+        let output_str =
+            String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(
+            output_str.trim(),
+            "3",
+            "-m larger than the match count should return all matches"
+        );
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 
