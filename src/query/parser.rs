@@ -553,6 +553,57 @@ mod tests {
     }
 
     #[test]
+    fn field_then_wildcard_display_roundtrip() {
+        let query = "foo.*";
+        let result = parse_query(query).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::FieldWildcard,
+            ])
+        );
+        // Regression: this used to display as "foo*", which reparses as
+        // KleeneStar(foo) - a different query.
+        assert_eq!(query, result.to_string());
+        assert_eq!(result, parse_query(&result.to_string()).unwrap());
+    }
+
+    #[test]
+    fn modified_field_then_access_display_roundtrip() {
+        // Regression: "foo*.[0]" used to display as "foo*[0]", which does
+        // not reparse (the grammar requires accesses before the modifier).
+        for query in ["foo*.[0]", "foo?.[0]", "foo?.[1:3]", "foo*.[*]"] {
+            let result = parse_query(query).unwrap();
+            assert_eq!(query, &result.to_string());
+            assert_eq!(result, parse_query(&result.to_string()).unwrap());
+        }
+    }
+
+    #[test]
+    fn field_then_modified_access_display_roundtrip() {
+        // The no-separator form is kept when the modifier is on the access
+        for query in ["foo[0]?", "foo[0]*", "foo[1:3]?", "foo[*]?"] {
+            let result = parse_query(query).unwrap();
+            assert_eq!(query, &result.to_string());
+            assert_eq!(result, parse_query(&result.to_string()).unwrap());
+        }
+    }
+
+    #[test]
+    fn kleene_star_display_unchanged() {
+        let query = "foo*";
+        let result = parse_query(query).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::KleeneStar(Box::new(Query::Field(
+                "foo".into()
+            )))])
+        );
+        assert_eq!(query, result.to_string());
+    }
+
+    #[test]
     fn parse_simple_disjunction_group() {
         let query = "(foo | bar).baz";
         let result = parse_query(query).unwrap();
