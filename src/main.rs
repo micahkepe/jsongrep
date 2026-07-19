@@ -41,8 +41,19 @@ struct Args {
     /// Query string (e.g., "**.name").
     query: Option<String>,
     #[arg(value_name = "FILE")]
-    /// Optional path to file. If omitted, reads from STDIN.
-    input: Option<PathBuf>,
+    /// Optional path(s) to file(s). If omitted, reads from STDIN. With
+    /// multiple files, the query is compiled once and run against each
+    /// file, with a file heading before each file's matches.
+    inputs: Vec<PathBuf>,
+    /// Print only the names of files containing at least one match
+    /// (like `grep -l`).
+    #[arg(
+        short = 'l',
+        long,
+        action = ArgAction::SetTrue,
+        conflicts_with_all = ["count", "depth", "no_display"]
+    )]
+    files_with_matches: bool,
     /// Case insensitive search.
     #[arg(short, long, action = ArgAction::SetTrue)]
     ignore_case: bool,
@@ -249,6 +260,17 @@ impl Input {
     }
 }
 
+/// Whether any error in the chain is a broken pipe (the downstream consumer
+/// of stdout has gone away), which is a signal to stop printing, not an
+/// input-file failure.
+fn is_broken_pipe(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        cause
+            .downcast_ref::<io::Error>()
+            .is_some_and(|io_err| io_err.kind() == ErrorKind::BrokenPipe)
+    })
+}
+
 /// Parse input content, from the input path buffer if provided, else try STDIN.
 ///
 /// # Errors
@@ -429,26 +451,81 @@ fn main() -> Result<()> {
             let mut writer = BufWriter::new(stdout);
 
             // `--depth` without a query: sole positional argument is the file
-            if args.depth && args.query.is_some() && args.input.is_none() {
-                args.input = args.query.take().map(PathBuf::from);
+            if args.depth
+                && args.inputs.is_empty()
+                && let Some(query) = args.query.take()
+            {
+                args.inputs.push(PathBuf::from(query));
+            }
+            // With files already present, the query slot is legacy-ignored
+            // (`jg --depth "<query>" file` back-compat) UNLESS it names an
+            // existing file: then `jg --depth a.json b.json` means both
+            // files, not "ignore a.json".
+            if args.depth
+                && !args.inputs.is_empty()
+                && let Some(query) = args.query.take()
+            {
+                let candidate = PathBuf::from(&query);
+                if candidate.exists() {
+                    args.inputs.insert(0, candidate);
+                }
             }
             // short circuit to only perform the depth computation
-            if args.depth && args.input.is_some() {
-                let format = detect_format(args.input.as_ref(), args.format);
-                with_json(args.input, format, |json| {
-                    if args.porcelain {
-                        writeln!(writer, "{}", depth(json))?;
-                    } else {
-                        writeln!(
-                            writer,
-                            "{} {}",
-                            "Depth:".bold().blue(),
-                            depth(json)
-                        )?;
+            if args.depth && !args.inputs.is_empty() {
+                let multi = args.inputs.len() > 1;
+                let mut failed_inputs = 0usize;
+                for path in args.inputs {
+                    let format = detect_format(Some(&path), args.format);
+                    let name = path.display().to_string();
+                    let file_result = with_json(Some(path), format, |json| {
+                        if multi {
+                            // Attribute per file, grep -c style.
+                            let styled_name = if args.porcelain {
+                                name.normal()
+                            } else {
+                                name.bold().magenta()
+                            };
+                            writeln!(
+                                writer,
+                                "{}:{}",
+                                styled_name,
+                                depth(json)
+                            )?;
+                        } else if args.porcelain {
+                            writeln!(writer, "{}", depth(json))?;
+                        } else {
+                            writeln!(
+                                writer,
+                                "{} {}",
+                                "Depth:".bold().blue(),
+                                depth(json)
+                            )?;
+                        }
+                        Ok(())
+                    });
+                    if let Err(err) = file_result {
+                        if multi && !is_broken_pipe(&err) {
+                            writer.flush().ok();
+                            eprintln!("jg: {name}: {err:#}");
+                            failed_inputs += 1;
+                        } else if multi {
+                            break;
+                        } else {
+                            return Err(err);
+                        }
                     }
-                    Ok(())
-                })?;
+                }
 
+                if failed_inputs > 0 {
+                    match writer.flush() {
+                        Ok(()) => {}
+                        Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+                        Err(err) => return Err(err.into()),
+                    }
+                    anyhow::bail!(
+                        "{failed_inputs} input file(s) could not be processed"
+                    );
+                }
                 return Ok(());
             }
 
@@ -464,67 +541,154 @@ fn main() -> Result<()> {
                 raw_query.parse().with_context(|| "Failed to parse query")?
             };
 
-            let format = detect_format(args.input.as_ref(), args.format);
-            with_json(args.input, format, |json| {
-                let dfa = if args.ignore_case {
-                    QueryDFA::from_query_bounded_ignore_case(
-                        &query,
-                        DEFAULT_MAX_DFA_STATES,
-                    )
-                } else {
-                    QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
-                }?;
-                let results = dfa.find(json);
+            // Compile the DFA once; run it against every input.
+            let dfa = if args.ignore_case {
+                QueryDFA::from_query_bounded_ignore_case(
+                    &query,
+                    DEFAULT_MAX_DFA_STATES,
+                )
+            } else {
+                QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
+            }?;
 
-                if args.count || args.depth {
-                    args.no_display = true;
-                }
+            if args.count || args.depth {
+                args.no_display = true;
+            }
 
-                if args.count {
-                    if args.porcelain {
-                        writeln!(writer, "{}", results.len())?;
+            let multi = args.inputs.len() > 1;
+            let inputs: Vec<Option<PathBuf>> = if args.inputs.is_empty() {
+                vec![None]
+            } else {
+                args.inputs.into_iter().map(Some).collect()
+            };
+
+            // Errors in one file must not prevent searching the rest
+            // (grep semantics); remember and report at the end.
+            let mut failed_inputs = 0usize;
+            let mut printed_block = false;
+
+            for input in inputs {
+                let format = detect_format(input.as_ref(), args.format);
+                let name = input.as_ref().map_or_else(
+                    || "(standard input)".to_string(),
+                    |p| p.display().to_string(),
+                );
+
+                let file_result = with_json(input, format, |json| {
+                    let results = dfa.find(json);
+
+                    if args.files_with_matches {
+                        if !results.is_empty() {
+                            writeln!(writer, "{name}")?;
+                        }
+                        return Ok(());
+                    }
+
+                    if args.count {
+                        if multi {
+                            // grep -c style per-file attribution.
+                            let styled_name = if args.porcelain {
+                                name.normal()
+                            } else {
+                                name.bold().magenta()
+                            };
+                            writeln!(
+                                writer,
+                                "{}:{}",
+                                styled_name,
+                                results.len()
+                            )?;
+                        } else if args.porcelain {
+                            writeln!(writer, "{}", results.len())?;
+                        } else {
+                            writeln!(
+                                writer,
+                                "{} {}",
+                                "Found matches:".bold().blue(),
+                                results.len()
+                            )
+                            .with_context(|| "Failed to write to stdout")?;
+                        }
+                    }
+
+                    if args.depth {
+                        if args.porcelain {
+                            writeln!(writer, "{}", depth(json))?;
+                        } else {
+                            writeln!(
+                                writer,
+                                "{} {}",
+                                "Depth:".bold().blue(),
+                                depth(json)
+                            )?;
+                        }
+                    }
+
+                    if !args.no_display && !results.is_empty() {
+                        // ripgrep-style headings: with several inputs, name
+                        // the file once before its matches, with a blank
+                        // line between file blocks.
+                        if multi {
+                            if printed_block {
+                                writeln!(writer)?;
+                            }
+                            let styled_name = if args.porcelain {
+                                name.normal()
+                            } else {
+                                name.bold().green()
+                            };
+                            writeln!(writer, "{styled_name}")?;
+                        }
+                        printed_block = true;
+
+                        let pretty = !args.compact;
+                        for result in &results {
+                            write_colored_result(
+                                &mut writer,
+                                result.value,
+                                &result.path,
+                                &WriteOptions {
+                                    pretty,
+                                    show_path,
+                                    raw: args.raw_output,
+                                },
+                            )?;
+                        }
+                    }
+
+                    Ok(())
+                });
+
+                if let Err(err) = file_result {
+                    if multi && !is_broken_pipe(&err) {
+                        // Keep going, grep-style; attribute the failure.
+                        // Flush pending matches first so stdout/stderr
+                        // interleave in file order.
+                        writer.flush().ok();
+                        eprintln!("jg: {name}: {err:#}");
+                        failed_inputs += 1;
+                    } else if multi {
+                        // The output pipe is gone: nothing more can be
+                        // printed, so stop quietly (same as single-input
+                        // broken-pipe handling).
+                        break;
                     } else {
-                        writeln!(
-                            writer,
-                            "{} {}",
-                            "Found matches:".bold().blue(),
-                            results.len()
-                        )
-                        .with_context(|| "Failed to write to stdout")?;
+                        return Err(err);
                     }
                 }
+            }
 
-                if args.depth {
-                    if args.porcelain {
-                        writeln!(writer, "{}", depth(json))?;
-                    } else {
-                        writeln!(
-                            writer,
-                            "{} {}",
-                            "Depth:".bold().blue(),
-                            depth(json)
-                        )?;
-                    }
+            if failed_inputs > 0 {
+                // Flush what we printed before reporting the failure.
+                match writer.flush() {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+                    Err(err) => return Err(err.into()),
                 }
-
-                if !args.no_display {
-                    let pretty = !args.compact;
-                    for result in &results {
-                        write_colored_result(
-                            &mut writer,
-                            result.value,
-                            &result.path,
-                            &WriteOptions {
-                                pretty,
-                                show_path,
-                                raw: args.raw_output,
-                            },
-                        )?;
-                    }
-                }
-
-                Ok(())
-            })?;
+                anyhow::bail!(
+                    "{failed_inputs} input file(s) could not be processed"
+                );
+            }
 
             match writer.flush() {
                 Ok(()) => {}

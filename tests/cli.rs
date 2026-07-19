@@ -321,6 +321,238 @@ mod tests {
     }
 
     // ==============================================================================
+    // Multiple file arguments
+    // ==============================================================================
+
+    #[test]
+    fn multi_file_headings_and_matches() {
+        let a = temp_file_with(".json", br#"{"name": "from-a"}"#);
+        let b = temp_file_with(".json", br#"{"name": "from-b"}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["name", &a_path, &b_path, "--compact"])
+            .success()
+            .code(0)
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+
+        let expected =
+            format!("{a_path}\n\"from-a\"\n\n{b_path}\n\"from-b\"\n");
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn multi_file_heading_only_for_files_with_matches() {
+        let a = temp_file_with(".json", br#"{"name": "hit"}"#);
+        let b = temp_file_with(".json", br#"{"other": 1}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["name", &a_path, &b_path, "--compact"])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+
+        assert!(output.contains(&a_path));
+        assert!(
+            !output.contains(&b_path),
+            "file with no matches must not get a heading: {output:?}"
+        );
+    }
+
+    #[test]
+    fn multi_file_mixed_formats() {
+        // Per-file format autodetection: query YAML and JSON together.
+        let a = temp_file_with(".json", br#"{"host": "json-host"}"#);
+        let b = temp_file_with(".yaml", b"host: yaml-host\n");
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["host", &a_path, &b_path, "--compact"])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert!(output.contains("\"json-host\""));
+        assert!(output.contains("\"yaml-host\""));
+    }
+
+    #[test]
+    fn files_with_matches_lists_only_hits() {
+        let a = temp_file_with(".json", br#"{"name": "hit"}"#);
+        let b = temp_file_with(".json", br#"{"other": 1}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["-l", "name", &a_path, &b_path])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), a_path);
+    }
+
+    #[test]
+    fn multi_file_count_per_file() {
+        let a = temp_file_with(".json", br#"{"x": 1, "y": 2}"#);
+        let b = temp_file_with(".json", br#"{"z": 3}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["*", &a_path, &b_path, "--count"])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(output, format!("{a_path}:2\n{b_path}:1\n"));
+    }
+
+    #[test]
+    fn multi_file_error_continues_with_remaining() {
+        let a = temp_file_with(".json", br#"{"name": "still-searched"}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+
+        let assert = run_main(&[
+            "name",
+            "/nonexistent/missing.json",
+            &a_path,
+            "--compact",
+        ])
+        .failure()
+        .code(1);
+        let output = assert.get_output();
+        let stdout =
+            String::from_utf8(output.stdout.clone()).expect("utf8 stdout");
+        let stderr =
+            String::from_utf8(output.stderr.clone()).expect("utf8 stderr");
+
+        assert!(
+            stdout.contains("\"still-searched\""),
+            "remaining files must still be searched: {stdout:?}"
+        );
+        assert!(
+            stderr.contains("missing.json"),
+            "failure must be attributed to the file: {stderr:?}"
+        );
+    }
+
+    #[test]
+    fn multi_file_count_porcelain_has_no_ansi() {
+        let a = temp_file_with(".json", br#"{"x": 1}"#);
+        let b = temp_file_with(".json", br#"{"y": 2}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["*", &a_path, &b_path, "--count", "--porcelain"])
+            .env("CLICOLOR_FORCE", "1")
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            !output.contains('\u{1b}'),
+            "porcelain multi-count must be uncolored: {output:?}"
+        );
+        assert_eq!(output, format!("{a_path}:1\n{b_path}:1\n"));
+    }
+
+    #[test]
+    fn depth_multiple_files_all_processed() {
+        // Regression: the first of several files must not be swallowed by
+        // the legacy query-slot shuffle.
+        let a = temp_file_with(".json", br#"{"a": {"b": 1}}"#);
+        let b = temp_file_with(".json", br#"{"x": 1}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let output = run_main(&["--depth", &a_path, &b_path, "--porcelain"])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(output, format!("{a_path}:3\n{b_path}:2\n"));
+    }
+
+    #[test]
+    fn depth_multi_file_error_continues() {
+        // NOTE: the missing file must not be the first positional - the
+        // first slot is the legacy `--depth "<query>" file` query, which
+        // is ignored when it does not name an existing file (back-compat).
+        let a = temp_file_with(".json", br#"{"a": 1}"#);
+        let b = temp_file_with(".json", br#"{"b": {"c": 1}}"#);
+        let a_path = a.path().to_str().expect("path").to_string();
+        let b_path = b.path().to_str().expect("path").to_string();
+
+        let assert = run_main(&[
+            "--depth",
+            &a_path,
+            "/nonexistent/missing.json",
+            &b_path,
+            "--porcelain",
+        ])
+        .failure();
+        let output = assert.get_output();
+        let stdout =
+            String::from_utf8(output.stdout.clone()).expect("utf8 stdout");
+        let stderr =
+            String::from_utf8(output.stderr.clone()).expect("utf8 stderr");
+        assert!(
+            stdout.contains(&format!("{a_path}:2")),
+            "first file must be processed: {stdout:?}"
+        );
+        assert!(
+            stdout.contains(&format!("{b_path}:3")),
+            "file after the failing one must still be processed: {stdout:?}"
+        );
+        assert!(stderr.contains("missing.json"));
+    }
+
+    #[test]
+    fn depth_legacy_query_slot_still_ignored() {
+        // Back-compat: `jg --depth "<query>" file` ignores the query slot
+        // when it does not name an existing file.
+        let output = run_main(&[
+            "--depth",
+            "not.a.file.query",
+            SIMPLE_JSON_FILEPATH,
+            "--porcelain",
+        ])
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert!(
+            !output.contains(':'),
+            "single-file depth output must stay unattributed: {output:?}"
+        );
+    }
+
+    #[test]
+    fn single_file_output_unchanged_by_multi_support() {
+        // No heading, no per-file prefix when only one input is given.
+        let output = run_main(&["age", SIMPLE_JSON_FILEPATH, "--compact"])
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let output = String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), "32");
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 
