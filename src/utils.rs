@@ -27,6 +27,17 @@ pub fn depth(json: &Value) -> usize {
 // Colorized JSON Output
 // ==============================================================================
 
+/// Available options for printing matches.
+#[derive(Debug, Default)]
+pub struct WriteOptions {
+    /// Whether to pretty print the output.
+    pub pretty: bool,
+    /// Whether to include the file paths for matches.
+    pub show_path: bool,
+    /// Whether to print the raw output or auto-escape characters.
+    pub raw: bool,
+}
+
 /// Write a single query result (path header + colorized JSON value) to `writer`.
 /// Silently returns `Ok(())` on broken pipe so that piping to tools like
 /// `less` or `head` exits cleanly.
@@ -43,9 +54,7 @@ pub fn write_colored_result<W: Write>(
     writer: &mut W,
     value: &Value,
     path: &[PathType],
-    pretty: bool,
-    show_path: bool,
-    raw: bool,
+    options: &WriteOptions,
 ) -> anyhow::Result<()> {
     let path = path
         .iter()
@@ -54,16 +63,18 @@ pub fn write_colored_result<W: Write>(
         .join(".");
 
     let result = (|| -> io::Result<()> {
-        if show_path && !path.is_empty() {
+        if options.show_path && !path.is_empty() {
             writeln!(writer, "{}:", path.bold().magenta())?;
         }
-        if raw && let Value::Str(s) = value {
+        if options.raw
+            && let Value::Str(s) = value
+        {
             // Raw output: the string's contents, not its JSON encoding.
             // Escape sequences in the source (e.g. \n) have already been
             // decoded by the JSON parser, so this writes real newlines etc.
             write!(writer, "{s}")?;
         } else {
-            write_colored_json(writer, value, 0, pretty)?;
+            write_colored_json(writer, value, 0, options.pretty)?;
         }
         writeln!(writer)?;
         Ok(())

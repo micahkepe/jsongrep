@@ -20,7 +20,7 @@ use std::{
 use jsongrep::{
     commands,
     query::{Query, QueryDFA},
-    utils::{depth, write_colored_result},
+    utils::{WriteOptions, depth, write_colored_result},
 };
 
 /// Query an input JSON document against a jsongrep query.
@@ -514,9 +514,11 @@ fn main() -> Result<()> {
                             &mut writer,
                             result.value,
                             &result.path,
-                            pretty,
-                            show_path,
-                            args.raw_output,
+                            &WriteOptions {
+                                pretty,
+                                show_path,
+                                raw: args.raw_output,
+                            },
                         )?;
                     }
                 }

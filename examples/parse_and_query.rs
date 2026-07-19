@@ -10,7 +10,7 @@
 use jsongrep::{
     Value,
     query::{Query, QueryDFA},
-    utils::write_colored_result,
+    utils::{WriteOptions, write_colored_result},
 };
 use std::io::{self, BufWriter, Write};
 
@@ -37,9 +37,11 @@ fn main() -> anyhow::Result<()> {
             &mut writer,
             result.value,
             &result.path,
-            true,
-            true,
-            false,
+            &WriteOptions {
+                pretty: true,
+                show_path: true,
+                ..Default::default()
+            },
         )?;
     }
     writer.write_all(b"\n")?;
@@ -65,9 +67,11 @@ fn main() -> anyhow::Result<()> {
                 &mut writer,
                 result.value,
                 &result.path,
-                true,
-                true,
-                false,
+                &WriteOptions {
+                    pretty: true,
+                    show_path: true,
+                    ..Default::default()
+                },
             )?;
         }
     }
@@ -89,9 +93,11 @@ fn main() -> anyhow::Result<()> {
             &mut writer,
             result.value,
             &result.path,
-            true,
-            true,
-            false,
+            &WriteOptions {
+                pretty: true,
+                show_path: true,
+                ..Default::default()
+            },
         )?;
     }
 

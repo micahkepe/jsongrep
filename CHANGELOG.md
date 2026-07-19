@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `#[non_exhaustive]`; downstream exhaustive matches need a wildcard arm.
 - `/regex/` query strings now return a parse error instead of parsing
   successfully (and panicking on execution).
+- `jsongrep::utils::write_colored_result` now takes a `WriteOptions` struct
+  instead of separate `pretty`, `show_path`, and `raw` parameters.
 
 ## [0.9.0] - 2026-04-18
 
