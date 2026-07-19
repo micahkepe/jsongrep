@@ -29,6 +29,91 @@ use crate::query::{
     common::{JSONPointer, PathType, TransitionLabel},
 };
 
+/// Error returned when DFA determinization exceeds a configured state
+/// budget.
+///
+/// Subset construction is worst-case exponential in the query size (e.g.
+/// `(a|b)*.a.(a|b).(a|b)...` doubles the state count with every trailing
+/// step), so a short adversarial query string can otherwise consume
+/// unbounded time and memory. Services compiling untrusted queries should
+/// use [`QueryDFA::from_query_bounded`] and treat this error as "query too
+/// complex".
+///
+/// # Examples
+///
+/// ```
+/// use jsongrep::query::{Query, QueryDFA};
+/// use jsongrep::query::dfa::StateLimitExceeded;
+///
+/// // (a|b)*.a.(a|b)^8 determinizes to 513 states — a budget of 100
+/// // catches it long before completion.
+/// let query: Query = "(a|b)*.a.(a|b).(a|b).(a|b).(a|b).(a|b).(a|b).(a|b).(a|b)"
+///     .parse()
+///     .unwrap();
+/// let err = QueryDFA::from_query_bounded(&query, 100).unwrap_err();
+/// assert_eq!(err.limit, 100);
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct StateLimitExceeded {
+    /// The state budget that would have been exceeded.
+    pub limit: usize,
+}
+
+impl std::error::Error for StateLimitExceeded {}
+
+impl Display for StateLimitExceeded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "query is too complex: DFA construction would exceed {} states; \
+             simplify repetitions/alternations in the query",
+            self.limit
+        )
+    }
+}
+
+/// Error returned by the bounded string-to-DFA constructors: either the
+/// query string failed to parse, or determinization hit the state budget.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum QueryCompileError {
+    /// The query string failed to parse.
+    Parse(QueryParseError),
+    /// Determinization would exceed the configured state budget.
+    StateLimit(StateLimitExceeded),
+}
+
+impl std::error::Error for QueryCompileError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Parse(e) => Some(e),
+            Self::StateLimit(e) => Some(e),
+        }
+    }
+}
+
+impl Display for QueryCompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parse(e) => e.fmt(f),
+            Self::StateLimit(e) => e.fmt(f),
+        }
+    }
+}
+
+impl From<QueryParseError> for QueryCompileError {
+    fn from(e: QueryParseError) -> Self {
+        Self::Parse(e)
+    }
+}
+
+impl From<StateLimitExceeded> for QueryCompileError {
+    fn from(e: StateLimitExceeded) -> Self {
+        Self::StateLimit(e)
+    }
+}
+
 /// Represents a Deterministic Finite Automaton (DFA) for JSON queries. An
 /// important thing to note is that the alphabet depends on the query.
 #[non_exhaustive]
@@ -122,9 +207,15 @@ impl QueryDFA {
     /// contain it (the parser rejects `/regex/` syntax with
     /// [`QueryParseError::UnsupportedFeature`]); only hand-constructed ASTs
     /// can reach this panic.
+    ///
+    /// Construction is unbounded: an adversarial query can require an
+    /// exponential number of DFA states. Use
+    /// [`QueryDFA::from_query_bounded`] when compiling untrusted input.
     #[must_use]
     pub fn from_query(query: &Query) -> Self {
-        Self::build_from_query(query, false)
+        // A usize::MAX budget cannot be exceeded.
+        Self::build_from_query(query, false, usize::MAX)
+            .unwrap_or_else(|_| unreachable!("unbounded DFA build"))
     }
 
     /// Constructs a new case-insensitive [`QueryDFA`] from a constructed
@@ -135,9 +226,14 @@ impl QueryDFA {
     ///
     /// Panics if the query contains [`Query::Regex`]; see
     /// [`QueryDFA::from_query`].
+    ///
+    /// Construction is unbounded; see [`QueryDFA::from_query`] and
+    /// [`QueryDFA::from_query_bounded_ignore_case`].
     #[must_use]
     pub fn from_query_ignore_case(query: &Query) -> Self {
-        Self::build_from_query(query, true)
+        // A usize::MAX budget cannot be exceeded.
+        Self::build_from_query(query, true, usize::MAX)
+            .unwrap_or_else(|_| unreachable!("unbounded DFA build"))
     }
 
     /// Attempt to construct a new [`QueryDFA`] from the query string.
@@ -163,10 +259,102 @@ impl QueryDFA {
         Ok(Self::from_query_ignore_case(&query))
     }
 
+    /// Constructs a new [`QueryDFA`] from a [`Query`], failing if
+    /// determinization would exceed `max_states` DFA states.
+    ///
+    /// This is the constructor to use when queries come from untrusted
+    /// input (network services, playgrounds): subset construction is
+    /// worst-case exponential, and the budget turns a potential
+    /// memory/CPU blowup into a clean error.
+    ///
+    /// The budget bounds the number of DFA states; per-state cost (and the
+    /// NFA construction that precedes determinization) remains polynomial
+    /// in the query length, so callers accepting untrusted queries should
+    /// bound the query string length as well.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateLimitExceeded`] when the budget is exhausted (a
+    /// budget of `n` permits at most `n` states; a budget of `0` always
+    /// fails).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jsongrep::query::{Query, QueryDFA};
+    ///
+    /// let query: Query = "users[*].name".parse().unwrap();
+    /// let dfa = QueryDFA::from_query_bounded(&query, 10_000).unwrap();
+    /// assert!(dfa.num_states <= 10_000);
+    /// ```
+    pub fn from_query_bounded(
+        query: &Query,
+        max_states: usize,
+    ) -> Result<Self, StateLimitExceeded> {
+        Self::build_from_query(query, false, max_states)
+    }
+
+    /// Case-insensitive variant of [`QueryDFA::from_query_bounded`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateLimitExceeded`] when the budget is exhausted.
+    pub fn from_query_bounded_ignore_case(
+        query: &Query,
+        max_states: usize,
+    ) -> Result<Self, StateLimitExceeded> {
+        Self::build_from_query(query, true, max_states)
+    }
+
+    /// Parse a query string and compile it with a state budget in one step:
+    /// the safe entry point for untrusted query strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QueryCompileError::Parse`] for invalid query strings and
+    /// [`QueryCompileError::StateLimit`] when determinization would exceed
+    /// `max_states`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jsongrep::query::QueryDFA;
+    ///
+    /// let dfa =
+    ///     QueryDFA::from_query_str_bounded("users[*].name", 10_000).unwrap();
+    /// assert!(dfa.num_states <= 10_000);
+    /// ```
+    pub fn from_query_str_bounded(
+        query: &str,
+        max_states: usize,
+    ) -> Result<Self, QueryCompileError> {
+        let query: Query = query.parse()?;
+        Ok(Self::from_query_bounded(&query, max_states)?)
+    }
+
+    /// Case-insensitive variant of [`QueryDFA::from_query_str_bounded`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QueryCompileError`]; see
+    /// [`QueryDFA::from_query_str_bounded`].
+    pub fn from_query_str_bounded_ignore_case(
+        query: &str,
+        max_states: usize,
+    ) -> Result<Self, QueryCompileError> {
+        let query: Query = query.parse()?;
+        Ok(Self::from_query_bounded_ignore_case(&query, max_states)?)
+    }
+
     /// Shared constructor that threads `case_insensitive` into the builder.
-    fn build_from_query(query: &Query, case_insensitive: bool) -> Self {
+    fn build_from_query(
+        query: &Query,
+        case_insensitive: bool,
+        max_states: usize,
+    ) -> Result<Self, StateLimitExceeded> {
         let mut builder = DFABuilder::new();
         builder.case_insensitive = case_insensitive;
+        builder.max_states = max_states;
         builder.build_dfa(query)
     }
 
@@ -274,6 +462,10 @@ struct DFABuilder {
 
     /// Whether fields are case-sensitive.
     pub case_insensitive: bool,
+
+    /// Maximum number of DFA states determinization may create before
+    /// aborting with [`StateLimitExceeded`].
+    max_states: usize,
 }
 
 impl DFABuilder {
@@ -285,6 +477,7 @@ impl DFABuilder {
             collected_ranges: Vec::new(),
             range_to_range_id: Vec::new(),
             case_insensitive: false,
+            max_states: usize::MAX,
         }
     }
 
@@ -404,7 +597,10 @@ impl DFABuilder {
     /// producing a `QueryDFA`. For each DFA state, we map it to a set of NFA
     /// states.
     #[expect(clippy::too_many_lines)]
-    fn determinize_nfa(&mut self, nfa: &QueryNFA) -> QueryDFA {
+    fn determinize_nfa(
+        &mut self,
+        nfa: &QueryNFA,
+    ) -> Result<QueryDFA, StateLimitExceeded> {
         // Use a HashMap to map sets of currently reachable NFA states to DFA
         // state indices
         // `curr_nfa_states_to_dfa_state[NFA states bitmap]` -> DFA state index
@@ -529,6 +725,11 @@ impl DFABuilder {
                     } else {
                         // New DFA state
                         let new_dfa_state = dfa_states.len();
+                        if new_dfa_state >= self.max_states {
+                            return Err(StateLimitExceeded {
+                                limit: self.max_states,
+                            });
+                        }
                         nfa_states_to_dfa_state
                             .insert(next_nfa_states.clone(), new_dfa_state);
                         dfa_states.push(next_nfa_states.clone());
@@ -552,7 +753,7 @@ impl DFABuilder {
             }
         }
 
-        QueryDFA {
+        Ok(QueryDFA {
             num_states: dfa_states.len(),
             start_state: 0,
             is_accepting,
@@ -562,7 +763,7 @@ impl DFABuilder {
             key_to_key_id: std::mem::take(&mut self.key_to_key_id),
             range_to_range_id: std::mem::take(&mut self.range_to_range_id),
             case_insensitive: self.case_insensitive,
-        }
+        })
     }
 
     /// Builds a deterministic finite automaton from a query.
@@ -572,12 +773,22 @@ impl DFABuilder {
     /// made disjoint. After this, the DFA is constructed first by turning the
     /// query into an epsilon-free NFA via the Glushkov construction, and then
     /// determinized to obtain the final DFA.
-    fn build_dfa(&mut self, query: &Query) -> QueryDFA {
+    fn build_dfa(
+        &mut self,
+        query: &Query,
+    ) -> Result<QueryDFA, StateLimitExceeded> {
+        // Every DFA has at least the start state, so a zero budget can
+        // never be honored (this also covers the empty-query fast path
+        // below, which returns a one-state DFA).
+        if self.max_states == 0 {
+            return Err(StateLimitExceeded { limit: 0 });
+        }
+
         // Handle empty query case: match root (identity)
         if let Query::Sequence(steps) = query
             && steps.is_empty()
         {
-            return QueryDFA {
+            return Ok(QueryDFA {
                 num_states: 1,
                 start_state: 0,
                 is_accepting: vec![true],
@@ -586,7 +797,7 @@ impl DFABuilder {
                 key_to_key_id: HashMap::new(),
                 range_to_range_id: vec![],
                 case_insensitive: false,
-            };
+            });
         }
 
         // Extract symbols to obtain finite alphabet
@@ -1653,6 +1864,98 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(1u64.into()));
+    }
+
+    // ==============================================================================
+    // Bounded determinization
+    // ==============================================================================
+
+    /// Build the classic exponential-blowup query `(a|b)*.a.(a|b)^n`,
+    /// which determinizes to 2^(n+1) + 1 DFA states.
+    fn pathological_query(n: usize) -> Query {
+        let mut q = String::from("(a|b)*.a");
+        for _ in 0..n {
+            q.push_str(".(a|b)");
+        }
+        q.parse().expect("valid query")
+    }
+
+    #[test]
+    fn bounded_build_rejects_exponential_query() {
+        let query = pathological_query(8); // 513 states unbounded
+        let result = QueryDFA::from_query_bounded(&query, 100);
+        assert_eq!(result.unwrap_err(), StateLimitExceeded { limit: 100 });
+    }
+
+    #[test]
+    fn bounded_build_exact_boundary() {
+        // 513 states unbounded: a budget of exactly 513 must succeed, and
+        // 512 must fail (budget n permits at most n states).
+        let query = pathological_query(8);
+        assert!(QueryDFA::from_query_bounded(&query, 513).is_ok());
+        assert!(QueryDFA::from_query_bounded(&query, 512).is_err());
+    }
+
+    #[test]
+    fn bounded_build_zero_budget_always_fails() {
+        let simple: Query = "a".parse().expect("valid query");
+        assert!(QueryDFA::from_query_bounded(&simple, 0).is_err());
+
+        // The empty query's one-state fast path must honor the budget too.
+        let empty: Query = "".parse().expect("valid query");
+        assert!(QueryDFA::from_query_bounded(&empty, 0).is_err());
+        assert!(QueryDFA::from_query_bounded(&empty, 1).is_ok());
+    }
+
+    #[test]
+    fn bounded_str_constructor_reports_both_error_kinds() {
+        assert!(matches!(
+            QueryDFA::from_query_str_bounded("unclosed\"", 1000),
+            Err(QueryCompileError::Parse(_))
+        ));
+        let mut q = String::from("(a|b)*.a");
+        for _ in 0..8 {
+            q.push_str(".(a|b)");
+        }
+        assert!(matches!(
+            QueryDFA::from_query_str_bounded(&q, 100),
+            Err(QueryCompileError::StateLimit(_))
+        ));
+        assert!(QueryDFA::from_query_str_bounded("users[*].name", 100).is_ok());
+    }
+
+    #[test]
+    fn bounded_build_succeeds_within_budget() {
+        let query = pathological_query(8);
+        let dfa = QueryDFA::from_query_bounded(&query, 1000)
+            .expect("513 states fit in a 1000-state budget");
+        assert_eq!(dfa.num_states, 513);
+
+        // The bounded DFA behaves identically to the unbounded one.
+        let json: Value =
+            serde_json::from_str(r#"{"a": {"a": {"a": 1}}}"#).expect("json");
+        let unbounded = QueryDFA::from_query(&query);
+        assert_eq!(dfa.find(&json).len(), unbounded.find(&json).len());
+    }
+
+    #[test]
+    fn bounded_build_ignore_case_respects_budget() {
+        let query = pathological_query(8);
+        let result = QueryDFA::from_query_bounded_ignore_case(&query, 100);
+        assert!(result.is_err());
+        assert!(QueryDFA::from_query_bounded_ignore_case(&query, 1000).is_ok());
+    }
+
+    #[test]
+    fn bounded_build_normal_query_unaffected() {
+        let query: Query = "users.[*].name".parse().expect("valid query");
+        let json: Value = serde_json::from_str(
+            r#"{"users": [{"name": "a"}, {"name": "b"}]}"#,
+        )
+        .expect("json");
+        let dfa = QueryDFA::from_query_bounded(&query, 1 << 20)
+            .expect("simple query is far below any realistic budget");
+        assert_eq!(dfa.find(&json).len(), 2);
     }
 
     #[test]

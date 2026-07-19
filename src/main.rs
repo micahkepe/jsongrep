@@ -111,6 +111,14 @@ enum GenerateCommand {
 /// See: <https://burntsushi.net/ripgrep/#mechanics>.
 const MMAP_MIN_FILE_SIZE: u64 = 1 << 20; // 1 MiB
 
+/// Ceiling on DFA states during query compilation. Subset construction is
+/// worst-case exponential in the query length, so a short adversarial query
+/// could otherwise consume unbounded time and memory; past this budget `jg`
+/// reports "query is too complex" instead. 2^18 states keeps the worst-case
+/// abort around a second while remaining orders of magnitude beyond any
+/// realistic query (which needs tens of states).
+const DEFAULT_MAX_DFA_STATES: usize = 1 << 18;
+
 /// Possible input sources for jsongrep.
 ///
 /// Input is kept as raw bytes so that binary formats (CBOR, `MessagePack`)
@@ -442,10 +450,13 @@ fn main() -> Result<()> {
             let format = detect_format(args.input.as_ref(), args.format);
             with_json(args.input, format, |json| {
                 let dfa = if args.ignore_case {
-                    QueryDFA::from_query_ignore_case(&query)
+                    QueryDFA::from_query_bounded_ignore_case(
+                        &query,
+                        DEFAULT_MAX_DFA_STATES,
+                    )
                 } else {
-                    QueryDFA::from_query(&query)
-                };
+                    QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
+                }?;
                 let results = dfa.find(json);
 
                 if args.count || args.depth {
