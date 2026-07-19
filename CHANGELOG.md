@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `jg` CLI caps query compilation at 2^18 DFA states (a clean error
   after ~0.4 s worst case instead of unbounded time/memory), and the WASM
   playground at 2^16.
+- `-r`/`--raw-output`: print matched strings without JSON quotes or escaping
+  (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
 
 ### Fixed
 
@@ -40,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `#[non_exhaustive]`; downstream exhaustive matches need a wildcard arm.
 - `/regex/` query strings now return a parse error instead of parsing
   successfully (and panicking on execution).
+- `jsongrep::utils::write_colored_result` now takes a `WriteOptions` struct
+  instead of separate `pretty`, `show_path`, and `raw` parameters.
 
 ## [0.9.0] - 2026-04-18
 

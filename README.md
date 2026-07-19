@@ -351,6 +351,7 @@ Arguments:
 Options:
   -i, --ignore-case      Case insensitive search
       --compact          Do not pretty-print the JSON output
+  -r, --raw-output       Print matched strings without JSON quotes or escaping (like `jq -r`)
       --count            Display count of number of matches
       --depth            Display depth of the input document
       --porcelain        Machine-readable output: strip labels and colors (useful for piping)
@@ -389,6 +390,17 @@ curl -s https://api.nobelprize.org/v1/prize.json | jg -F firstname --count --por
 
 ```
 1026
+```
+
+**Raw string output** (like `jq -r`) for shell pipelines:
+
+```bash
+TOKEN=$(echo '{"auth": {"token": "abc123"}}' | jg -r 'auth.token')
+echo "$TOKEN"
+```
+
+```
+abc123
 ```
 
 **Piping to other tools:**
