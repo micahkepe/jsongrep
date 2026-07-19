@@ -161,6 +161,37 @@ mod tests {
     }
 
     #[test]
+    fn quoted_field_surrogate_pair_escape_matches() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "json", r#""\uD83D\uDE00""#, "--no-path", "--compact"])
+            .write_stdin(r#"{"😀": "grin"}"#)
+            .assert()
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(
+            output.trim(),
+            r#""grin""#,
+            "surrogate-pair escape should match the emoji key"
+        );
+    }
+
+    #[test]
+    fn quoted_field_lone_surrogate_is_clean_error() {
+        let assert =
+            run_main(&[r#""\uD83D""#, SIMPLE_JSON_FILEPATH]).failure().code(1);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            stderr.contains("lone surrogate"),
+            "expected lone surrogate parse error, got: {stderr:?}"
+        );
+    }
+
+    #[test]
     fn fixed_string_finds_key_at_any_depth() {
         let assert =
             run_main(&["-F", "/activities", "tests/data/openapi_paths.json"])

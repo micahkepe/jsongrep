@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--compact` is implied, so output is one machine-parseable JSON value
   per line. Previously only the `--count`/`--depth` labels were
   affected.
+- Quoted fields now decode UTF-16 surrogate pairs (`\uXXXX\uXXXX`) into the
+  code point they encode, matching `serde_json`, so fields named with emoji
+  and other non-BMP characters can be queried via their JSON escape form.
+  Previously both halves were silently dropped, producing a wrong (often
+  empty) field name. A surrogate half that is not part of a valid high+low
+  pair is now a parse error instead of being silently discarded.
 
 ### Breaking
 
