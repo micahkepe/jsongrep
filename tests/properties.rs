@@ -26,15 +26,6 @@ const MAX_CONVERGENCE_ROUNDS: usize = 2 * MAX_GEN_DEPTH as usize + 2;
 /// Characters the query DSL actually uses, plus a few plain field
 /// characters. Biasing random strings toward this alphabet reaches far
 /// deeper into the parser than uniformly random Unicode would.
-///
-/// NOTE: the digit alphabet is deliberately `{0, 1, 9}`. The decimal
-/// digits of `usize::MAX` (18446744073709551615) cannot be written with
-/// it, so every index this alphabet can express either exceeds `usize`
-/// and is rejected cleanly at parse time, or is at most
-/// `usize::MAX - 1`, where the `idx + 1` in NFA/DFA construction cannot
-/// overflow. That known overflow panic is fixed upstream by the
-/// parse-hardening PR; until it lands, these strings deliberately cannot
-/// reach it.
 fn dsl_string() -> impl Strategy<Value = String> {
     proptest::collection::vec(
         proptest::sample::select(vec![
@@ -62,30 +53,6 @@ fn dsl_string() -> impl Strategy<Value = String> {
         0..30,
     )
     .prop_map(|chars| chars.into_iter().collect())
-}
-
-/// `true` if the query contains a regex anywhere. Regex queries parse but
-/// hit `unimplemented!()` in NFA construction (tracked upstream; the
-/// parse-hardening PR rejects them at parse time), so they are excluded
-/// from the DFA-build property until that lands. Leaf variants are
-/// enumerated explicitly so that adding a `Query` variant forces a review
-/// here instead of silently falling through a wildcard.
-fn contains_regex(query: &Query) -> bool {
-    match query {
-        Query::Regex(_) => true,
-        Query::Optional(inner) | Query::KleeneStar(inner) => {
-            contains_regex(inner)
-        }
-        Query::Sequence(queries) | Query::Disjunction(queries) => {
-            queries.iter().any(contains_regex)
-        }
-        Query::Field(_)
-        | Query::Index(_)
-        | Query::Range(_, _)
-        | Query::RangeFrom(_)
-        | Query::FieldWildcard
-        | Query::ArrayWildcard => false,
-    }
 }
 
 /// `true` if the query displays as the empty string (mirrors the private
@@ -186,17 +153,14 @@ proptest! {
         let _ = parse_query(&s);
     }
 
-    /// Every query that parses must compile to a DFA without panicking -
-    /// except the two documented exclusions for known, upstream-tracked
-    /// panics this suite cannot yet assert on: regex queries
-    /// ([`contains_regex`]) and indices at exactly `usize::MAX`
-    /// (unreachable by construction, see [`dsl_string`]). Once the
-    /// parse-hardening PR lands, both exclusions should be deleted.
+    /// Every query that parses must compile to a DFA without panicking.
+    /// The two former exclusions here (regex queries, indices at exactly
+    /// `usize::MAX`) are gone: the parser now rejects regex syntax with
+    /// `UnsupportedFeature`, and `usize::MAX` indices are well-defined, so
+    /// whatever `parse_query` accepts must build.
     #[test]
     fn dfa_build_never_panics_on_parsed_queries(s in dfa_query_string()) {
-        if let Ok(query) = parse_query(&s)
-            && !contains_regex(&query)
-        {
+        if let Ok(query) = parse_query(&s) {
             let _ = QueryDFA::from_query(&query);
         }
     }
