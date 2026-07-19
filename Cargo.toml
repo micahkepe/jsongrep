@@ -3,6 +3,7 @@ name = "jsongrep"
 version = "0.9.0"
 authors = ["Micah Kepe <micahkepe@gmail.com>"]
 edition = "2024"
+rust-version = "1.88"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/micahkepe/jsongrep"

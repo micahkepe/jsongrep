@@ -96,7 +96,8 @@ impl Query {
         Self::Field(name.into())
     }
 
-    /// Envelopes the fixed query string with a recursive depth "(* | [*])" prelude.
+    /// Envelopes the fixed query string with a recursive depth `(* | [*])*`
+    /// prelude.
     ///
     /// NOTE: Used mainly for `-F`/ `--fixed-string` CLI flag.
     pub fn recursive_depth_fixed_string<T: Into<String>>(fixed: T) -> Self {
