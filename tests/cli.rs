@@ -223,15 +223,10 @@ mod tests {
     fn porcelain_match_output_is_compact_json_lines() {
         // --porcelain must imply --compact: one JSON value per line, no
         // pretty-printing, parseable by line-oriented consumers.
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["--porcelain", "--no-path", "users[*]"])
-            .write_stdin(r#"{"users": [{"a": 1}, {"b": 2}]}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["--porcelain", "--no-path", "users[*]"],
+            r#"{"users": [{"a": 1}, {"b": 2}]}"#,
+        );
         assert_eq!(output, "{\"a\":1}\n{\"b\":2}\n");
         for line in output.lines() {
             serde_json::from_str::<Value>(line)
@@ -265,102 +260,63 @@ mod tests {
 
     #[test]
     fn raw_output_unquotes_strings() {
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "name", "--no-path"])
-            .write_stdin(r#"{"name": "Ada Lovelace"}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-r", "name", "--no-path"],
+            r#"{"name": "Ada Lovelace"}"#,
+        );
         assert_eq!(output, "Ada Lovelace\n");
     }
 
     #[test]
     fn raw_output_decodes_escapes() {
         // \n and \" in the JSON source must come out as real characters.
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "msg", "--no-path"])
-            .write_stdin(r#"{"msg": "line1\nline\"2\""}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-r", "msg", "--no-path"],
+            r#"{"msg": "line1\nline\"2\""}"#,
+        );
         assert_eq!(output, "line1\nline\"2\"\n");
     }
 
     #[test]
     fn raw_output_empty_string_is_bare_newline() {
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "s", "--no-path"])
-            .write_stdin(r#"{"s": ""}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output =
+            query_stdin_output(&["-r", "s", "--no-path"], r#"{"s": ""}"#);
         assert_eq!(output, "\n");
     }
 
     #[test]
     fn raw_output_preserves_trailing_newline_plus_record_newline() {
         // jq -r prints the string contents then its own record newline.
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "s", "--no-path"])
-            .write_stdin(r#"{"s": "x\n"}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output =
+            query_stdin_output(&["-r", "s", "--no-path"], r#"{"s": "x\n"}"#);
         assert_eq!(output, "x\n\n");
     }
 
     #[test]
     fn raw_output_with_path_header() {
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "name", "--with-path"])
-            .write_stdin(r#"{"name": "Ada"}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-r", "name", "--with-path"],
+            r#"{"name": "Ada"}"#,
+        );
         assert_eq!(output, "name:\nAda\n");
     }
 
     #[test]
     fn raw_output_leaves_non_strings_as_json() {
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "*", "--no-path", "--compact"])
-            .write_stdin(r#"{"n": 42, "b": true, "o": {"k": "v"}}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-r", "*", "--no-path", "--compact"],
+            r#"{"n": 42, "b": true, "o": {"k": "v"}}"#,
+        );
         assert_eq!(output, "42\ntrue\n{\"k\":\"v\"}\n");
     }
 
     #[test]
     fn raw_output_only_affects_top_level_strings() {
         // A string nested inside a matched object keeps its JSON quoting.
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-r", "user", "--no-path", "--compact"])
-            .write_stdin(r#"{"user": {"name": "Ada"}}"#)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-r", "user", "--no-path", "--compact"],
+            r#"{"user": {"name": "Ada"}}"#,
+        );
         assert_eq!(output, "{\"name\":\"Ada\"}\n");
     }
 
@@ -414,6 +370,15 @@ mod tests {
     /// across formats without worrying about whitespace differences.
     fn query_output(args: &[&str]) -> String {
         let assert = run_main(args).success().code(0);
+        String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output")
+    }
+
+    /// Like [`query_output`], but pipes `stdin` into the process.
+    fn query_stdin_output(args: &[&str], stdin: impl Into<Vec<u8>>) -> String {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd.args(args).write_stdin(stdin).assert().success();
         String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output")
     }
@@ -529,16 +494,10 @@ mod tests {
     fn jsonl_stdin_with_format_flag() {
         let jsonl_content =
             std::fs::read_to_string(SIMPLE_JSONL_FILEPATH).expect("read jsonl");
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-f", "jsonl", "[0].email", "--no-path", "--compact"])
-            .write_stdin(jsonl_content)
-            .assert()
-            .success()
-            .code(0);
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-f", "jsonl", "[0].email", "--no-path", "--compact"],
+            jsonl_content,
+        );
         assert_eq!(
             output.trim(),
             r#""bguise0@indiegogo.com""#,
@@ -679,16 +638,10 @@ mod tests {
         let mut cbor_buf = Vec::new();
         ciborium::into_writer(&value, &mut cbor_buf)
             .expect("CBOR serialization");
-
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-f", "cbor", "age", "--no-path", "--compact"])
-            .write_stdin(cbor_buf)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-f", "cbor", "age", "--no-path", "--compact"],
+            cbor_buf,
+        );
         assert_eq!(output.trim(), json_reference("age").trim());
     }
 
@@ -698,16 +651,10 @@ mod tests {
             serde_json::from_str(SIMPLE_JSON_STR).expect("parse simple.json");
         let msgpack_buf =
             rmp_serde::to_vec(&value).expect("MessagePack serialization");
-
-        let mut cmd =
-            Command::cargo_bin("jg").expect("Failed to find main binary");
-        let assert = cmd
-            .args(["-f", "msgpack", "name.first", "--no-path", "--compact"])
-            .write_stdin(msgpack_buf)
-            .assert()
-            .success();
-        let output = String::from_utf8(assert.get_output().stdout.clone())
-            .expect("Invalid UTF-8 output");
+        let output = query_stdin_output(
+            &["-f", "msgpack", "name.first", "--no-path", "--compact"],
+            msgpack_buf,
+        );
         assert_eq!(output.trim(), json_reference("name.first").trim());
     }
 
