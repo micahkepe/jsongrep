@@ -99,25 +99,39 @@ enum GenerateCommand {
     },
 }
 
+/// Minimum file size for which memory-mapping is attempted.
+///
+/// For small files, it is likely that a single read call is at least as fast or faster than mmap
+/// (mmap setup and page-fault overhead dominate for small files) and avoids mmap's file-truncation
+/// hazards.
+///
+/// NOTE: in the future when globbing (<https://github.com/micahkepe/jsongrep/issues/33>) and
+/// recursive searching are enabled, can look into other heuristics for performance.
+///
+/// See: <https://burntsushi.net/ripgrep/#mechanics>.
+const MMAP_MIN_FILE_SIZE: u64 = 1 << 20; // 1 MiB
+
 /// Possible input sources for jsongrep.
+///
+/// Input is kept as raw bytes so that binary formats (CBOR, `MessagePack`)
+/// work from any source; UTF-8 is validated only when a text format needs
+/// it.
 enum Input {
-    /// Buffered standard input.
-    Stdin(String),
+    /// Fully buffered input: stdin, small files, non-regular files (FIFOs,
+    /// process substitution), and the fallback when mmap fails.
+    Buffer(Vec<u8>),
     /// A memory-mapped file from the file system. Assumes an immutable handle.
     File(Mmap),
 }
 
 impl Input {
     fn to_str(&self) -> Result<&str, Utf8Error> {
-        match self {
-            Self::Stdin(buffer) => Ok(buffer.as_str()),
-            Self::File(mmap) => str::from_utf8(mmap),
-        }
+        str::from_utf8(self.to_bytes())
     }
 
     fn to_bytes(&self) -> &[u8] {
         match self {
-            Self::Stdin(buf) => buf.as_bytes(),
+            Self::Buffer(buf) => buf.as_slice(),
             Self::File(mmap) => mmap.as_ref(),
         }
     }
@@ -228,22 +242,43 @@ impl Input {
 /// piped input, prints the help message and exits with an error.
 fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
     if let Some(path) = input {
-        let fd =
+        let mut fd =
             OpenOptions::new().read(true).open(&path).with_context(|| {
                 format!("Failed to open file {}", path.display())
             })?;
 
-        // SAFETY:
-        // mmap is unsafe if the backing file is modified, either by ourselves or by
-        // other processes.
-        // We will never modify the file, and if other processes do,
-        // there is not much we can do about it.
-        let map = unsafe {
-            MmapOptions::new().map(&fd).with_context(|| {
-                format!("Failed to mmap file {}", path.display())
-            })?
-        };
-        Ok(Input::File(map))
+        // Only mmap large regular files. Non-regular files (FIFOs, process
+        // substitution like `jg q <(curl ...)`, character devices) cannot be
+        // mapped, and small files gain nothing from mapping. If mapping
+        // fails anyway, fall back to a plain read instead of erroring.
+        let metadata = fd.metadata().ok();
+        let is_large_regular_file = metadata
+            .as_ref()
+            .is_some_and(|m| m.is_file() && m.len() >= MMAP_MIN_FILE_SIZE);
+
+        if is_large_regular_file {
+            // SAFETY:
+            // mmap is unsafe if the backing file is modified, either by
+            // ourselves or by other processes. We will never modify the
+            // file, and if other processes do, there is not much we can do
+            // about it.
+            if let Ok(map) = unsafe { MmapOptions::new().map(&fd) } {
+                return Ok(Input::File(map));
+            }
+        }
+
+        // Capacity hint capped at the mmap threshold: only files below it
+        // (or rare mmap fallbacks) reach this path, and a stale/huge stat
+        // length must not trigger a giant allocation.
+        let capacity_hint = metadata
+            .map_or(0, |m| m.len().min(MMAP_MIN_FILE_SIZE))
+            .try_into()
+            .unwrap_or(0);
+        let mut buffer = Vec::with_capacity(capacity_hint);
+        fd.read_to_end(&mut buffer).with_context(|| {
+            format!("Failed to read file {}", path.display())
+        })?;
+        Ok(Input::Buffer(buffer))
     } else {
         if io::stdin().is_terminal() {
             // No piped input and no file specified
@@ -251,9 +286,12 @@ fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
             cmd.print_help()?;
             anyhow::bail!("No input specified");
         }
-        let mut buffer = String::new();
-        io::stdin().read_to_string(&mut buffer)?;
-        Ok(Input::Stdin(buffer))
+        // Read raw bytes: binary formats (CBOR, MessagePack) are valid
+        // stdin inputs; UTF-8 is only required (and validated) for text
+        // formats.
+        let mut buffer = Vec::new();
+        io::stdin().read_to_end(&mut buffer)?;
+        Ok(Input::Buffer(buffer))
     }
 }
 
@@ -322,9 +360,7 @@ where
     };
     let json_str: &str = match &json_string_owned {
         Some(s) => s.as_str(),
-        None => input_content
-            .to_str()
-            .context("File contents are not valid UTF-8")?,
+        None => input_content.to_str().context("Input is not valid UTF-8")?,
     };
     let json: Value = serde_json::from_str(json_str)
         .with_context(|| format!("Failed to parse as {format}"))?;
