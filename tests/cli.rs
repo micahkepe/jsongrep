@@ -321,6 +321,65 @@ mod tests {
     }
 
     // ==============================================================================
+    // Exit status (-e) and quiet (-q) tests
+    // ==============================================================================
+
+    #[test]
+    fn exit_status_zero_on_match() {
+        run_main(&["-e", "age", SIMPLE_JSON_FILEPATH]).success().code(0);
+    }
+
+    #[test]
+    fn exit_status_one_on_no_match() {
+        run_main(&["-e", "does.not.exist", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(1);
+    }
+
+    #[test]
+    fn exit_status_two_on_error() {
+        run_main(&["-e", "age", "/nonexistent/file.json"]).failure().code(2);
+    }
+
+    #[test]
+    fn default_exit_zero_on_no_match_unchanged() {
+        // Back-compat: without -e/-q, no match still exits 0.
+        run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH]).success().code(0);
+    }
+
+    #[test]
+    fn default_exit_one_on_error_unchanged() {
+        run_main(&["age", "/nonexistent/file.json"]).failure().code(1);
+    }
+
+    #[test]
+    fn quiet_suppresses_output_and_sets_status() {
+        let assert =
+            run_main(&["-q", "age", SIMPLE_JSON_FILEPATH]).success().code(0);
+        let output = assert.get_output();
+        assert!(
+            output.stdout.is_empty(),
+            "-q must print nothing on match, got: {:?}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+
+        let assert = run_main(&["-q", "does.not.exist", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(1);
+        assert!(
+            assert.get_output().stdout.is_empty(),
+            "-q must print nothing on no-match"
+        );
+    }
+
+    #[test]
+    fn quiet_conflicts_with_count() {
+        run_main(&["-q", "--count", "age", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(2);
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 
