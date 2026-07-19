@@ -20,6 +20,7 @@ use serde_json_borrow::Value;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Display,
+    ops::ControlFlow,
     rc::Rc,
 };
 
@@ -378,6 +379,80 @@ impl QueryDFA {
     #[must_use]
     pub fn find<'a>(&self, json: &'a Value<'a>) -> Vec<JSONPointer<'a>> {
         DFAQueryEngine::find_with_dfa(json, self)
+    }
+
+    /// Execute this compiled query, returning at most `limit` matches in
+    /// document order.
+    ///
+    /// The traversal stops as soon as the limit is reached, so
+    /// `find_limited(json, 1)` costs O(work until the first match) rather
+    /// than a full document walk.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jsongrep::{Value, query::QueryDFA};
+    ///
+    /// let json: Value =
+    ///     serde_json::from_str(r#"{"a": 1, "b": 2, "c": 3}"#).unwrap();
+    /// let query = QueryDFA::from_query_str("*").unwrap();
+    /// assert_eq!(query.find_limited(&json, 2).len(), 2);
+    /// ```
+    #[must_use]
+    pub fn find_limited<'a>(
+        &self,
+        json: &'a Value<'a>,
+        limit: usize,
+    ) -> Vec<JSONPointer<'a>> {
+        if limit == 0 {
+            return Vec::new();
+        }
+        let mut results = Vec::new();
+        let _: ControlFlow<()> =
+            DFAQueryEngine::visit_with_dfa(json, self, |ptr| {
+                results.push(ptr);
+                if results.len() >= limit {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            });
+        results
+    }
+
+    /// Execute this compiled query, invoking `visit` for each match in
+    /// document order. Return [`ControlFlow::Break`] from the visitor to
+    /// stop the search early; the break value is returned to the caller
+    /// (`ControlFlow::Continue(())` means the whole document was searched).
+    ///
+    /// This is the zero-materialization primitive: existence checks and
+    /// streaming consumers avoid collecting matches into a `Vec` entirely.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::ops::ControlFlow;
+    /// use jsongrep::{Value, query::QueryDFA};
+    ///
+    /// let json: Value =
+    ///     serde_json::from_str(r#"{"a": 1, "b": 2}"#).unwrap();
+    /// let query = QueryDFA::from_query_str("*").unwrap();
+    ///
+    /// // Existence check: stop at the first match.
+    /// let found = query
+    ///     .for_each_match(&json, |_| ControlFlow::Break(()))
+    ///     .is_break();
+    /// assert!(found);
+    /// ```
+    pub fn for_each_match<'a, B, F>(
+        &self,
+        json: &'a Value<'a>,
+        visit: F,
+    ) -> ControlFlow<B>
+    where
+        F: FnMut(JSONPointer<'a>) -> ControlFlow<B>,
+    {
+        DFAQueryEngine::visit_with_dfa(json, self, visit)
     }
 
     /// Check if a given state is accepting/final.
@@ -820,21 +895,27 @@ impl DFABuilder {
 pub struct DFAQueryEngine;
 
 impl DFAQueryEngine {
-    /// Performs a depth-first search over the JSON document AST, accumulating
-    /// results as it traverses and finds final states.
-    fn traverse_json<'a>(
+    /// Performs a depth-first search over the JSON document AST, invoking the
+    /// visitor for each match. The visitor returns [`ControlFlow::Break`] to
+    /// stop the traversal early (e.g. after enough matches have been seen);
+    /// the break propagates straight up through the recursion, so an early
+    /// stop costs no further document work.
+    fn traverse_json<'a, B, F>(
         dfa: &QueryDFA,
         current_state: usize,
         path: &mut Vec<PathType>,
         value: &'a Value<'a>,
-        results: &mut Vec<JSONPointer<'a>>,
-    ) {
+        visit: &mut F,
+    ) -> ControlFlow<B>
+    where
+        F: FnMut(JSONPointer<'a>) -> ControlFlow<B>,
+    {
         // Check if current state is accepting
         if dfa.is_accepting_state(current_state) {
-            results.push(JSONPointer {
+            visit(JSONPointer {
                 path: path.clone(), // clone path only for result
                 value,
-            });
+            })?;
         }
 
         match value {
@@ -852,12 +933,13 @@ impl DFAQueryEngine {
                         path.push(PathType::Field(key_rc));
 
                         // Recurse on the extended path
-                        Self::traverse_json(
-                            dfa, next_state, path, val, results,
+                        let flow = Self::traverse_json(
+                            dfa, next_state, path, val, visit,
                         );
 
                         // Backtrack by removing what we just added
                         path.pop();
+                        flow?;
                     }
                 }
             }
@@ -873,12 +955,13 @@ impl DFAQueryEngine {
                             path.push(PathType::Index(idx));
 
                             // Recurse on the extended path
-                            Self::traverse_json(
-                                dfa, next_state, path, val, results,
+                            let flow = Self::traverse_json(
+                                dfa, next_state, path, val, visit,
                             );
 
                             // Backtrack
                             path.pop();
+                            flow?;
                         }
                     }
                     // If get_index_symbol_id returns None, skip this index (no valid transition)
@@ -888,6 +971,8 @@ impl DFAQueryEngine {
             Value::Null | Value::Bool(_) | Value::Number(_) | Value::Str(_) => {
             }
         }
+
+        ControlFlow::Continue(())
     }
 }
 
@@ -902,15 +987,32 @@ impl DFAQueryEngine {
         dfa: &QueryDFA,
     ) -> Vec<JSONPointer<'a>> {
         let mut results = Vec::new();
-        let mut path = Vec::new();
-        Self::traverse_json(
-            dfa,
-            dfa.start_state,
-            &mut path,
-            json,
-            &mut results,
-        );
+        let _: ControlFlow<()> = Self::visit_with_dfa(json, dfa, |ptr| {
+            results.push(ptr);
+            ControlFlow::Continue(())
+        });
         results
+    }
+
+    /// Search a JSON document using a pre-compiled [`QueryDFA`], invoking
+    /// `visit` for each match in document order.
+    ///
+    /// The visitor returns [`ControlFlow::Break`] to stop the search early;
+    /// the remainder of the document is then not traversed and the break
+    /// value is returned. This is the primitive behind [`QueryDFA::find`]
+    /// and [`QueryDFA::find_limited`], and the right entry point for
+    /// existence checks or streaming consumption where materializing every
+    /// match up front is wasteful.
+    pub fn visit_with_dfa<'a, B, F>(
+        json: &'a Value<'a>,
+        dfa: &QueryDFA,
+        mut f: F,
+    ) -> ControlFlow<B>
+    where
+        F: FnMut(JSONPointer<'a>) -> ControlFlow<B>,
+    {
+        let mut path = Vec::new();
+        Self::traverse_json(dfa, dfa.start_state, &mut path, json, &mut f)
     }
 }
 
@@ -2017,5 +2119,66 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].value, &Value::Number(2u64.into()));
+    }
+
+    // ==============================================================================
+    // Early exit / bounded search
+    // ==============================================================================
+
+    #[test]
+    fn find_limited_returns_prefix_of_find() {
+        let input = r#"{ "users": [
+            {"name": "a"}, {"name": "b"}, {"name": "c"}, {"name": "d"}
+        ]}"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+        let dfa =
+            QueryDFA::from_query_str("users.[*].name").expect("valid query");
+
+        let all = dfa.find(&json);
+        assert_eq!(all.len(), 4);
+
+        for limit in 0..=5 {
+            let limited = dfa.find_limited(&json, limit);
+            assert_eq!(limited.len(), limit.min(4), "limit {limit}");
+            // Same matches, same document order.
+            for (l, a) in limited.iter().zip(&all) {
+                assert_eq!(l.path, a.path);
+                assert_eq!(l.value, a.value);
+            }
+        }
+    }
+
+    #[test]
+    fn for_each_match_break_stops_traversal() {
+        let input = r#"{ "users": [
+            {"name": "a"}, {"name": "b"}, {"name": "c"}
+        ]}"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+        let dfa =
+            QueryDFA::from_query_str("users.[*].name").expect("valid query");
+
+        // The visitor must not be invoked again after it breaks.
+        let mut calls = 0;
+        let flow = dfa.for_each_match(&json, |_| {
+            calls += 1;
+            ControlFlow::Break(())
+        });
+        assert_eq!(calls, 1, "visitor must not be called after Break");
+        assert!(flow.is_break(), "early stop must surface to the caller");
+    }
+
+    #[test]
+    fn for_each_match_continue_visits_all() {
+        let input = r#"{ "a": 1, "b": 2, "c": 3 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+        let dfa = QueryDFA::from_query_str("*").expect("valid query");
+
+        let mut calls = 0;
+        let flow: ControlFlow<()> = dfa.for_each_match(&json, |_| {
+            calls += 1;
+            ControlFlow::Continue(())
+        });
+        assert_eq!(calls, 3);
+        assert!(flow.is_continue(), "full search must report Continue");
     }
 }

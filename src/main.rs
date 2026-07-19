@@ -73,6 +73,13 @@ struct Args {
     /// Searches for the field at any depth, equivalent to `(* | [*])*."<query>"`.
     #[arg(short = 'F', long, action = ArgAction::SetTrue)]
     fixed_string: bool,
+    /// Stop searching after NUM matches.
+    ///
+    /// The document traversal terminates as soon as the limit is reached,
+    /// so `--max-count 1` on a large document only pays for the work up to
+    /// the first match (like grep's `-m`).
+    #[arg(short = 'm', long, value_name = "NUM", conflicts_with = "depth")]
+    max_count: Option<usize>,
     /// Always print the path header, even when output is piped.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "no_path")]
     with_path: bool,
@@ -474,7 +481,10 @@ fn main() -> Result<()> {
                 } else {
                     QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
                 }?;
-                let results = dfa.find(json);
+                let results = args.max_count.map_or_else(
+                    || dfa.find(json),
+                    |limit| dfa.find_limited(json, limit),
+                );
 
                 if args.count || args.depth {
                     args.no_display = true;
