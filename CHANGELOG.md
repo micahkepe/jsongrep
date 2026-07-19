@@ -68,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modifier on an empty operand (reachable via `QueryBuilder::new()
 .optional()`) now displays as the empty query it denotes instead of an
   unparseable bare `?`.
+- `Query` display elides sequence elements that display as the empty query
+  (the identity of concatenation), instead of emitting unparseable forms
+  like `foo..bar` for a hand-built sequence containing an empty
+  subsequence.
 
 ### Breaking
 
