@@ -74,7 +74,7 @@ impl Display for QueryNFA {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, &b)| if b {
-                    Some(format!("[{}] {}", i, &self.pos_to_label[i]))
+                    Some(format!("[{}] {}", i, self.pos_to_label[i]))
                 } else {
                     None
                 })
@@ -87,7 +87,7 @@ impl Display for QueryNFA {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, &b)| if b {
-                    Some(format!("[{}] {}", i, &self.pos_to_label[i]))
+                    Some(format!("[{}] {}", i, self.pos_to_label[i]))
                 } else {
                     None
                 })
@@ -99,17 +99,17 @@ impl Display for QueryNFA {
                 writeln!(
                     f,
                     "\t[{}] {} cannot be followed",
-                    i, &self.pos_to_label[i]
+                    i, self.pos_to_label[i]
                 )?;
                 continue;
             }
             writeln!(
                 f,
                 "\t[{}] {} can be followed by:",
-                i, &self.pos_to_label[i]
+                i, self.pos_to_label[i]
             )?;
             for &j in followers {
-                writeln!(f, "\t\t[{}] {}", j, &self.pos_to_label[j])?;
+                writeln!(f, "\t\t[{}] {}", j, self.pos_to_label[j])?;
             }
         }
         writeln!(f, "Transitions:")?;
