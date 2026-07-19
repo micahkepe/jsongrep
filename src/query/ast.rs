@@ -54,7 +54,7 @@ pub enum Query {
     ArrayWildcard,
     /// Regex access, e.g., "/regex/".
     ///
-    /// Not implemented by the query engine yet: the string parser rejects
+    /// NOTE: Not implemented by the query engine yet: the string parser rejects
     /// `/regex/` syntax, and NFA/DFA construction panics on this variant.
     Regex(String),
     /// Optional access, e.g., "?".
