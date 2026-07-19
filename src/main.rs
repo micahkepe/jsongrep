@@ -99,9 +99,16 @@ enum GenerateCommand {
     },
 }
 
-/// Minimum file size for which memory-mapping is attempted. Below this,
-/// a plain read is at least as fast (mmap setup and page-fault overhead
-/// dominate for small files) and avoids mmap's file-truncation hazards.
+/// Minimum file size for which memory-mapping is attempted.
+///
+/// For small files, it is likely that a single read call is at least as fast or faster than mmap
+/// (mmap setup and page-fault overhead dominate for small files) and avoids mmap's file-truncation
+/// hazards.
+///
+/// NOTE: in the future when globbing (<https://github.com/micahkepe/jsongrep/issues/33>) and
+/// recursive searching are enabled, can look into other heuristics for performance.
+///
+/// See: <https://burntsushi.net/ripgrep/#mechanics>.
 const MMAP_MIN_FILE_SIZE: u64 = 1 << 20; // 1 MiB
 
 /// Possible input sources for jsongrep.
