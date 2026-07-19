@@ -38,6 +38,21 @@ use crate::query::{
 /// unbounded time and memory. Services compiling untrusted queries should
 /// use [`QueryDFA::from_query_bounded`] and treat this error as "query too
 /// complex".
+///
+/// # Examples
+///
+/// ```
+/// use jsongrep::query::{Query, QueryDFA};
+/// use jsongrep::query::dfa::StateLimitExceeded;
+///
+/// // (a|b)*.a.(a|b)^8 determinizes to 513 states — a budget of 100
+/// // catches it long before completion.
+/// let query: Query = "(a|b)*.a.(a|b).(a|b).(a|b).(a|b).(a|b).(a|b).(a|b).(a|b)"
+///     .parse()
+///     .unwrap();
+/// let err = QueryDFA::from_query_bounded(&query, 100).unwrap_err();
+/// assert_eq!(err.limit, 100);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct StateLimitExceeded {
