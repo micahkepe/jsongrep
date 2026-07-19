@@ -593,27 +593,102 @@ impl DFABuilder {
         self.range_to_range_id.sort_by_key(|a| a.0.start);
     }
 
+    /// Precompute, for each NFA transition label, the set of DFA alphabet
+    /// symbols that the label can consume. This hoists all label/symbol
+    /// compatibility logic (including case-insensitive lowercasing) out of
+    /// the subset-construction inner loop: determinization then only walks
+    /// the actual transitions of member NFA states instead of re-matching
+    /// every label against every symbol for every DFA state.
+    fn label_to_symbols(&self, nfa: &QueryNFA) -> Vec<Vec<usize>> {
+        nfa.pos_to_label
+            .iter()
+            .map(|label| match label {
+                // A named field consumes exactly its own alphabet symbol.
+                // When case-insensitive, the alphabet and key map store
+                // lowercased names (see `extract_symbols`), so normalize
+                // once here.
+                TransitionLabel::Field(name) => {
+                    let id = if self.case_insensitive {
+                        self.key_to_key_id
+                            .get(&Rc::new(name.to_lowercase()))
+                            .copied()
+                    } else {
+                        self.key_to_key_id.get(name).copied()
+                    };
+                    // `extract_symbols` registers every field of the query
+                    // before determinization, so a miss is unreachable via
+                    // `build_dfa`.
+                    debug_assert!(
+                        id.is_some(),
+                        "NFA field label {name:?} missing from key map"
+                    );
+                    id.map_or_else(Vec::new, |id| vec![id])
+                }
+
+                // A field wildcard consumes any field symbol as well as the
+                // "other" symbol (keys not named in the query).
+                TransitionLabel::FieldWildcard => {
+                    let mut ids = vec![TransitionLabel::other_idx()];
+                    ids.extend(self.alphabet.iter().enumerate().filter_map(
+                        |(id, sym)| {
+                            matches!(sym, TransitionLabel::Field(_))
+                                .then_some(id)
+                        },
+                    ));
+                    ids
+                }
+
+                // A range label consumes every disjoint alphabet range that
+                // it fully includes.
+                TransitionLabel::Range(start, end) => self
+                    .range_to_range_id
+                    .iter()
+                    .filter(|(range, _)| {
+                        start <= &range.start && &range.end <= end
+                    })
+                    .map(|&(_, id)| id)
+                    .collect(),
+
+                // An open-ended range consumes every disjoint alphabet range
+                // that starts at or after it.
+                TransitionLabel::RangeFrom(start) => self
+                    .range_to_range_id
+                    .iter()
+                    .filter(|(range, _)| start <= &range.start)
+                    .map(|&(_, id)| id)
+                    .collect(),
+
+                // `Other` never appears in `pos_to_label` (labels come from
+                // query atoms), but map it to the "other" symbol for
+                // completeness.
+                TransitionLabel::Other => vec![TransitionLabel::other_idx()],
+            })
+            .collect()
+    }
+
     /// Use subset construction to convert the constructed epsilon-free NFA to a DFA,
     /// producing a `QueryDFA`. For each DFA state, we map it to a set of NFA
-    /// states.
-    #[expect(clippy::too_many_lines)]
+    /// states, represented as a fixed-width bitset (`Vec<u64>`) to keep
+    /// hashing and set operations cheap.
     fn determinize_nfa(
         &mut self,
         nfa: &QueryNFA,
     ) -> Result<QueryDFA, StateLimitExceeded> {
-        // Use a HashMap to map sets of currently reachable NFA states to DFA
-        // state indices
-        // `curr_nfa_states_to_dfa_state[NFA states bitmap]` -> DFA state index
-        let mut nfa_states_to_dfa_state: HashMap<Vec<bool>, usize> =
+        let blocks = nfa.num_states.div_ceil(64);
+        let alphabet_len = self.alphabet.len();
+
+        // For each NFA label, which alphabet symbols it can consume.
+        let label_to_symbols = self.label_to_symbols(nfa);
+
+        // Map from a set of NFA states (bitset) to its DFA state index.
+        let mut nfa_states_to_dfa_state: HashMap<Vec<u64>, usize> =
             HashMap::new();
 
-        // Queue to store DFA states to process (each is a set of NFA states as
-        // a bitmap)
-        let mut work_queue: VecDeque<Vec<bool>> = VecDeque::new();
+        // Queue of DFA state indices to process.
+        let mut work_queue: VecDeque<usize> = VecDeque::new();
 
-        // List of DFA states, each represented as a set of NFA states
         // dfa_states[DFA state] -> set of NFA states
-        let mut dfa_states: Vec<Vec<bool>> = Vec::new();
+        let mut dfa_states: Vec<Vec<u64>> = Vec::new();
 
         // Transition table for the DFA
         let mut transitions: Vec<Vec<Option<usize>>> = Vec::new();
@@ -622,134 +697,80 @@ impl DFABuilder {
         let mut is_accepting: Vec<bool> = Vec::new();
 
         // Initialize with the start state (NFA start state)
-        let mut start_set = vec![false; nfa.num_states];
-        start_set[nfa.start_state] = true; // start set is just `0`
+        let mut start_set = vec![0u64; blocks];
+        start_set[nfa.start_state / 64] |= 1 << (nfa.start_state % 64);
         nfa_states_to_dfa_state.insert(start_set.clone(), 0);
-        dfa_states.push(start_set.clone());
-        work_queue.push_back(start_set);
-        transitions.push(vec![None; self.alphabet.len()]);
+        dfa_states.push(start_set);
+        work_queue.push_back(0);
+        transitions.push(vec![None; alphabet_len]);
         is_accepting.push(nfa.is_accepting[nfa.start_state]);
 
         // Process each DFA state
-        while let Some(current_set) = work_queue.pop_front() {
-            let current_dfa_state =
-                *nfa_states_to_dfa_state.get(&current_set).unwrap();
+        while let Some(current_dfa_state) = work_queue.pop_front() {
+            // Clone the (small) bitset so we can push new states below.
+            let current_set = dfa_states[current_dfa_state].clone();
 
-            // For each symbol in the DFA alphabet
-            for (symbol_id, dfa_symbol) in self.alphabet.iter().enumerate() {
-                // Collect all NFA states reachable from the current set via this symbol
-                let mut next_nfa_states = vec![false; nfa.num_states];
+            // Reachable NFA states per alphabet symbol, built in a single
+            // pass over the member states' transitions.
+            let mut next_sets: Vec<Option<Vec<u64>>> = vec![None; alphabet_len];
 
-                // Check each NFA state in the current DFA state
-                (0..nfa.num_states).for_each(|nfa_state| {
-                    if current_set[nfa_state] {
-                        // Check transitions from this NFA state
-                        for &(label_idx, dest_state) in
-                            &nfa.transitions[nfa_state]
-                        {
-                            let nfa_label = &nfa.pos_to_label[label_idx];
+            for (block_idx, &block) in current_set.iter().enumerate() {
+                let mut bits = block;
+                while bits != 0 {
+                    let nfa_state =
+                        block_idx * 64 + bits.trailing_zeros() as usize;
+                    bits &= bits - 1; // clear lowest set bit
 
-                            // Check if the NFA transition label matches or overlaps with the DFA symbol
-                            match (nfa_label, dfa_symbol) {
-                                // Field match: when case-insensitive, the DFA
-                                // alphabet stores lowercased names (from
-                                // extract_symbols), so we lowercase the NFA
-                                // field before comparing.
-                                (
-                                    TransitionLabel::Field(nfa_field),
-                                    TransitionLabel::Field(dfa_field),
-                                ) if {
-                                    if self.case_insensitive {
-                                        nfa_field.to_lowercase() == **dfa_field
-                                    } else {
-                                        nfa_field == dfa_field
-                                    }
-                                } =>
-                                {
-                                    next_nfa_states[dest_state] = true;
-                                }
-
-                                // FieldWildcard match: can match on "Other" (keys
-                                // not in query), or a seen Field
-                                (
-                                    TransitionLabel::FieldWildcard
-                                    | TransitionLabel::Other,
-                                    TransitionLabel::Other,
-                                )
-                                | (
-                                    TransitionLabel::FieldWildcard,
-                                    TransitionLabel::Field(_),
-                                )
-                                | (
-                                    TransitionLabel::Range(
-                                        usize::MIN,
-                                        usize::MAX,
-                                    ),
-                                    TransitionLabel::Range(_, _),
-                                ) => {
-                                    next_nfa_states[dest_state] = true;
-                                }
-                                // Range match: NFA range includes DFA range
-                                (
-                                    TransitionLabel::Range(nfa_start, nfa_end),
-                                    TransitionLabel::Range(dfa_start, dfa_end),
-                                ) if *nfa_start <= *dfa_start
-                                    && *dfa_end <= *nfa_end =>
-                                {
-                                    next_nfa_states[dest_state] = true;
-                                }
-
-                                // RangeFrom match: NFA range starts before or at DFA range start
-                                (
-                                    TransitionLabel::RangeFrom(nfa_start),
-                                    TransitionLabel::Range(dfa_start, _),
-                                ) if *nfa_start <= *dfa_start => {
-                                    next_nfa_states[dest_state] = true;
-                                }
-
-                                // ArrayWildcard match: matches any range
-                                // Other symbol match
-                                _ => {}
-                            }
+                    for &(label_idx, dest_state) in &nfa.transitions[nfa_state]
+                    {
+                        for &symbol_id in &label_to_symbols[label_idx] {
+                            let set = next_sets[symbol_id]
+                                .get_or_insert_with(|| vec![0u64; blocks]);
+                            set[dest_state / 64] |= 1 << (dest_state % 64);
                         }
                     }
-                });
-
-                // If there are reachable states, create or find the
-                // corresponding DFA state
-                if next_nfa_states.iter().any(|&b| b) {
-                    let next_dfa_state = if let Some(&dfa_state) =
-                        nfa_states_to_dfa_state.get(&next_nfa_states)
-                    {
-                        dfa_state
-                    } else {
-                        // New DFA state
-                        let new_dfa_state = dfa_states.len();
-                        if new_dfa_state >= self.max_states {
-                            return Err(StateLimitExceeded {
-                                limit: self.max_states,
-                            });
-                        }
-                        nfa_states_to_dfa_state
-                            .insert(next_nfa_states.clone(), new_dfa_state);
-                        dfa_states.push(next_nfa_states.clone());
-                        work_queue.push_back(next_nfa_states.clone());
-                        transitions.push(vec![None; self.alphabet.len()]);
-
-                        // Accepting if any NFA state in the set is accepting
-                        is_accepting.push(
-                            next_nfa_states
-                                .iter()
-                                .enumerate()
-                                .any(|(i, &b)| b && nfa.is_accepting[i]),
-                        );
-                        new_dfa_state
-                    };
-
-                    // Add transition
-                    transitions[current_dfa_state][symbol_id] =
-                        Some(next_dfa_state);
                 }
+            }
+
+            // Create or find the DFA state for each non-empty successor set.
+            for (symbol_id, next_nfa_states) in
+                next_sets.into_iter().enumerate()
+            {
+                let Some(next_nfa_states) = next_nfa_states else {
+                    continue;
+                };
+
+                let next_dfa_state = if let Some(&dfa_state) =
+                    nfa_states_to_dfa_state.get(&next_nfa_states)
+                {
+                    dfa_state
+                } else {
+                    // New DFA state: accepting if any member NFA state is
+                    // accepting.
+                    let new_dfa_state = dfa_states.len();
+                    if new_dfa_state >= self.max_states {
+                        return Err(StateLimitExceeded {
+                            limit: self.max_states,
+                        });
+                    }
+                    is_accepting.push(nfa.is_accepting.iter().enumerate().any(
+                        |(i, &accepting)| {
+                            accepting
+                                && next_nfa_states[i / 64] & (1 << (i % 64))
+                                    != 0
+                        },
+                    ));
+                    dfa_states.push(next_nfa_states.clone());
+                    nfa_states_to_dfa_state
+                        .insert(next_nfa_states, new_dfa_state);
+                    work_queue.push_back(new_dfa_state);
+                    transitions.push(vec![None; alphabet_len]);
+                    new_dfa_state
+                };
+
+                // Add transition
+                transitions[current_dfa_state][symbol_id] =
+                    Some(next_dfa_state);
             }
         }
 
