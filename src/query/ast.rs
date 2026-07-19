@@ -500,7 +500,6 @@ impl QueryBuilder {
     /// Apply a regex to the last atom in the query:
     /// ```
     /// use jsongrep::query::{QueryBuilder, Query};
-    /// use regex::Regex;
     /// // Create a regex to match any string starting with "foo"
     /// let re = r"^foo";
     /// // Query: "foo.*"
