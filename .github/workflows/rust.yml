@@ -2,27 +2,71 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
+# Third-party actions are pinned to commit SHAs (tag in trailing comment).
+# GitHub-owned actions (actions/*) are pinned to major version tags.
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Build (no default features)
-      run: cargo check --no-default-features --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Run Clippy
-      run: cargo clippy --verbose -- -D warnings
-    - name: Check formatting
-      run: cargo fmt --check
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Build
+        run: cargo build --verbose
+      - name: Build (no default features)
+        run: cargo check --no-default-features --verbose
+      - name: Run tests
+        run: cargo test --verbose
+
+  lint:
+    name: Lint (fmt, clippy, docs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # Benches include_str! fixtures from the schemastore submodule, so
+      # clippy --all-targets needs it. Fetch just that submodule, shallow -
+      # the other submodules total ~700 MB and nothing compiles against them.
+      - name: Fetch schemastore submodule (bench fixtures)
+        run: git submodule update --init --depth 1 tests/data/schemastore
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Run Clippy (all targets, including benches)
+        run: cargo clippy --all-targets --verbose -- -D warnings
+      - name: Check documentation
+        run: cargo doc --no-deps --verbose
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: MSRV (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: "1.88"
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Check with MSRV
+        run: cargo check --verbose

@@ -61,7 +61,8 @@ use crate::query::Query;
 mod pest_parser {
     use pest_derive::Parser;
 
-    /// Parser for turning raw query strings into [`Query`] objects.
+    /// Parser for turning raw query strings into
+    /// [`Query`](crate::query::Query) objects.
     #[derive(Parser)]
     #[grammar = "query/grammar/query.pest"]
     pub struct QueryDSLParser;
