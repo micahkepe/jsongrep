@@ -39,8 +39,11 @@ pub struct WriteOptions {
 }
 
 /// Write a single query result (path header + colorized JSON value) to `writer`.
-/// Silently returns `Ok(())` on broken pipe so that piping to tools like
-/// `less` or `head` exits cleanly.
+///
+/// Returns `Ok(true)` when the result was written and the caller may keep
+/// writing further results, and `Ok(false)` on a broken pipe (the downstream
+/// consumer, e.g. `head` or `less`, has gone away), so the caller can stop
+/// formatting the remaining results instead of writing into a dead pipe.
 ///
 /// When `raw` is set, a matched value that is a string is written without
 /// JSON quotes or escaping (like `jq -r`), so shell pipelines get the bare
@@ -49,22 +52,26 @@ pub struct WriteOptions {
 ///
 /// # Errors
 ///
-/// Returns an error if writing to `writer` fails.
+/// Returns an error if writing to `writer` fails for any reason other than a
+/// broken pipe.
 pub fn write_colored_result<W: Write>(
     writer: &mut W,
     value: &Value,
     path: &[PathType],
     options: &WriteOptions,
-) -> anyhow::Result<()> {
-    let path = path
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(".");
-
+) -> anyhow::Result<bool> {
     let result = (|| -> io::Result<()> {
         if options.show_path && !path.is_empty() {
-            writeln!(writer, "{}:", path.bold().magenta())?;
+            // Only pay for building the joined path string when it is
+            // actually shown.
+            let mut header = String::new();
+            for (i, part) in path.iter().enumerate() {
+                if i > 0 {
+                    header.push('.');
+                }
+                header.push_str(&part.to_string());
+            }
+            writeln!(writer, "{}:", header.bold().magenta())?;
         }
         if options.raw
             && let Value::Str(s) = value
@@ -81,8 +88,8 @@ pub fn write_colored_result<W: Write>(
     })();
 
     match result {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == ErrorKind::BrokenPipe => Ok(()),
+        Ok(()) => Ok(true),
+        Err(err) if err.kind() == ErrorKind::BrokenPipe => Ok(false),
         Err(err) => Err(err).context("write colorized JSON to stdout"),
     }
 }
@@ -128,8 +135,8 @@ fn write_colored_json<W: Write>(
         }
         Value::Object(obj) => {
             write!(writer, "{{")?;
-            let entries: Vec<_> = obj.iter().collect();
-            for (i, (key, val)) in entries.iter().enumerate() {
+            let len = obj.len();
+            for (i, (key, val)) in obj.iter().enumerate() {
                 if pretty {
                     writeln!(writer)?;
                     write!(writer, "{:width$}", "", width = next_indent)?;
@@ -144,15 +151,76 @@ fn write_colored_json<W: Write>(
                     write!(writer, ":")?;
                 }
                 write_colored_json(writer, val, next_indent, pretty)?;
-                if i < entries.len() - 1 {
+                if i < len - 1 {
                     write!(writer, ",")?;
                 }
             }
-            if pretty && !entries.is_empty() {
+            if pretty && len > 0 {
                 writeln!(writer)?;
                 write!(writer, "{:width$}", "", width = indent)?;
             }
             write!(writer, "}}")
         }
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "Unit testing.")]
+mod tests {
+    use super::*;
+
+    /// A writer that always fails with the given [`ErrorKind`].
+    struct FailingWriter(ErrorKind);
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::from(self.0))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::from(self.0))
+        }
+    }
+
+    #[test]
+    fn write_colored_result_returns_true_on_success() {
+        let value: Value = serde_json::from_str("{\"a\": 1}").unwrap();
+        let mut out = Vec::new();
+        let keep_going = write_colored_result(
+            &mut out,
+            &value,
+            &[],
+            &WriteOptions { pretty: true, ..Default::default() },
+        )
+        .unwrap();
+        assert!(keep_going);
+        assert!(!out.is_empty());
+    }
+
+    #[test]
+    fn write_colored_result_signals_stop_on_broken_pipe() {
+        let value: Value = serde_json::from_str("{\"a\": 1}").unwrap();
+        let mut broken = FailingWriter(ErrorKind::BrokenPipe);
+        let keep_going = write_colored_result(
+            &mut broken,
+            &value,
+            &[],
+            &WriteOptions { pretty: true, ..Default::default() },
+        )
+        .unwrap();
+        assert!(!keep_going, "broken pipe should signal the caller to stop");
+    }
+
+    #[test]
+    fn write_colored_result_propagates_other_errors() {
+        let value: Value = serde_json::from_str("{\"a\": 1}").unwrap();
+        let mut failing = FailingWriter(ErrorKind::PermissionDenied);
+        let result = write_colored_result(
+            &mut failing,
+            &value,
+            &[],
+            &WriteOptions { pretty: true, ..Default::default() },
+        );
+        assert!(result.is_err(), "non-pipe IO errors should propagate");
     }
 }

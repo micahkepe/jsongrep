@@ -33,7 +33,9 @@ fn main() -> anyhow::Result<()> {
     let results = jsongrep::grep(&json, "users[*].name").expect("valid query");
 
     for result in &results {
-        write_colored_result(
+        // `write_colored_result` returns Ok(false) when the output pipe has
+        // been closed (e.g. piping into `head`), so callers can stop early.
+        if !write_colored_result(
             &mut writer,
             result.value,
             &result.path,
@@ -42,7 +44,9 @@ fn main() -> anyhow::Result<()> {
                 show_path: true,
                 ..Default::default()
             },
-        )?;
+        )? {
+            break;
+        }
     }
     writer.write_all(b"\n")?;
 
@@ -63,7 +67,7 @@ fn main() -> anyhow::Result<()> {
         let json: Value = serde_json::from_str(doc).expect("valid JSON");
         let results = dfa.find(&json);
         for result in &results {
-            write_colored_result(
+            if !write_colored_result(
                 &mut writer,
                 result.value,
                 &result.path,
@@ -72,7 +76,9 @@ fn main() -> anyhow::Result<()> {
                     show_path: true,
                     ..Default::default()
                 },
-            )?;
+            )? {
+                break;
+            }
         }
     }
     writer.write_all(b"\n")?;
@@ -89,7 +95,7 @@ fn main() -> anyhow::Result<()> {
 
     writer.write_all(b"users[*].* results (via AST):\n")?;
     for result in &results {
-        write_colored_result(
+        if !write_colored_result(
             &mut writer,
             result.value,
             &result.path,
@@ -98,7 +104,9 @@ fn main() -> anyhow::Result<()> {
                 show_path: true,
                 ..Default::default()
             },
-        )?;
+        )? {
+            break;
+        }
     }
 
     Ok(())
