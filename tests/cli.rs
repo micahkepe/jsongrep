@@ -137,6 +137,25 @@ mod tests {
         assert_eq!(output_json, expected_json);
     }
 
+    #[test]
+    fn chained_array_accesses_match() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "json", "grid[1][0]", "--no-path", "--compact"])
+            .write_stdin(r#"{"grid": [[1, 2], [3, 4]]}"#)
+            .assert()
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(
+            output.trim(),
+            "3",
+            "chained accesses grid[1][0] should match the nested element"
+        );
+    }
+
     // ==============================================================================
     // Quoted field and --fixed-string tests
     // ==============================================================================

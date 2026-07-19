@@ -30,10 +30,10 @@ group           = { "(" ~ disjunction ~ ")" }
 /// Sequence of queries
 sequence        = { step ~ ("." ~ step)* }
 
-/// Step in a sequence - can be an atom with modifiers, or a field with array
-/// accesses
+/// Step in a sequence - can be an atom with modifiers, or a field with any
+/// number of chained array accesses, e.g. "foo[0][1]"
 step            = {
-                    (field ~ (index | range | array_wildcard)?) ~ modifier?
+                    (field ~ (index | range | array_wildcard)*) ~ modifier?
                     | atom ~ modifier?
                     | group ~ modifier?
                   }
