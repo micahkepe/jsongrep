@@ -9,8 +9,8 @@
 
 use jsongrep::{
     Value,
+    cli::{WriteOptions, write_colored_result},
     query::{Query, QueryDFA},
-    utils::{WriteOptions, write_colored_result},
 };
 use std::io::{self, BufWriter, Write};
 
