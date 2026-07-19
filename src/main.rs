@@ -456,12 +456,13 @@ fn main() -> Result<()> {
                 anyhow::anyhow!("Query string required unless using subcommand")
             })?;
 
-            let query: Query = if args.fixed_string {
+            let (query, predicate) = if args.fixed_string {
                 // `-F`/`--fixed-string:` treat the query as a literal field name
                 // and search at any depth, equivalent to `(* | [*])*."<literal>"`
-                Query::recursive_depth_fixed_string(raw_query)
+                (Query::recursive_depth_fixed_string(raw_query), None)
             } else {
-                raw_query.parse().with_context(|| "Failed to parse query")?
+                jsongrep::query::parse_query_with_predicate(&raw_query)
+                    .with_context(|| "Failed to parse query")?
             };
 
             let format = detect_format(args.input.as_ref(), args.format);
@@ -474,7 +475,12 @@ fn main() -> Result<()> {
                 } else {
                     QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
                 }?;
-                let results = dfa.find(json);
+                let mut results = dfa.find(json);
+                // Trailing value predicate (e.g. `age >= 30`): filter which
+                // matched values survive.
+                if let Some(predicate) = &predicate {
+                    results.retain(|result| predicate.matches(result.value));
+                }
 
                 if args.count || args.depth {
                     args.no_display = true;

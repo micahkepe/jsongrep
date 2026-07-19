@@ -117,9 +117,17 @@ pub use serde_json_borrow::Value;
 
 /// Query a JSON document with a query string, returning all matches.
 ///
-/// This is the simplest entry point for the library. For repeated queries
-/// against different documents, prefer compiling the query once with
-/// [`query::QueryDFA::from_query_str`] and calling [`query::QueryDFA::find`].
+/// This is the simplest entry point for the library. For repeated
+/// predicate-free queries against different documents, prefer compiling the
+/// query once with [`query::QueryDFA::from_query_str`] and calling
+/// [`query::QueryDFA::find`]; for repeated predicate queries, parse once
+/// with [`query::parse_query_with_predicate`], compile the path part with
+/// [`query::QueryDFA::from_query`], and filter each result set with
+/// [`query::Predicate::matches`].
+///
+/// The query string may carry a trailing value predicate that filters the
+/// matched values (see [`query::Predicate`]), e.g.
+/// `users[*].age >= 30` or `**.name = "Alice"`.
 ///
 /// # Errors
 ///
@@ -133,10 +141,26 @@ pub use serde_json_borrow::Value;
 /// assert_eq!(results.len(), 1);
 /// assert_eq!(results[0].value.to_string(), "1");
 /// ```
+///
+/// With a value predicate:
+///
+/// ```
+/// let json: jsongrep::Value =
+///     serde_json::from_str(r#"{"users": [{"age": 25}, {"age": 40}]}"#)
+///         .unwrap();
+/// let results = jsongrep::grep(&json, "users[*].age >= 30").unwrap();
+/// assert_eq!(results.len(), 1);
+/// assert_eq!(results[0].value.to_string(), "40");
+/// ```
 pub fn grep<'a>(
     json: &'a Value<'a>,
     query: &str,
 ) -> Result<Vec<query::JSONPointer<'a>>, query::QueryParseError> {
-    let dfa = query::QueryDFA::from_query_str(query)?;
-    Ok(dfa.find(json))
+    let (query, predicate) = query::parse_query_with_predicate(query)?;
+    let dfa = query::QueryDFA::from_query(&query);
+    let mut results = dfa.find(json);
+    if let Some(predicate) = &predicate {
+        results.retain(|result| predicate.matches(result.value));
+    }
+    Ok(results)
 }

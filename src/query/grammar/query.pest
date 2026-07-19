@@ -18,7 +18,35 @@ reserved        = { "." | "|" | "*" | "?" | "[" | "]" | "(" | ")" | "/" }
 
 /// Top-level query rule; SOI = "start of input", EOI = "end of input".
 /// Empty queries act as a identity operator on the input JSON document.
-query           = { SOI ~ disjunction? ~ EOI }
+/// An optional trailing predicate filters matched values by comparison,
+/// e.g. `users[*].age >= 30` or `**.name = "Alice"`.
+query           = { SOI ~ disjunction? ~ predicate? ~ EOI }
+
+/// Value predicate: comparison operator plus a JSON scalar literal.
+/// NOTE: unquoted field names may contain comparison characters, so a
+/// predicate following an unquoted field must be separated by whitespace
+/// (`a = 1`, not `a=1` - the latter is the field named "a=1").
+predicate       = { cmp_op ~ pred_literal }
+
+/// Comparison operators (two-character forms first so PEG ordering does
+/// not truncate them)
+cmp_op          = { "==" | "=" | "!=" | "<=" | ">=" | "<" | ">" }
+
+/// Scalar literal on the right-hand side of a predicate
+pred_literal    = { quoted_field | pred_number | pred_bool | pred_null }
+
+/// JSON number literal (sign, decimals, exponent)
+pred_number     = @{
+                    "-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+                    ~ ("." ~ ASCII_DIGIT+)?
+                    ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+                  }
+
+/// Boolean literal
+pred_bool       = { "true" | "false" }
+
+/// Null literal
+pred_null       = { "null" }
 
 /// Disjunction of queries
 disjunction     = { sequence ~ ( "|" ~ sequence )* }

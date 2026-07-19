@@ -321,6 +321,79 @@ mod tests {
     }
 
     // ==============================================================================
+    // Value predicate tests
+    // ==============================================================================
+
+    const USERS_JSON: &str = r#"{"users": [
+        {"name": "Alice", "age": 40, "admin": true},
+        {"name": "Bob", "age": 25, "admin": false},
+        {"name": "Carol", "age": 31, "admin": true}
+    ]}"#;
+
+    fn predicate_query(query: &str) -> String {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args([query, "--no-path", "--compact"])
+            .write_stdin(USERS_JSON)
+            .assert()
+            .success();
+        String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output")
+    }
+
+    #[test]
+    fn predicate_string_equality() {
+        let output = predicate_query(r#"users[*].name = "Alice""#);
+        assert_eq!(output.trim(), r#""Alice""#);
+    }
+
+    #[test]
+    fn predicate_numeric_comparison() {
+        let output = predicate_query("users[*].age > 30");
+        assert_eq!(output.trim(), "40\n31");
+    }
+
+    #[test]
+    fn predicate_boolean() {
+        let output = predicate_query("users[*].admin = true");
+        assert_eq!(output.trim(), "true\ntrue");
+    }
+
+    #[test]
+    fn predicate_not_equal() {
+        let output = predicate_query(r#"users[*].name != "Bob""#);
+        assert_eq!(output.trim(), "\"Alice\"\n\"Carol\"");
+    }
+
+    #[test]
+    fn predicate_with_recursive_descent() {
+        let output = predicate_query("(* | [*])*.age >= 31");
+        assert_eq!(output.trim(), "40\n31");
+    }
+
+    #[test]
+    fn predicate_no_survivors_outputs_nothing() {
+        let output = predicate_query("users[*].age > 100");
+        assert!(output.trim().is_empty());
+    }
+
+    #[test]
+    fn field_containing_equals_still_matches_literally() {
+        // Back-compat: no whitespace means `=` is part of the field name.
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["a=1", "--no-path", "--compact"])
+            .write_stdin(r#"{"a=1": "weird key"}"#)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), r#""weird key""#);
+    }
+
+    // ==============================================================================
     // Path header display tests
     // ==============================================================================
 
