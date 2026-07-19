@@ -321,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn large_file_takes_mmap_path() {
+    fn large_file_parses_correctly() {
         // Files at or above the mmap threshold (1 MiB) go through the
         // memory-mapped path; verify it still parses and matches.
         let mut big = String::from(r#"{"pad": ""#);
