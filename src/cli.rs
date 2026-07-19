@@ -1,4 +1,4 @@
-//! Miscellaneous utility functions.
+//! CLI utilities.
 
 use anyhow::Context as _;
 use colored::Colorize;
@@ -22,10 +22,6 @@ pub fn depth(json: &Value) -> usize {
         }
     }
 }
-
-// ==============================================================================
-// Colorized JSON Output
-// ==============================================================================
 
 /// Available options for printing matches.
 #[derive(Debug, Default)]
