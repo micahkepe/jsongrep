@@ -73,6 +73,44 @@ mod tests {
     }
 
     #[test]
+    fn regex_query_errors_cleanly_instead_of_panicking() {
+        // /regex/ syntax is grammar-valid but unimplemented; it must exit
+        // with a normal error (code 1), not a panic (code 101).
+        let assert = run_main(&["/foo.*/", SIMPLE_JSON_FILEPATH]);
+        let assert = assert.failure().code(1);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            stderr.contains("not implemented"),
+            "expected a clean unsupported-feature error, got: {stderr:?}"
+        );
+        assert!(
+            !stderr.contains("panicked"),
+            "regex query must not panic: {stderr:?}"
+        );
+    }
+
+    #[test]
+    fn usize_max_index_no_panic() {
+        let query = format!("[{}]", usize::MAX);
+        let output = run_main(&[
+            &query,
+            SIMPLE_JSON_FILEPATH,
+            "--count",
+            "--no-display",
+            "--porcelain",
+        ])
+        .success()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+        let output_str =
+            String::from_utf8(output).expect("Invalid UTF-8 output");
+        assert_eq!(output_str.trim(), "0");
+    }
+
+    #[test]
     fn simple_query() {
         // Test a simple query "age" on simple.json. The output format is a
         // path header line followed by the JSON value, e.g.:

@@ -450,8 +450,9 @@ determinizes to a
 execution. See the [grammar](./src/query/grammar) directory and the
 [`query`](./src/query) module for implementation details.
 
-> **Experimental:** The grammar supports `/regex/` syntax for matching field
-> names by pattern, but this is not yet fully implemented. Determinizing
+> **Not yet implemented:** The grammar reserves `/regex/` syntax for matching
+> field names by pattern, but the engine cannot execute it yet, so such
+> queries are rejected with an "Unsupported feature" error. Determinizing
 > overlapping regexes (e.g., `/a/` vs `/aab/`) requires subset construction
 > across multiple patterns - planned but not complete.
 

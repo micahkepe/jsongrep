@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `/regex/` queries no longer panic: the parser now rejects them with a clean
+  "not implemented yet" error (`QueryParseError::UnsupportedFeature`) instead
+  of letting DFA construction hit `unimplemented!()` from the CLI, library,
+  and WASM playground.
+- Array index `[18446744073709551615]` (`usize::MAX`) no longer overflows
+  (panic in debug builds, silent wrap in release); it now matches nothing,
+  which is correct since an element at that index cannot exist.
+
+### Breaking
+
+- `QueryParseError` gains the `UnsupportedFeature` variant and is now
+  `#[non_exhaustive]`; downstream exhaustive matches need a wildcard arm.
+- `/regex/` query strings now return a parse error instead of parsing
+  successfully (and panicking on execution).
+
 ## [0.9.0] - 2026-04-18
 
 ### Added

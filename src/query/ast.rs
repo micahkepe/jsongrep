@@ -53,6 +53,9 @@ pub enum Query {
     /// Wildcard array access, e.g., "foo\[*\]".
     ArrayWildcard,
     /// Regex access, e.g., "/regex/".
+    ///
+    /// NOTE: Not implemented by the query engine yet: the string parser rejects
+    /// `/regex/` syntax, and NFA/DFA construction panics on this variant.
     Regex(String),
     /// Optional access, e.g., "?".
     ///
@@ -494,6 +497,19 @@ impl QueryBuilder {
     }
 
     /// Adds a regex query to the query builder.
+    ///
+    /// <div class="warning">
+    ///
+    /// Regex field matching is **not implemented yet**: the query AST can
+    /// represent it, but building a [`QueryDFA`](crate::query::QueryDFA)
+    /// from a query containing [`Query::Regex`] currently panics with
+    /// `unimplemented!()`, and the query-string parser rejects `/regex/`
+    /// syntax with [`QueryParseError::UnsupportedFeature`]. Only use this
+    /// builder method for constructing/inspecting ASTs.
+    ///
+    /// [`QueryParseError::UnsupportedFeature`]: crate::query::QueryParseError::UnsupportedFeature
+    ///
+    /// </div>
     ///
     /// # Examples
     ///
