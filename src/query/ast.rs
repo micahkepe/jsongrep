@@ -175,27 +175,28 @@ impl Display for Query {
                     if i > 0
                         && let Some(prev_query) = queries.get(i - 1)
                     {
-                        /* Handle optional modifiers -> extract inner queries */
+                        /* A modifier ("?" or Kleene star) on the current step
+                         * applies to the access itself (e.g. "foo[0]?"), so
+                         * unwrap it before deciding on a separator. */
                         let inner_query = match query {
                             Self::Optional(inner) | Self::KleeneStar(inner) => {
                                 inner
                             }
                             _ => query,
                         };
-                        let prev_inner = match prev_query {
-                            Self::Optional(inner) | Self::KleeneStar(inner) => {
-                                inner
-                            }
-                            _ => prev_query,
-                        };
-                        /* Handle field accessed followed by a ranged accessed. */
-                        match (prev_inner, inner_query) {
+                        /* Omit the '.' only between a bare field and its array
+                         * access, mirroring the grammar's field ~ access form.
+                         * The previous step must NOT be unwrapped: a modified
+                         * field like "foo*" needs the separator ("foo*[0]" is
+                         * not parseable), and FieldWildcard must not join the
+                         * access set ("foo.*" rendered as "foo*" would reparse
+                         * as KleeneStar(foo), a different query). */
+                        match (prev_query, inner_query) {
                             (
                                 Self::Field(_),
                                 Self::Index(_)
                                 | Self::Range(_, _)
                                 | Self::RangeFrom(_)
-                                | Self::FieldWildcard
                                 | Self::ArrayWildcard,
                             ) => {
                                 // continue; no '.' separator
