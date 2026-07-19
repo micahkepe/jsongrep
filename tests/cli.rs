@@ -491,6 +491,74 @@ mod tests {
     }
 
     #[test]
+    fn jsonl_parse_error_reports_line_number() {
+        // Line 2 is malformed; the error must point at the user's actual
+        // line, not a position inside an internal buffer.
+        let jsonl_content = "{\"id\": 1}\n{\"id\": oops}\n{\"id\": 3}\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "jsonl", "[*].id"])
+            .write_stdin(jsonl_content)
+            .assert()
+            .failure();
+        let stderr = String::from_utf8(assert.get_output().stderr.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            stderr.contains("Failed to parse JSONL line 2"),
+            "JSONL parse error should name line 2, got: {stderr:?}"
+        );
+    }
+
+    #[test]
+    fn jsonl_crlf_line_endings() {
+        let jsonl_content = "{\"id\": 1}\r\n{\"id\": 2}\r\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args([
+                "-f",
+                "jsonl",
+                "[*].id",
+                "--count",
+                "--no-display",
+                "--porcelain",
+            ])
+            .write_stdin(jsonl_content)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(
+            output.trim(),
+            "2",
+            "CRLF-terminated JSONL records should parse"
+        );
+    }
+
+    #[test]
+    fn jsonl_blank_lines_are_skipped() {
+        let jsonl_content = "{\"id\": 1}\n\n   \n{\"id\": 2}\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args([
+                "-f",
+                "jsonl",
+                "[*].id",
+                "--count",
+                "--no-display",
+                "--porcelain",
+            ])
+            .write_stdin(jsonl_content)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), "2", "blank JSONL lines should be skipped");
+    }
+
+    #[test]
     fn jsonl_stdin_with_format_flag() {
         let jsonl_content =
             std::fs::read_to_string(SIMPLE_JSONL_FILEPATH).expect("read jsonl");

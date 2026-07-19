@@ -153,27 +153,6 @@ impl Input {
 
     fn to_json_string(&self, format: Format) -> Result<String> {
         match format {
-            Format::Jsonl => {
-                let text = self.to_str().map_err(|_| {
-                    anyhow::anyhow!("JSONL input is not valid UTF-8")
-                })?;
-                let mut buf = String::from("[");
-                let mut first = true;
-                for line in text.lines() {
-                    let line = line.trim();
-                    if line.is_empty() {
-                        continue;
-                    }
-                    if !first {
-                        buf.push(',');
-                    }
-                    buf.push_str(line);
-                    first = false;
-                }
-                buf.push(']');
-                Ok(buf)
-            }
-
             // YAML
             #[cfg(feature = "yaml")]
             Format::Yaml => {
@@ -240,9 +219,11 @@ impl Input {
             }
 
             // Unreachable, someone made an oopsie
-            Format::Auto | Format::Json => {
+            // (JSONL is parsed per line in `parse_jsonl`, borrowing from the
+            // input buffer, so it never goes through this owned-string path.)
+            Format::Auto | Format::Json | Format::Jsonl => {
                 unreachable!(
-                    "to_json_string called with Auto or Json, not needed"
+                    "to_json_string called with Auto, Json, or Jsonl, not needed"
                 )
             }
         }
@@ -357,8 +338,29 @@ fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
     }
 }
 
+/// Parse JSONL/NDJSON input line by line into a single top-level array,
+/// borrowing each record directly from the input buffer.
+///
+/// Compared to concatenating all lines into a synthetic `[...]` JSON string
+/// and re-parsing it, this avoids a second full-input-sized allocation and
+/// reports parse errors with the actual line number of the offending record.
+fn parse_jsonl(text: &str) -> Result<Value<'_>> {
+    let mut records = Vec::new();
+    for (idx, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let record: Value = serde_json::from_str(line).with_context(|| {
+            format!("Failed to parse JSONL line {}", idx + 1)
+        })?;
+        records.push(record);
+    }
+    Ok(Value::Array(records))
+}
+
 /// Parses the input and invokes `f` with a borrowed [`Value`] to preserve zero-copy path for
-/// JSON/Auto `Format`s.
+/// JSON/Auto and JSONL `Format`s.
 fn with_json<F, T>(input: Option<PathBuf>, format: Format, f: F) -> Result<T>
 where
     F: FnOnce(&Value) -> Result<T>,
@@ -366,20 +368,32 @@ where
     let input_content = parse_input_content(input)?;
 
     // For JSON/Auto we borrow directly from the mmap/stdin buffer,
-    // preserving the zero-copy path that serde_json_borrow provides.
-    // For other formats, we convert to an owned JSON string first
-    // and then borrow from that.
-    let json_string_owned = match format {
-        Format::Json | Format::Auto => None,
-        other => Some(input_content.to_json_string(other)?),
-    };
-    let json_str: &str = match &json_string_owned {
-        Some(s) => s.as_str(),
-        None => input_content.to_str().context("Input is not valid UTF-8")?,
-    };
-    let json: Value = serde_json::from_str(json_str)
-        .with_context(|| format!("Failed to parse as {format}"))?;
-    f(&json)
+    // preserving the zero-copy path that serde_json_borrow provides. JSONL
+    // is parsed per line, likewise borrowing from the input buffer. For
+    // other formats, we convert to an owned JSON string first and then
+    // borrow from that.
+    match format {
+        Format::Json | Format::Auto => {
+            let json_str =
+                input_content.to_str().context("Input is not valid UTF-8")?;
+            let json: Value = serde_json::from_str(json_str)
+                .with_context(|| format!("Failed to parse as {format}"))?;
+            f(&json)
+        }
+        Format::Jsonl => {
+            let text = input_content.to_str().map_err(|_| {
+                anyhow::anyhow!("JSONL input is not valid UTF-8")
+            })?;
+            let json = parse_jsonl(text)?;
+            f(&json)
+        }
+        other => {
+            let json_string_owned = input_content.to_json_string(other)?;
+            let json: Value = serde_json::from_str(&json_string_owned)
+                .with_context(|| format!("Failed to parse as {format}"))?;
+            f(&json)
+        }
+    }
 }
 
 /// Entry point for main binary.
