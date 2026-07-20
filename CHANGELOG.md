@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jsongrep::utils::write_colored_result` now takes a `WriteOptions` struct
   instead of separate `pretty`, `show_path`, and `raw` parameters.
 
-### Internal
+### Changed
 
 - CI now tests on macOS and Windows in addition to Ubuntu (the platforms
   release binaries ship for), adds an MSRV check (`rust-version = "1.88"`,
@@ -54,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shallow schemastore submodule fetch for the bench fixtures), and treats
   rustdoc warnings as errors. Third-party actions are pinned to commit
   SHAs.
+- Release workflow: `cargo publish` is now gated on a test run and on all
+  five release binaries building (publishing is irreversible); third-party
+  actions are pinned to commit SHAs, including the Homebrew bump action
+  which holds a push-capable PAT and was previously pinned to a moving
+  branch; checkout action unified to v6.
 
 ## [0.9.0] - 2026-04-18
 

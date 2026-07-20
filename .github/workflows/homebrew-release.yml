@@ -9,7 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Bump Homebrew formula
-        uses: mislav/bump-homebrew-formula-action@v3
+        # Pinned to a commit SHA: this action receives a push-capable PAT
+        # (HOMEBREW_GITHUB_API_TOKEN), and "v3" is a moving branch, so an
+        # upstream compromise would hand that token to attacker-controlled
+        # code on the next release. SHA = v3 branch head of 2025-09-16
+        # (post-v3.4), i.e. exactly what "@v3" resolved to when pinned.
+        uses: mislav/bump-homebrew-formula-action@56a283fa15557e9abaa4bdb63b8212abc68e655c # v3 (2025-09-16)
         with:
           formula-name: jsongrep
           tag-name: ${{ github.event.release.tag_name }}
