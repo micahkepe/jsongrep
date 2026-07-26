@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--compact` is implied, so output is one machine-parseable JSON value
   per line. Previously only the `--count`/`--depth` labels were
   affected.
+- `Query` display no longer renders `foo.*` (field then field wildcard) as
+  `foo*`, which reparsed as `foo` repeated zero or more times - a different
+  query. Likewise `foo*.[0]` no longer renders as `foo*[0]`, which did not
+  reparse at all. The `.` separator is now omitted only between a bare field
+  and its array access, so displaying and reparsing a query preserves its
+  meaning.
 
 ### Breaking
 
