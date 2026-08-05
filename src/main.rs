@@ -79,6 +79,15 @@ struct Args {
     /// Never print the path header, even in a terminal.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
     no_path: bool,
+    /// Quiet: write nothing to stdout; communicate via the exit status
+    /// only (errors still print to stderr).
+    #[arg(
+        short = 'q',
+        long,
+        action = ArgAction::SetTrue,
+        conflicts_with_all = ["count", "depth"]
+    )]
+    quiet: bool,
     /// Input format (auto-detects from file extension if omitted).
     #[arg(short = 'f', long, default_value = "auto")]
     format: Format,
@@ -153,27 +162,6 @@ impl Input {
 
     fn to_json_string(&self, format: Format) -> Result<String> {
         match format {
-            Format::Jsonl => {
-                let text = self.to_str().map_err(|_| {
-                    anyhow::anyhow!("JSONL input is not valid UTF-8")
-                })?;
-                let mut buf = String::from("[");
-                let mut first = true;
-                for line in text.lines() {
-                    let line = line.trim();
-                    if line.is_empty() {
-                        continue;
-                    }
-                    if !first {
-                        buf.push(',');
-                    }
-                    buf.push_str(line);
-                    first = false;
-                }
-                buf.push(']');
-                Ok(buf)
-            }
-
             // YAML
             #[cfg(feature = "yaml")]
             Format::Yaml => {
@@ -240,9 +228,11 @@ impl Input {
             }
 
             // Unreachable, someone made an oopsie
-            Format::Auto | Format::Json => {
+            // (JSONL is parsed per line in `parse_jsonl`, borrowing from the
+            // input buffer, so it never goes through this owned-string path.)
+            Format::Auto | Format::Json | Format::Jsonl => {
                 unreachable!(
-                    "to_json_string called with Auto or Json, not needed"
+                    "to_json_string called with Auto, Json, or Jsonl, not needed"
                 )
             }
         }
@@ -357,8 +347,29 @@ fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
     }
 }
 
+/// Parse JSONL/NDJSON input line by line into a single top-level array,
+/// borrowing each record directly from the input buffer.
+///
+/// Compared to concatenating all lines into a synthetic `[...]` JSON string
+/// and re-parsing it, this avoids a second full-input-sized allocation and
+/// reports parse errors with the actual line number of the offending record.
+fn parse_jsonl(text: &str) -> Result<Value<'_>> {
+    let mut records = Vec::new();
+    for (idx, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let record: Value = serde_json::from_str(line).with_context(|| {
+            format!("Failed to parse JSONL line {}", idx + 1)
+        })?;
+        records.push(record);
+    }
+    Ok(Value::Array(records))
+}
+
 /// Parses the input and invokes `f` with a borrowed [`Value`] to preserve zero-copy path for
-/// JSON/Auto `Format`s.
+/// JSON/Auto and JSONL `Format`s.
 fn with_json<F, T>(input: Option<PathBuf>, format: Format, f: F) -> Result<T>
 where
     F: FnOnce(&Value) -> Result<T>,
@@ -366,30 +377,68 @@ where
     let input_content = parse_input_content(input)?;
 
     // For JSON/Auto we borrow directly from the mmap/stdin buffer,
-    // preserving the zero-copy path that serde_json_borrow provides.
-    // For other formats, we convert to an owned JSON string first
-    // and then borrow from that.
-    let json_string_owned = match format {
-        Format::Json | Format::Auto => None,
-        other => Some(input_content.to_json_string(other)?),
-    };
-    let json_str: &str = match &json_string_owned {
-        Some(s) => s.as_str(),
-        None => input_content.to_str().context("Input is not valid UTF-8")?,
-    };
-    let json: Value = serde_json::from_str(json_str)
-        .with_context(|| format!("Failed to parse as {format}"))?;
-    f(&json)
+    // preserving the zero-copy path that serde_json_borrow provides. JSONL
+    // is parsed per line, likewise borrowing from the input buffer. For
+    // other formats, we convert to an owned JSON string first and then
+    // borrow from that.
+    match format {
+        Format::Json | Format::Auto => {
+            let json_str =
+                input_content.to_str().context("Input is not valid UTF-8")?;
+            let json: Value = serde_json::from_str(json_str)
+                .with_context(|| format!("Failed to parse as {format}"))?;
+            f(&json)
+        }
+        Format::Jsonl => {
+            let text = input_content.to_str().map_err(|_| {
+                anyhow::anyhow!("JSONL input is not valid UTF-8")
+            })?;
+            let json = parse_jsonl(text)?;
+            f(&json)
+        }
+        other => {
+            let json_string_owned = input_content.to_json_string(other)?;
+            let json: Value = serde_json::from_str(&json_string_owned)
+                .with_context(|| format!("Failed to parse as {format}"))?;
+            f(&json)
+        }
+    }
 }
 
 /// Entry point for main binary.
 ///
-/// This parses the command line arguments and executes the query. If the input
+/// Exit codes follow grep/ripgrep conventions:
+/// * 0 = at least one match
+/// * 1 = no match
+/// * 2 = error.
+fn main() -> std::process::ExitCode {
+    let args = Args::parse();
+
+    match run(args) {
+        Ok(matched) => {
+            if matched {
+                std::process::ExitCode::SUCCESS
+            } else {
+                std::process::ExitCode::from(1)
+            }
+        }
+        Err(err) => {
+            eprintln!("Error: {err:?}");
+            std::process::ExitCode::from(2)
+        }
+    }
+}
+
+/// Parse the command line arguments and execute the query. If the input
 /// is piped in, it reads from STDIN. The output is printed to STDOUT, with
 /// formatting determined by the command line arguments.
+///
+/// Returns whether the run "matched": `true` for at least one query match
+/// and for non-query commands (`generate`, `--depth`), `false` for a query
+/// that found nothing.
 #[expect(clippy::too_many_lines, reason = "Argument parsing combinations")]
-fn main() -> Result<()> {
-    let mut args = Args::parse();
+fn run(mut args: Args) -> Result<bool> {
+    let mut matched = true;
 
     // Porcelain means machine-parseable: force colors off (regardless of
     // TTY detection) and one JSON value per line, so consumers can rely on
@@ -449,7 +498,14 @@ fn main() -> Result<()> {
                     Ok(())
                 })?;
 
-                return Ok(());
+                // Flush explicitly: BufWriter::drop swallows flush errors,
+                // which would turn an output failure into a success exit.
+                match writer.flush() {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+                    Err(err) => return Err(err.into()),
+                }
+                return Ok(true);
             }
 
             let raw_query = args.query.ok_or_else(|| {
@@ -475,6 +531,12 @@ fn main() -> Result<()> {
                     QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
                 }?;
                 let results = dfa.find(json);
+                matched = !results.is_empty();
+
+                // Quiet mode: only the exit status speaks.
+                if args.quiet {
+                    return Ok(());
+                }
 
                 if args.count || args.depth {
                     args.no_display = true;
@@ -510,7 +572,9 @@ fn main() -> Result<()> {
                 if !args.no_display {
                     let pretty = !args.compact;
                     for result in &results {
-                        write_colored_result(
+                        // Stop formatting once the downstream consumer is
+                        // gone (e.g. `jg ... | head -1`).
+                        if !write_colored_result(
                             &mut writer,
                             result.value,
                             &result.path,
@@ -519,7 +583,9 @@ fn main() -> Result<()> {
                                 show_path,
                                 raw: args.raw_output,
                             },
-                        )?;
+                        )? {
+                            break;
+                        }
                     }
                 }
 
@@ -534,5 +600,5 @@ fn main() -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(matched)
 }

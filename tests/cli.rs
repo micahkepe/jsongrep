@@ -46,8 +46,8 @@ mod tests {
     #[test]
     fn nonexistent_field_simple_query() {
         let output = run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH])
-            .success()
-            .code(0)
+            .failure()
+            .code(1)
             .get_output()
             .stdout
             .clone();
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn invalid_query() {
         let assert = run_main(&["unclosed\"", SIMPLE_JSON_FILEPATH]);
-        assert.failure().code(1);
+        assert.failure().code(2);
     }
 
     #[test]
@@ -77,7 +77,7 @@ mod tests {
         // /regex/ syntax is grammar-valid but unimplemented; it must exit
         // with a normal error (code 1), not a panic (code 101).
         let assert = run_main(&["/foo.*/", SIMPLE_JSON_FILEPATH]);
-        let assert = assert.failure().code(1);
+        let assert = assert.failure().code(2);
         let stderr = String::from_utf8(assert.get_output().stderr.clone())
             .expect("Invalid UTF-8 output");
         assert!(
@@ -100,8 +100,8 @@ mod tests {
             "--no-display",
             "--porcelain",
         ])
-        .success()
-        .code(0)
+        .failure()
+        .code(1) // no match
         .get_output()
         .stdout
         .clone();
@@ -135,6 +135,25 @@ mod tests {
             serde_json::from_str("32").expect("Failed to parse expected JSON");
 
         assert_eq!(output_json, expected_json);
+    }
+
+    #[test]
+    fn chained_array_accesses_match() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "json", "grid[1][0]", "--no-path", "--compact"])
+            .write_stdin(r#"{"grid": [[1, 2], [3, 4]]}"#)
+            .assert()
+            .success()
+            .code(0);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(
+            output.trim(),
+            "3",
+            "chained accesses grid[1][0] should match the nested element"
+        );
     }
 
     // ==============================================================================
@@ -232,8 +251,8 @@ mod tests {
     fn fixed_string_no_match() {
         let output =
             run_main(&["-F", "/nonexistent", "tests/data/openapi_paths.json"])
-                .success()
-                .code(0)
+                .failure()
+                .code(1)
                 .get_output()
                 .stdout
                 .clone();
@@ -349,6 +368,52 @@ mod tests {
             r#"{"user": {"name": "Ada"}}"#,
         );
         assert_eq!(output, "{\"name\":\"Ada\"}\n");
+    }
+
+    // ==============================================================================
+    // Exit status and quiet (-q) tests
+    // ==============================================================================
+
+    #[test]
+    fn exit_status_zero_on_match() {
+        run_main(&["age", SIMPLE_JSON_FILEPATH]).success().code(0);
+    }
+
+    #[test]
+    fn exit_status_one_on_no_match() {
+        run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH]).failure().code(1);
+    }
+
+    #[test]
+    fn exit_status_two_on_error() {
+        run_main(&["age", "/nonexistent/file.json"]).failure().code(2);
+    }
+
+    #[test]
+    fn quiet_suppresses_output_and_sets_status() {
+        let assert =
+            run_main(&["-q", "age", SIMPLE_JSON_FILEPATH]).success().code(0);
+        let output = assert.get_output();
+        assert!(
+            output.stdout.is_empty(),
+            "-q must print nothing on match, got: {:?}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+
+        let assert = run_main(&["-q", "does.not.exist", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(1);
+        assert!(
+            assert.get_output().stdout.is_empty(),
+            "-q must print nothing on no-match"
+        );
+    }
+
+    #[test]
+    fn quiet_conflicts_with_count() {
+        run_main(&["-q", "--count", "age", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(2);
     }
 
     // ==============================================================================
@@ -519,6 +584,74 @@ mod tests {
             "--compact",
         ]);
         assert_eq!(output.trim(), "42");
+    }
+
+    #[test]
+    fn jsonl_parse_error_reports_line_number() {
+        // Line 2 is malformed; the error must point at the user's actual
+        // line, not a position inside an internal buffer.
+        let jsonl_content = "{\"id\": 1}\n{\"id\": oops}\n{\"id\": 3}\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "jsonl", "[*].id"])
+            .write_stdin(jsonl_content)
+            .assert()
+            .failure();
+        let stderr = String::from_utf8(assert.get_output().stderr.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            stderr.contains("Failed to parse JSONL line 2"),
+            "JSONL parse error should name line 2, got: {stderr:?}"
+        );
+    }
+
+    #[test]
+    fn jsonl_crlf_line_endings() {
+        let jsonl_content = "{\"id\": 1}\r\n{\"id\": 2}\r\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args([
+                "-f",
+                "jsonl",
+                "[*].id",
+                "--count",
+                "--no-display",
+                "--porcelain",
+            ])
+            .write_stdin(jsonl_content)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(
+            output.trim(),
+            "2",
+            "CRLF-terminated JSONL records should parse"
+        );
+    }
+
+    #[test]
+    fn jsonl_blank_lines_are_skipped() {
+        let jsonl_content = "{\"id\": 1}\n\n   \n{\"id\": 2}\n";
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args([
+                "-f",
+                "jsonl",
+                "[*].id",
+                "--count",
+                "--no-display",
+                "--porcelain",
+            ])
+            .write_stdin(jsonl_content)
+            .assert()
+            .success();
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output.trim(), "2", "blank JSONL lines should be skipped");
     }
 
     #[test]

@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playground at 2^16.
 - `-r`/`--raw-output`: print matched strings without JSON quotes or escaping
   (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
+- `-q`/`--quiet`: suppress stdout entirely; communicate via exit status
+  only (errors still print to stderr).
 
 ### Fixed
 
@@ -41,6 +43,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Previously both halves were silently dropped, producing a wrong (often
   empty) field name. A surrogate half that is not part of a valid high+low
   pair is now a parse error instead of being silently discarded.
+- Chained array accesses now parse: `foo[0][1]`, `foo[0][1:3][*]`, etc.
+  Previously the grammar allowed only one array access per step, so these
+  familiar jq/JSONPath forms were rejected with a parse error and users had
+  to write `foo[0].[1]` instead (which remains valid and is the canonical
+  display form). A trailing `?`/`*` modifier binds to the last access,
+  matching the existing single-access behaviour.
+- `Query` display no longer renders `foo.*` (field then field wildcard) as
+  `foo*`, which reparsed as `foo` repeated zero or more times - a different
+  query. Likewise `foo*.[0]` no longer renders as `foo*[0]`, which did not
+  reparse at all. The `.` separator is now omitted only between a bare field
+  and its array access, so displaying and reparsing a query preserves its
+  meaning.
 
 ### Breaking
 
@@ -50,6 +64,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   successfully (and panicking on execution).
 - `jsongrep::utils::write_colored_result` now takes a `WriteOptions` struct
   instead of separate `pretty`, `show_path`, and `raw` parameters.
+- `QueryDFA::key_to_key_id` type changed from `HashMap<Rc, usize>` to
+  `HashMap<String, usize>`.
+- Exit codes now follow grep/ripgrep conventions by default: 0 = at least
+  one match, 1 = no match, 2 = error. Previously `jg` exited 0 regardless
+  of whether anything matched.
+
+### Changed
+
+- CI now tests on macOS and Windows in addition to Ubuntu (the platforms
+  release binaries ship for), adds an MSRV check (`rust-version = "1.88"`,
+  required by let-chains under edition 2024), caches builds with
+  `rust-cache`, runs clippy over all targets including benches (with a
+  shallow schemastore submodule fetch for the bench fixtures), and treats
+  rustdoc warnings as errors. Third-party actions are pinned to commit
+  SHAs.
+- Release workflow: `cargo publish` is now gated on a test run and on all
+  five release binaries building (publishing is irreversible); third-party
+  actions are pinned to commit SHAs, including the Homebrew bump action
+  which holds a push-capable PAT and was previously pinned to a moving
+  branch; checkout action unified to v6.
 
 ## [0.9.0] - 2026-04-18
 

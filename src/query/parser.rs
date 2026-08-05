@@ -61,7 +61,8 @@ use crate::query::Query;
 mod pest_parser {
     use pest_derive::Parser;
 
-    /// Parser for turning raw query strings into [`Query`] objects.
+    /// Parser for turning raw query strings into
+    /// [`Query`](crate::query::Query) objects.
     #[derive(Parser)]
     #[grammar = "query/grammar/query.pest"]
     pub struct QueryDSLParser;
@@ -599,9 +600,132 @@ mod tests {
     }
 
     #[test]
+    fn parse_chained_array_accesses() {
+        let result = parse_query("foo[0][1]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Index(1),
+            ])])
+        );
+        // Canonical display separates subsequent accesses with '.'
+        assert_eq!("foo[0].[1]", result.to_string());
+        // ...and the canonical form is reparseable with a stable display
+        // (the reparsed AST nests differently but display is idempotent;
+        // semantic equivalence is covered by the CLI matching test)
+        let reparsed = parse_query(&result.to_string()).unwrap();
+        assert_eq!(result.to_string(), reparsed.to_string());
+    }
+
+    #[test]
+    fn parse_chained_accesses_kleene_binds_to_last() {
+        let result = parse_query("foo[0][1]*").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::KleeneStar(Box::new(Query::Index(1))),
+            ])])
+        );
+    }
+
+    #[test]
+    fn parse_access_after_modifier_rejected() {
+        // The modifier ends the step; a further access needs a '.' separator
+        let result = parse_query("foo[0]?[1]");
+        assert!(
+            matches!(result, Err(QueryParseError::UnexpectedToken(_))),
+            "Actual result: {result:?}"
+        );
+    }
+
+    #[test]
+    fn parse_chained_mixed_accesses() {
+        let result = parse_query("foo[0][1:3][*]").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Range(Some(1), Some(3)),
+                Query::ArrayWildcard,
+            ])])
+        );
+    }
+
+    #[test]
+    fn parse_chained_accesses_with_modifier() {
+        // The modifier binds to the last access, matching the existing
+        // single-access behaviour of e.g. "foo[0]?"
+        let result = parse_query("foo[0][1]?").unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::Index(0),
+                Query::Optional(Box::new(Query::Index(1))),
+            ])])
+        );
+    }
+
+    #[test]
     fn parse_multiple_optional() {
         let query = "c*.c?.c?";
         let result = parse_query(query).unwrap();
+        assert_eq!(query, result.to_string());
+    }
+
+    #[test]
+    fn field_then_wildcard_display_roundtrip() {
+        let query = "foo.*";
+        let result = parse_query(query).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![
+                Query::Field("foo".into()),
+                Query::FieldWildcard,
+            ])
+        );
+        // Regression: this used to display as "foo*", which reparses as
+        // KleeneStar(foo) - a different query.
+        assert_eq!(query, result.to_string());
+        assert_eq!(result, parse_query(&result.to_string()).unwrap());
+    }
+
+    #[test]
+    fn modified_field_then_access_display_roundtrip() {
+        // Regression: "foo*.[0]" used to display as "foo*[0]", which does
+        // not reparse (the grammar requires accesses before the modifier).
+        for query in ["foo*.[0]", "foo?.[0]", "foo?.[1:3]", "foo*.[*]"] {
+            let result = parse_query(query).unwrap();
+            assert_eq!(query, &result.to_string());
+            assert_eq!(result, parse_query(&result.to_string()).unwrap());
+        }
+    }
+
+    #[test]
+    fn field_then_modified_access_display_roundtrip() {
+        // The no-separator form is kept when the modifier is on the access
+        for query in ["foo[0]?", "foo[0]*", "foo[1:3]?", "foo[*]?"] {
+            let result = parse_query(query).unwrap();
+            assert_eq!(query, &result.to_string());
+            assert_eq!(result, parse_query(&result.to_string()).unwrap());
+        }
+    }
+
+    #[test]
+    fn kleene_star_display_unchanged() {
+        let query = "foo*";
+        let result = parse_query(query).unwrap();
+        assert_eq!(
+            result,
+            Query::Sequence(vec![Query::KleeneStar(Box::new(Query::Field(
+                "foo".into()
+            )))])
+        );
         assert_eq!(query, result.to_string());
     }
 
