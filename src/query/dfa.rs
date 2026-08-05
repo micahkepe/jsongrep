@@ -134,12 +134,13 @@ pub struct QueryDFA {
     /// The finite alphabet gathered from the input query.
     pub alphabet: Vec<TransitionLabel>,
 
-    /// Mapping of field names to symbol indices in alphabet. Uses a reference
-    /// counter for the field name to avoid expensive clones. Any encountered
-    /// key while traversing that was not found from symbol extraction phase
-    /// of the query AST is lumped together with all "other" keys, which
+    /// Mapping of field names to symbol indices in alphabet. Keyed by
+    /// `String` so that lookups can be performed directly with a `&str`
+    /// (via `Borrow<str>`) without allocating. Any encountered key while
+    /// traversing that was not found from symbol extraction phase of the
+    /// query AST is lumped together with all "other" keys, which
     /// corresponds to key ID `0`.
-    pub key_to_key_id: HashMap<Rc<String>, usize>,
+    pub key_to_key_id: HashMap<String, usize>,
 
     /// Maps non-overlapping ranges of array indices to their corresponding
     /// symbol IDs in the DFA's alphabet.
@@ -388,18 +389,25 @@ impl QueryDFA {
 
     /// Get the symbol index for a field name. When the DFA was built with
     /// case-insensitive matching, the key is lowercased before lookup.
+    ///
+    /// This is called for every key of every object visited during a
+    /// document walk, so the common paths must not allocate: case-sensitive
+    /// lookups probe the map directly with the borrowed key, and
+    /// case-insensitive lookups only allocate a lowercased copy when the key
+    /// contains ASCII uppercase or any non-ASCII character (for pure
+    /// lowercase-ASCII keys, lowercasing is a guaranteed no-op).
     #[must_use]
     pub fn get_field_symbol_id(&self, field: &str) -> usize {
-        let normalized = if self.case_insensitive {
-            field.to_lowercase()
+        let id = if self.case_insensitive
+            && !field.bytes().all(|b| b.is_ascii() && !b.is_ascii_uppercase())
+        {
+            self.key_to_key_id.get(field.to_lowercase().as_str())
         } else {
-            field.to_owned()
+            // Case-sensitive, or already ASCII-lowercase so lowercasing
+            // would be a no-op.
+            self.key_to_key_id.get(field)
         };
-        let field_rc = Rc::new(normalized);
-        self.key_to_key_id
-            .get(&field_rc)
-            .copied()
-            .unwrap_or(TransitionLabel::other_idx())
+        id.copied().unwrap_or(TransitionLabel::other_idx())
     }
 
     /// Get the symbol index for an array index by performing a binary search
@@ -449,7 +457,7 @@ struct DFABuilder {
     alphabet: Vec<TransitionLabel>,
 
     /// Mapping of keys/fields to their index in the alphabet.
-    key_to_key_id: HashMap<Rc<String>, usize>,
+    key_to_key_id: HashMap<String, usize>,
 
     /// Store the original ranges from the raw queries so that they can be
     /// deduplicated and made disjoint for deterministic transition edges in
@@ -492,20 +500,13 @@ impl DFABuilder {
                 } else {
                     name.clone()
                 };
-                let name_rc: Rc<String> = Rc::new(normalized);
-                self.key_to_key_id.entry(name_rc.clone()).or_insert_with(
-                    || {
-                        // NOTE: `or_insert_with` defers execution until it is
-                        // verified that the default function returns empty,
-                        // unlike `or_insert`, which would push a duplicate symbol
-                        // onto the alphabet regardless of whether the key was
-                        // already in the map
-                        let symbol_id = self.alphabet.len();
-                        self.alphabet
-                            .push(TransitionLabel::Field(name_rc.clone()));
-                        symbol_id
-                    },
-                );
+                if !self.key_to_key_id.contains_key(&normalized) {
+                    let symbol_id = self.alphabet.len();
+                    self.alphabet.push(TransitionLabel::Field(Rc::new(
+                        normalized.clone(),
+                    )));
+                    self.key_to_key_id.insert(normalized, symbol_id);
+                }
             }
             Query::FieldWildcard => {
                 // NOTE: Continue; don't record a symbol as a field wildcard
@@ -840,6 +841,10 @@ impl DFAQueryEngine {
         match value {
             Value::Object(map) => {
                 for (key, val) in map.as_vec() {
+                    // Borrow the document key as a plain `&str` once, up
+                    // front (CowStr derefs to str).
+                    let key: &str = key;
+
                     // Get symbol ID for this field
                     let symbol_id = dfa.get_field_symbol_id(key);
 
@@ -847,8 +852,21 @@ impl DFAQueryEngine {
                     if let Some(next_state) =
                         dfa.transition(current_state, symbol_id)
                     {
-                        // extend the current path using reference counter smart pointer
-                        let key_rc: Rc<String> = Rc::new(key.to_string());
+                        // Reuse the interned key from the query alphabet when
+                        // it is the same string as the document key (true for
+                        // a case-sensitive Field symbol; the equality check
+                        // guards against externally mutated `key_to_key_id`);
+                        // otherwise allocate.
+                        let key_rc: Rc<String> =
+                            match dfa.alphabet.get(symbol_id) {
+                                Some(TransitionLabel::Field(interned))
+                                    if !dfa.case_insensitive
+                                        && interned.as_str() == key =>
+                                {
+                                    Rc::clone(interned)
+                                }
+                                _ => Rc::new(key.to_string()),
+                            };
                         path.push(PathType::Field(key_rc));
 
                         // Recurse on the extended path
@@ -1047,8 +1065,8 @@ mod tests {
         assert!(!dfa.is_accepting_state(1));
 
         // Should have "foo" and "bar" in the alphabet
-        assert!(dfa.key_to_key_id.contains_key(&Rc::new("foo".to_string())));
-        assert!(dfa.key_to_key_id.contains_key(&Rc::new("bar".to_string())));
+        assert!(dfa.key_to_key_id.contains_key("foo"));
+        assert!(dfa.key_to_key_id.contains_key("bar"));
     }
 
     #[test]
@@ -1990,6 +2008,59 @@ mod tests {
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].value, &Value::Number(10u64.into()));
         assert_eq!(matches[1].value, &Value::Number(20u64.into()));
+    }
+
+    #[test]
+    fn case_insensitive_non_ascii_uppercase_key() {
+        // Guards the allocation-free fast path in `get_field_symbol_id`:
+        // non-ASCII uppercase document keys must still be lowercased before
+        // lookup ('É' is not ASCII, so the byte-level check alone must not
+        // route it to the direct probe).
+        let input = r#"{ "ÉCOLE": 1, "école": 2 }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = QueryBuilder::new().field("école").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn case_insensitive_lowercase_ascii_key_direct_probe() {
+        // Lowercase-ASCII document keys take the no-allocation direct probe;
+        // they must still match an uppercase query (normalized at build).
+        let input = r#"{ "name": "Ada" }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let query = QueryBuilder::new().field("NAME").build();
+        let matches = find_ignore_case(&json, &query);
+
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn matched_path_reuses_interned_key() {
+        // The path element for a case-sensitive Field match should share the
+        // interned alphabet string rather than allocating per match.
+        let input = r#"{ "foo": [ {"x": 1}, {"x": 2} ] }"#;
+        let json: Value = serde_json::from_str(input).expect("hardcoded json");
+
+        let dfa = QueryDFA::from_query_str("foo.[*].x").expect("valid query");
+        let matches = DFAQueryEngine::find_with_dfa(&json, &dfa);
+
+        assert_eq!(matches.len(), 2);
+        for m in &matches {
+            match (&m.path[0], &m.path[2]) {
+                (PathType::Field(foo), PathType::Field(x)) => {
+                    assert_eq!(foo.as_str(), "foo");
+                    assert_eq!(x.as_str(), "x");
+                    // Interned: strong count > 1 because the alphabet holds
+                    // the same Rc.
+                    assert!(Rc::strong_count(foo) > 1);
+                }
+                other => panic!("unexpected path shape: {other:?}"),
+            }
+        }
     }
 
     #[test]
