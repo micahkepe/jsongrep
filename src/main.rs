@@ -510,7 +510,9 @@ fn main() -> Result<()> {
                 if !args.no_display {
                     let pretty = !args.compact;
                     for result in &results {
-                        write_colored_result(
+                        // Stop formatting once the downstream consumer is
+                        // gone (e.g. `jg ... | head -1`).
+                        if !write_colored_result(
                             &mut writer,
                             result.value,
                             &result.path,
@@ -519,7 +521,9 @@ fn main() -> Result<()> {
                                 show_path,
                                 raw: args.raw_output,
                             },
-                        )?;
+                        )? {
+                            break;
+                        }
                     }
                 }
 
