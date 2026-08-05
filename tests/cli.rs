@@ -46,8 +46,8 @@ mod tests {
     #[test]
     fn nonexistent_field_simple_query() {
         let output = run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH])
-            .success()
-            .code(0)
+            .failure()
+            .code(1)
             .get_output()
             .stdout
             .clone();
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn invalid_query() {
         let assert = run_main(&["unclosed\"", SIMPLE_JSON_FILEPATH]);
-        assert.failure().code(1);
+        assert.failure().code(2);
     }
 
     #[test]
@@ -77,7 +77,7 @@ mod tests {
         // /regex/ syntax is grammar-valid but unimplemented; it must exit
         // with a normal error (code 1), not a panic (code 101).
         let assert = run_main(&["/foo.*/", SIMPLE_JSON_FILEPATH]);
-        let assert = assert.failure().code(1);
+        let assert = assert.failure().code(2);
         let stderr = String::from_utf8(assert.get_output().stderr.clone())
             .expect("Invalid UTF-8 output");
         assert!(
@@ -100,8 +100,8 @@ mod tests {
             "--no-display",
             "--porcelain",
         ])
-        .success()
-        .code(0)
+        .failure()
+        .code(1) // no match
         .get_output()
         .stdout
         .clone();
@@ -201,8 +201,8 @@ mod tests {
     fn fixed_string_no_match() {
         let output =
             run_main(&["-F", "/nonexistent", "tests/data/openapi_paths.json"])
-                .success()
-                .code(0)
+                .failure()
+                .code(1)
                 .get_output()
                 .stdout
                 .clone();
@@ -318,6 +318,52 @@ mod tests {
             r#"{"user": {"name": "Ada"}}"#,
         );
         assert_eq!(output, "{\"name\":\"Ada\"}\n");
+    }
+
+    // ==============================================================================
+    // Exit status and quiet (-q) tests
+    // ==============================================================================
+
+    #[test]
+    fn exit_status_zero_on_match() {
+        run_main(&["age", SIMPLE_JSON_FILEPATH]).success().code(0);
+    }
+
+    #[test]
+    fn exit_status_one_on_no_match() {
+        run_main(&["does.not.exist", SIMPLE_JSON_FILEPATH]).failure().code(1);
+    }
+
+    #[test]
+    fn exit_status_two_on_error() {
+        run_main(&["age", "/nonexistent/file.json"]).failure().code(2);
+    }
+
+    #[test]
+    fn quiet_suppresses_output_and_sets_status() {
+        let assert =
+            run_main(&["-q", "age", SIMPLE_JSON_FILEPATH]).success().code(0);
+        let output = assert.get_output();
+        assert!(
+            output.stdout.is_empty(),
+            "-q must print nothing on match, got: {:?}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+
+        let assert = run_main(&["-q", "does.not.exist", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(1);
+        assert!(
+            assert.get_output().stdout.is_empty(),
+            "-q must print nothing on no-match"
+        );
+    }
+
+    #[test]
+    fn quiet_conflicts_with_count() {
+        run_main(&["-q", "--count", "age", SIMPLE_JSON_FILEPATH])
+            .failure()
+            .code(2);
     }
 
     // ==============================================================================

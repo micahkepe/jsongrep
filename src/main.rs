@@ -79,6 +79,15 @@ struct Args {
     /// Never print the path header, even in a terminal.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
     no_path: bool,
+    /// Quiet: write nothing to stdout; communicate via the exit status
+    /// only (errors still print to stderr).
+    #[arg(
+        short = 'q',
+        long,
+        action = ArgAction::SetTrue,
+        conflicts_with_all = ["count", "depth"]
+    )]
+    quiet: bool,
     /// Input format (auto-detects from file extension if omitted).
     #[arg(short = 'f', long, default_value = "auto")]
     format: Format,
@@ -384,12 +393,38 @@ where
 
 /// Entry point for main binary.
 ///
-/// This parses the command line arguments and executes the query. If the input
+/// Exit codes follow grep/ripgrep conventions:
+/// * 0 = at least one match
+/// * 1 = no match
+/// * 2 = error.
+fn main() -> std::process::ExitCode {
+    let args = Args::parse();
+
+    match run(args) {
+        Ok(matched) => {
+            if matched {
+                std::process::ExitCode::SUCCESS
+            } else {
+                std::process::ExitCode::from(1)
+            }
+        }
+        Err(err) => {
+            eprintln!("Error: {err:?}");
+            std::process::ExitCode::from(2)
+        }
+    }
+}
+
+/// Parse the command line arguments and execute the query. If the input
 /// is piped in, it reads from STDIN. The output is printed to STDOUT, with
 /// formatting determined by the command line arguments.
+///
+/// Returns whether the run "matched": `true` for at least one query match
+/// and for non-query commands (`generate`, `--depth`), `false` for a query
+/// that found nothing.
 #[expect(clippy::too_many_lines, reason = "Argument parsing combinations")]
-fn main() -> Result<()> {
-    let mut args = Args::parse();
+fn run(mut args: Args) -> Result<bool> {
+    let mut matched = true;
 
     // Porcelain means machine-parseable: force colors off (regardless of
     // TTY detection) and one JSON value per line, so consumers can rely on
@@ -449,7 +484,14 @@ fn main() -> Result<()> {
                     Ok(())
                 })?;
 
-                return Ok(());
+                // Flush explicitly: BufWriter::drop swallows flush errors,
+                // which would turn an output failure into a success exit.
+                match writer.flush() {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+                    Err(err) => return Err(err.into()),
+                }
+                return Ok(true);
             }
 
             let raw_query = args.query.ok_or_else(|| {
@@ -475,6 +517,12 @@ fn main() -> Result<()> {
                     QueryDFA::from_query_bounded(&query, DEFAULT_MAX_DFA_STATES)
                 }?;
                 let results = dfa.find(json);
+                matched = !results.is_empty();
+
+                // Quiet mode: only the exit status speaks.
+                if args.quiet {
+                    return Ok(());
+                }
 
                 if args.count || args.depth {
                     args.no_display = true;
@@ -538,5 +586,5 @@ fn main() -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(matched)
 }
