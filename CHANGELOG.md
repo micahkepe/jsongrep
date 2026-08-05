@@ -20,11 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playground at 2^16.
 - `-r`/`--raw-output`: print matched strings without JSON quotes or escaping
   (like `jq -r`), enabling `VAR=$(... | jg -r field)` shell pipelines.
-- `-e`/`--exit-status`: grep-style exit codes (0 = match found, 1 = no
-  match, 2 = error), and `-q`/`--quiet`: suppress output and exit as soon
-  as the status is known. Without these flags exit codes are unchanged
-  for back-compatibility (no match still exits 0; a planned 1.0 change
-  will make the grep behaviour the default).
+- `-q`/`--quiet`: suppress stdout entirely; communicate via exit status
+  only (errors still print to stderr).
 
 ### Fixed
 
@@ -57,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of separate `pretty`, `show_path`, and `raw` parameters.
 - `QueryDFA::key_to_key_id` type changed from `HashMap<Rc, usize>` to
   `HashMap<String, usize>`.
+- Exit codes now follow grep/ripgrep conventions by default: 0 = at least
+  one match, 1 = no match, 2 = error. Previously `jg` exited 0 regardless
+  of whether anything matched.
 
 ### Changed
 

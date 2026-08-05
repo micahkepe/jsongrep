@@ -79,18 +79,8 @@ struct Args {
     /// Never print the path header, even in a terminal.
     #[arg(long, action = ArgAction::SetTrue, conflicts_with = "with_path")]
     no_path: bool,
-    /// Exit with grep-style status codes.
-    ///
-    /// 0 = at least one match, 1 = no match, 2 = error (instead of the
-    /// default behavior of exiting 0 whether or not anything matched).
-    /// Useful in shell conditionals: `if jg -e 'a.b' f.json; then ...`.
-    #[arg(short = 'e', long, action = ArgAction::SetTrue)]
-    exit_status: bool,
     /// Quiet: write nothing to stdout; communicate via the exit status
     /// only (errors still print to stderr).
-    ///
-    /// Implies --exit-status: 0 = at least one match, 1 = no match,
-    /// 2 = error.
     #[arg(
         short = 'q',
         long,
@@ -403,25 +393,24 @@ where
 
 /// Entry point for main binary.
 ///
-/// Exit codes: without `-e`/`-q`, `jg` exits 0 on success and 1 on any
-/// error (2 for usage errors, via clap). With `-e`/`-q`, grep semantics
-/// apply: 0 = at least one match, 1 = no match, 2 = error.
+/// Exit codes follow grep/ripgrep conventions:
+/// * 0 = at least one match
+/// * 1 = no match
+/// * 2 = error.
 fn main() -> std::process::ExitCode {
     let args = Args::parse();
-    let grep_semantics = args.exit_status || args.quiet;
 
     match run(args) {
         Ok(matched) => {
-            if grep_semantics && !matched {
-                std::process::ExitCode::from(1)
-            } else {
+            if matched {
                 std::process::ExitCode::SUCCESS
+            } else {
+                std::process::ExitCode::from(1)
             }
         }
         Err(err) => {
-            // Mirror anyhow's default error rendering (message + chain).
             eprintln!("Error: {err:?}");
-            std::process::ExitCode::from(if grep_semantics { 2 } else { 1 })
+            std::process::ExitCode::from(2)
         }
     }
 }
