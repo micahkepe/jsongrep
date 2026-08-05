@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--compact` is implied, so output is one machine-parseable JSON value
   per line. Previously only the `--count`/`--depth` labels were
   affected.
+- Chained array accesses now parse: `foo[0][1]`, `foo[0][1:3][*]`, etc.
+  Previously the grammar allowed only one array access per step, so these
+  familiar jq/JSONPath forms were rejected with a parse error and users had
+  to write `foo[0].[1]` instead (which remains valid and is the canonical
+  display form). A trailing `?`/`*` modifier binds to the last access,
+  matching the existing single-access behaviour.
 - `Query` display no longer renders `foo.*` (field then field wildcard) as
   `foo*`, which reparsed as `foo` repeated zero or more times - a different
   query. Likewise `foo*.[0]` no longer renders as `foo*[0]`, which did not
