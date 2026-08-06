@@ -75,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exit codes now follow grep/ripgrep conventions by default: 0 = at least
   one match, 1 = no match, 2 = error. Previously `jg` exited 0 regardless
   of whether anything matched.
+- `jg --depth "<query>" file` no longer silently ignores the query slot;
+  `--depth` now takes only file arguments (`jg --depth file...`).
 
 ### Changed
 

@@ -1201,9 +1201,8 @@ mod tests {
 
     #[test]
     fn depth_suppresses_match_output() {
-        let assert = run_main(&["age", SIMPLE_JSON_FILEPATH, "--depth"])
-            .success()
-            .code(0);
+        let assert =
+            run_main(&[SIMPLE_JSON_FILEPATH, "--depth"]).success().code(0);
         let output = String::from_utf8(assert.get_output().stdout.clone())
             .expect("Invalid UTF-8 output");
         assert!(!output.contains("32"), "--depth should suppress match values");

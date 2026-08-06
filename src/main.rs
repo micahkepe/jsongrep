@@ -499,26 +499,14 @@ fn run(mut args: Args) -> Result<bool> {
             };
             let mut writer = BufWriter::new(stdout);
 
-            // `--depth` without a query: sole positional argument is the file
+            // `--depth` takes only files, no query string. Clap parses the
+            // first positional into `query`; move it into `inputs`.
             if args.depth
-                && args.inputs.is_empty()
                 && let Some(query) = args.query.take()
             {
-                args.inputs.push(PathBuf::from(query));
+                args.inputs.insert(0, PathBuf::from(query));
             }
-            // With files already present, the query slot is legacy-ignored
-            // (`jg --depth "<query>" file` back-compat) UNLESS it names an
-            // existing file: then `jg --depth a.json b.json` means both
-            // files, not "ignore a.json".
-            if args.depth
-                && !args.inputs.is_empty()
-                && let Some(query) = args.query.take()
-            {
-                let candidate = PathBuf::from(&query);
-                if candidate.exists() {
-                    args.inputs.insert(0, candidate);
-                }
-            }
+
             // short circuit to only perform the depth computation
             if args.depth && !args.inputs.is_empty() {
                 let multi = args.inputs.len() > 1;
