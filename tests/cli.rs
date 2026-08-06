@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn quoted_field_lone_surrogate_is_clean_error() {
         let assert =
-            run_main(&[r#""\uD83D""#, SIMPLE_JSON_FILEPATH]).failure().code(1);
+            run_main(&[r#""\uD83D""#, SIMPLE_JSON_FILEPATH]).failure().code(2);
         let stderr = String::from_utf8(assert.get_output().stderr.clone())
             .expect("Invalid UTF-8 output");
         assert!(
