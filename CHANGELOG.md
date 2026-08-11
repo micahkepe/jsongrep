@@ -61,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reparse at all. The `.` separator is now omitted only between a bare field
   and its array access, so displaying and reparsing a query preserves its
   meaning.
+- `Query` display now parenthesizes a `?`/`*` operand that itself carries a
+  modifier: `(foo?)*` used to display as `foo?*`, which does not reparse
+  (the grammar allows one modifier per step). Redundant parentheses around
+  a single plain step still collapse (`(foo)?` displays as `foo?`). A
+  modifier on an empty operand (reachable via `QueryBuilder::new()
+.optional()`) now displays as the empty query it denotes instead of an
+  unparseable bare `?`.
 
 ### Breaking
 
