@@ -611,10 +611,10 @@ impl DFABuilder {
                 TransitionLabel::Field(name) => {
                     let id = if self.case_insensitive {
                         self.key_to_key_id
-                            .get(&Rc::new(name.to_lowercase()))
+                            .get(name.to_lowercase().as_str())
                             .copied()
                     } else {
-                        self.key_to_key_id.get(name).copied()
+                        self.key_to_key_id.get(name.as_str()).copied()
                     };
                     // `extract_symbols` registers every field of the query
                     // before determinization, so a miss is unreachable via
