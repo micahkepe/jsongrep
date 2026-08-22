@@ -513,17 +513,6 @@ impl QueryDFA {
             None
         }
     }
-
-    /// Check whether a given index satisfies a range bounds.
-    #[must_use]
-    pub const fn index_in_range(
-        &self,
-        index: usize,
-        start: usize,
-        end: usize,
-    ) -> bool {
-        start <= index && index < end
-    }
 }
 
 /// Builder for constructing a DFA from a given `Query` instance.
