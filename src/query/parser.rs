@@ -808,6 +808,31 @@ mod tests {
     }
 
     #[test]
+    fn empty_subqueries_elided_in_sequence_display() {
+        // The empty query is the identity of concatenation, so eliding it
+        // is meaning-preserving; emitting it would produce unparseable
+        // forms like "foo..bar" or a trailing "foo.".
+        let q = Query::Sequence(vec![
+            Query::Field("foo".into()),
+            Query::Sequence(vec![]),
+            Query::Field("bar".into()),
+        ]);
+        assert_eq!("foo.bar", q.to_string());
+        assert_eq!(
+            parse_query(&q.to_string()).unwrap().to_string(),
+            q.to_string()
+        );
+
+        // Modifier-wrapped empties display empty too, and are likewise
+        // elided as sequence elements
+        let q = Query::Sequence(vec![
+            Query::Field("foo".into()),
+            Query::Optional(Box::new(Query::Sequence(vec![]))),
+        ]);
+        assert_eq!("foo", q.to_string());
+    }
+
+    #[test]
     fn parse_invalid_number() {
         let result = parse_query("foo[abc]");
         assert!(

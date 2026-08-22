@@ -172,10 +172,19 @@ impl Display for Query {
                  * range accesses and/or postfix unary operators, e.g, the query
                  * "foo.bar[0]?.baz*" should be formatted as such, and NOT as
                  * "foo.bar.[0]?.baz"
+                 *
+                 * Subqueries that display as the empty query (e.g. an empty
+                 * nested sequence, the identity) are elided entirely:
+                 * emitting them would produce unparseable forms like "foo."
+                 * or "foo..bar".
                  */
-                for (i, query) in queries.iter().enumerate() {
+                let visible: Vec<&Self> = queries
+                    .iter()
+                    .filter(|query| !displays_as_empty(query))
+                    .collect();
+                for (i, &query) in visible.iter().enumerate() {
                     if i > 0
-                        && let Some(prev_query) = queries.get(i - 1)
+                        && let Some(&prev_query) = visible.get(i - 1)
                     {
                         /* A modifier ("?" or Kleene star) on the current step
                          * applies to the access itself (e.g. "foo[0]?"), so
@@ -240,7 +249,13 @@ fn modifier_operand_needs_parens(query: &Query) -> bool {
 /// such an operand is dropped by `Display`: `Optional`/`KleeneStar` of the
 /// empty query both denote the empty query, and rendering `()?` would not
 /// reparse (a group cannot be empty). Reachable via
-/// `QueryBuilder::new().optional()`.
+/// `QueryBuilder::new().optional()`. `Sequence` display likewise elides
+/// such elements (the empty query is the identity of concatenation).
+///
+/// Caveat: a hand-built empty `Disjunction` denotes the empty *language*,
+/// not the empty query, and the DSL has no syntax for it; it also displays
+/// empty, so eliding it is semantically lossy. The parser can never
+/// produce one.
 fn displays_as_empty(query: &Query) -> bool {
     match query {
         Query::Sequence(queries) | Query::Disjunction(queries) => {
