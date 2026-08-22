@@ -2,12 +2,10 @@
 //!
 //! Unlike the example-based suites, these properties guard the whole input
 //! space: proptest generates hundreds of random inputs per run and shrinks
-//! any failure to a minimal counterexample. The display round-trip property
-//! is exactly the invariant behind the `foo*.[0]` and `(foo?)*` display
-//! fixes; these tests keep that whole class of bug from reappearing.
+//! any failure to a minimal counterexample.
 //!
 //! Known limitation: the convergence property checks syntactic stability,
-//! not meaning preservation - a formatter that stably printed the *wrong*
+//! not semantic preservation - a formatter that stably printed the *wrong*
 //! query would pass it. Semantic equivalence needs a DFA-differential
 //! oracle (future work).
 
@@ -29,26 +27,8 @@ const MAX_CONVERGENCE_ROUNDS: usize = 2 * MAX_GEN_DEPTH as usize + 2;
 fn dsl_string() -> impl Strategy<Value = String> {
     proptest::collection::vec(
         proptest::sample::select(vec![
-            'a',
-            'b',
-            'c',
-            '0',
-            '1',
-            '9',
-            '.',
-            '|',
-            '*',
-            '?',
-            '[',
-            ']',
-            '(',
-            ')',
-            ':',
-            '"',
-            '/',
-            ' ',
-            '_',
-            char::from(92), // backslash
+            'a', 'b', 'c', '0', '1', '9', '.', '|', '*', '?', '[', ']', '(',
+            ')', ':', '"', '/', ' ', '_', '\\',
         ]),
         0..30,
     )
@@ -85,7 +65,7 @@ fn arb_field_name() -> impl Strategy<Value = String> {
         1 => Just("a b".to_string()),
         1 => Just("*".to_string()),
         1 => Just(['a', '"', 'b'].iter().collect()),
-        1 => Just(['a', char::from(92), 'b'].iter().collect()),
+        1 => Just(['a', '\\', 'b'].iter().collect()),
         1 => Just("😀".to_string()),
     ]
 }
