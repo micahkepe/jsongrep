@@ -150,12 +150,13 @@ enum GenerateCommand {
 
 /// Minimum file size for which memory-mapping is attempted.
 ///
-/// For small files, it is likely that a single read call is at least as fast or faster than mmap
-/// (mmap setup and page-fault overhead dominate for small files) and avoids mmap's file-truncation
-/// hazards.
+/// For small files, it is likely that a single read call is at least as fast or
+/// faster than mmap (mmap setup and page-fault overhead dominate for small
+/// files) and avoids mmap's file-truncation hazards.
 ///
-/// NOTE: in the future when globbing (<https://github.com/micahkepe/jsongrep/issues/33>) and
-/// recursive searching are enabled, can look into other heuristics for performance.
+/// NOTE: with recursive directory walking now in place, consider skipping mmap
+/// for multi-file walks (per-file syscall overhead adds up) and reserving it
+/// for single large files.
 ///
 /// See: <https://burntsushi.net/ripgrep/#mechanics>.
 const MMAP_MIN_FILE_SIZE: u64 = 1 << 20; // 1 MiB
