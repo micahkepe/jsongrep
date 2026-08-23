@@ -6,9 +6,12 @@ use anyhow::{Context as _, Result};
 use clap::{ArgAction, CommandFactory as _, Parser, Subcommand};
 use clap_complete::generate;
 use colored::Colorize;
+use globset::Glob;
+use ignore::WalkBuilder;
 use memmap2::{Mmap, MmapOptions};
 use serde_json_borrow::Value;
 use std::{
+    collections::HashSet,
     fs::OpenOptions,
     io::{
         self, BufWriter, ErrorKind, IsTerminal as _, Read as _, Write, stdout,
@@ -45,6 +48,17 @@ struct Args {
     /// multiple files, the query is compiled once and run against each
     /// file, with a file heading before each file's matches.
     inputs: Vec<PathBuf>,
+    /// Include or exclude files and directories for searching that match the given glob.
+    ///
+    /// Does not filter explicitly named files, only directory entries.
+    #[arg(short = 'g', long)]
+    glob: Option<String>,
+    /// Prints the files that will be searched.
+    #[arg(long,
+        action = ArgAction::SetTrue,
+        conflicts_with_all = ["count", "depth", "no_display"]
+    )]
+    files: bool,
     /// Print only the names of files containing at least one match
     /// (like `grep -l`).
     #[arg(
@@ -273,8 +287,9 @@ fn is_broken_pipe(err: &anyhow::Error) -> bool {
 ///
 /// # Errors
 ///
-/// Returns early with an error if the file cannot be opened or read. If the input is not a file or
-/// piped input, prints the help message and exits with an error.
+/// Returns early with an error if the file cannot be opened or read. If the
+/// input is not a file or piped input, prints the help message and exits with
+/// an error.
 fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
     if let Some(path) = input {
         let mut fd =
@@ -509,10 +524,75 @@ fn run(mut args: Args) -> Result<bool> {
 
             // `--depth` takes only files, no query string. Clap parses the
             // first positional into `query`; move it into `inputs`.
-            if args.depth
+            //
+            // `--files` takes optional filepath(s).
+            if (args.depth || args.files)
                 && let Some(query) = args.query.take()
             {
                 args.inputs.insert(0, PathBuf::from(query));
+            }
+
+            // Update inputs with glob filtering and/or directory walking if
+            // needed.
+            if args.inputs.is_empty()
+                && (args.files
+                    || args.glob.is_some()
+                    || io::stdin().is_terminal())
+            {
+                args.inputs.push(PathBuf::from("."));
+            }
+            let mut explicit_files = Vec::new();
+            let mut dirs = Vec::new();
+            let mut other = Vec::new();
+            for p in std::mem::take(&mut args.inputs) {
+                if p.is_file() {
+                    explicit_files.push(p);
+                } else if p.is_dir() {
+                    dirs.push(p);
+                } else {
+                    other.push(p);
+                }
+            }
+            let explicit_set: HashSet<_> =
+                explicit_files.iter().cloned().collect();
+
+            args.inputs = explicit_files
+                .into_iter()
+                .chain(other)
+                .chain(dirs.iter().flat_map::<Vec<PathBuf>, _>(|f| {
+                    WalkBuilder::new(f)
+                        .build()
+                        .filter_map(std::result::Result::ok)
+                        .map(ignore::DirEntry::into_path)
+                        .filter(|p| p.is_file())
+                        .map(|p| {
+                            p.strip_prefix("./").map(PathBuf::from).unwrap_or(p)
+                        })
+                        .collect()
+                }))
+                .collect();
+
+            if let Some(pat) = &args.glob {
+                let globber = Glob::new(pat)?.compile_matcher();
+                args.inputs.retain(|p| {
+                    explicit_set.contains(p) || globber.is_match(p)
+                });
+            }
+
+            // --files to just list to-be-searched files and exit.
+            if args.files {
+                for input in &args.inputs {
+                    if args.porcelain {
+                        writeln!(writer, "{}", input.display())?;
+                    } else {
+                        writeln!(
+                            writer,
+                            "{}",
+                            format!("{}", input.display()).magenta()
+                        )?;
+                    }
+                }
+                return Ok(true);
             }
 
             // short circuit to only perform the depth computation
