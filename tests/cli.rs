@@ -52,11 +52,11 @@ fn temp_file_with(suffix: &str, data: &[u8]) -> tempfile::NamedTempFile {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, fs};
+    use std::{collections::HashSet, fs, path::PathBuf};
 
     use super::*;
     use serde_json::Value;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     #[test]
     fn nonexistent_field_simple_query() {
@@ -1296,11 +1296,11 @@ mod tests {
     }
 
     fn setup_fake_filesystem() -> TempDir {
-        // foo/
+        // tmp/
         // * bar/
         //      * {1-10}.json
         // * baz.json
-        let tmp = tempdir::TempDir::new("foo").expect("testing");
+        let tmp = tempfile::TempDir::new().expect("testing");
         let bar = tmp.path().join("bar");
         fs::create_dir(&bar).expect("create nested directory");
         for i in 1..=10 {
@@ -1366,15 +1366,17 @@ mod tests {
             run_main_from(&["--glob", "bar/[1-5].json", "--files"], tmp.path())
                 .success()
                 .code(0);
-        let mut output: HashSet<String> =
+        let mut output: HashSet<PathBuf> =
             String::from_utf8(cmd.get_output().stdout.clone())
                 .expect("failed to get stdout")
                 .lines()
-                .map(std::borrow::ToOwned::to_owned)
+                .map(PathBuf::from)
                 .collect();
         for i in 1..=5 {
+            let mut expected = PathBuf::from("bar");
+            expected.push(format!("{i}.json"));
             assert!(
-                &output.remove(&format!("bar/{i}.json")),
+                &output.remove(&expected),
                 "missing {i}.json in {output:#?}"
             );
         }
@@ -1391,15 +1393,17 @@ mod tests {
             run_main_from(&["--glob", "bar/?.json", "--files"], tmp.path())
                 .success()
                 .code(0);
-        let mut output: HashSet<String> =
+        let mut output: HashSet<PathBuf> =
             String::from_utf8(cmd.get_output().stdout.clone())
                 .expect("failed to get stdout")
                 .lines()
-                .map(std::borrow::ToOwned::to_owned)
+                .map(PathBuf::from)
                 .collect();
         for i in 1..=9 {
+            let mut expected = PathBuf::from("bar");
+            expected.push(format!("{i}.json"));
             assert!(
-                &output.remove(&format!("bar/{i}.json")),
+                &output.remove(&expected),
                 "missing {i}.json in {output:#?}"
             );
         }
