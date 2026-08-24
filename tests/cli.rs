@@ -1318,41 +1318,50 @@ mod tests {
     #[test]
     fn files_returns_all_nested_at_given_dir_path() {
         let tmp = setup_fake_filesystem();
-        let dir = format!("{}/{}", tmp.path().to_str().expect("setup"), "bar");
-        let cmd = run_main(&["--files", &dir]).success().code(0);
-        let mut output: HashSet<String> =
+        let dir = tmp.path().join("bar");
+        let dir_str = dir.to_str().expect("setup");
+        let cmd = run_main(&["--files", dir_str]).success().code(0);
+        let mut output: HashSet<PathBuf> =
             String::from_utf8(cmd.get_output().stdout.clone())
                 .expect("failed to get stdout")
                 .lines()
-                .map(std::borrow::ToOwned::to_owned)
+                .map(PathBuf::from)
                 .collect();
         for i in 1..=10 {
+            let expected = dir.join(format!("{i}.json"));
             assert!(
-                &output.remove(&format!("{dir}/{i}.json")),
+                output.remove(&expected),
                 "missing {i}.json in {output:#?}"
             );
         }
-        assert!(output.is_empty());
+        assert!(
+            output.is_empty(),
+            "expected output exhausted, found remaining: {output:#?}"
+        );
     }
 
     #[test]
     fn files_returns_all_files_with_no_path_args() {
         let tmp = setup_fake_filesystem();
         let cmd = run_main_from(&["--files"], tmp.path()).success().code(0);
-        let mut output: HashSet<String> =
+        let mut output: HashSet<PathBuf> =
             String::from_utf8(cmd.get_output().stdout.clone())
                 .expect("failed to get stdout")
                 .lines()
-                .map(std::borrow::ToOwned::to_owned)
+                .map(PathBuf::from)
                 .collect();
         for i in 1..=10 {
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
             assert!(
-                &output.remove(&format!("bar/{i}.json")),
-                "missing {i}.json in {output:#?}"
+                output.remove(&expected),
+                "missing {} in {output:#?}",
+                expected.display()
             );
         }
-
-        assert!(&output.remove("baz.json"), "missing baz.json in {output:#?}");
+        assert!(
+            output.remove(&PathBuf::from("baz.json")),
+            "missing baz.json in {output:#?}"
+        );
         assert!(
             output.is_empty(),
             "expected output exhausted, found remaining: {output:#?}"
@@ -1373,10 +1382,9 @@ mod tests {
                 .map(PathBuf::from)
                 .collect();
         for i in 1..=5 {
-            let mut expected = PathBuf::from("bar");
-            expected.push(format!("{i}.json"));
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
             assert!(
-                &output.remove(&expected),
+                output.remove(&expected),
                 "missing {i}.json in {output:#?}"
             );
         }
@@ -1400,10 +1408,9 @@ mod tests {
                 .map(PathBuf::from)
                 .collect();
         for i in 1..=9 {
-            let mut expected = PathBuf::from("bar");
-            expected.push(format!("{i}.json"));
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
             assert!(
-                &output.remove(&expected),
+                output.remove(&expected),
                 "missing {i}.json in {output:#?}"
             );
         }
