@@ -28,12 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counts, error-continue behaviour like grep (a bad file is reported and
   the rest still run), and `-l`/`--files-with-matches` to list only files
   containing at least one match.
+  - Directory entries are walked (via `ignore` crate). For example, you can also
+    do `jg 'query' some-dir a.yaml ...`.
 - Property-based test suite (`tests/properties.rs`, using `proptest`):
   parsing never panics on arbitrary or DSL-alphabet input, every parsed
   query compiles to a DFA without panicking, and `Query` display always
   produces parseable syntax that stabilizes under repeated reparse. These
   properties guard the whole input space behind the display round-trip
   fixes below.
+- `-g`/ `--glob` option for filtering directories listed in the file paths.
+- `--files` option for displaying files that would have been searched.
 
 ### Fixed
 

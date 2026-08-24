@@ -26,6 +26,18 @@ fn run_main(args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.assert()
 }
 
+/// Helper function to run the `main` binary with the given arguments and return a
+/// [`assert_cmd::assert::Assert`].
+fn run_main_from(
+    args: &[&str],
+    from: &std::path::Path,
+) -> assert_cmd::assert::Assert {
+    let mut cmd = Command::cargo_bin("jg").expect("Failed to find main binary");
+    cmd.current_dir(from);
+    cmd.args(args);
+    cmd.assert()
+}
+
 /// Write `data` into a temporary file with the given `suffix` (e.g. ".cbor") and return the
 /// [`tempfile::NamedTempFile`] handle. The file stays alive as long as the handle is held.
 fn temp_file_with(suffix: &str, data: &[u8]) -> tempfile::NamedTempFile {
@@ -40,8 +52,11 @@ fn temp_file_with(suffix: &str, data: &[u8]) -> tempfile::NamedTempFile {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashSet, fs, path::PathBuf};
+
     use super::*;
     use serde_json::Value;
+    use tempfile::TempDir;
 
     #[test]
     fn nonexistent_field_simple_query() {
@@ -1278,5 +1293,130 @@ mod tests {
     fn count_and_depth_are_mutually_exclusive() {
         run_main(&["age", SIMPLE_JSON_FILEPATH, "--count", "--depth"])
             .failure();
+    }
+
+    fn setup_fake_filesystem() -> TempDir {
+        // tmp/
+        // * bar/
+        //      * {1-10}.json
+        // * baz.json
+        let tmp = tempfile::TempDir::new().expect("testing");
+        let bar = tmp.path().join("bar");
+        fs::create_dir(&bar).expect("create nested directory");
+        for i in 1..=10 {
+            let _ = fs::File::create(bar.join(format!("{i}.json")));
+        }
+        let _ = fs::File::create(tmp.path().join("baz.json"));
+        tmp
+    }
+
+    #[test]
+    fn files_option_doesnt_require_paths() {
+        run_main(&["--files"]).success();
+    }
+
+    #[test]
+    fn files_returns_all_nested_at_given_dir_path() {
+        let tmp = setup_fake_filesystem();
+        let dir = tmp.path().join("bar");
+        let dir_str = dir.to_str().expect("setup");
+        let cmd = run_main(&["--files", dir_str]).success().code(0);
+        let mut output: HashSet<PathBuf> =
+            String::from_utf8(cmd.get_output().stdout.clone())
+                .expect("failed to get stdout")
+                .lines()
+                .map(PathBuf::from)
+                .collect();
+        for i in 1..=10 {
+            let expected = dir.join(format!("{i}.json"));
+            assert!(
+                output.remove(&expected),
+                "missing {i}.json in {output:#?}"
+            );
+        }
+        assert!(
+            output.is_empty(),
+            "expected output exhausted, found remaining: {output:#?}"
+        );
+    }
+
+    #[test]
+    fn files_returns_all_files_with_no_path_args() {
+        let tmp = setup_fake_filesystem();
+        let cmd = run_main_from(&["--files"], tmp.path()).success().code(0);
+        let mut output: HashSet<PathBuf> =
+            String::from_utf8(cmd.get_output().stdout.clone())
+                .expect("failed to get stdout")
+                .lines()
+                .map(PathBuf::from)
+                .collect();
+        for i in 1..=10 {
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
+            assert!(
+                output.remove(&expected),
+                "missing {} in {output:#?}",
+                expected.display()
+            );
+        }
+        assert!(
+            output.remove(&PathBuf::from("baz.json")),
+            "missing baz.json in {output:#?}"
+        );
+        assert!(
+            output.is_empty(),
+            "expected output exhausted, found remaining: {output:#?}"
+        );
+    }
+
+    #[test]
+    fn glob_filters_output_files() {
+        let tmp = setup_fake_filesystem();
+        let cmd =
+            run_main_from(&["--glob", "bar/[1-5].json", "--files"], tmp.path())
+                .success()
+                .code(0);
+        let mut output: HashSet<PathBuf> =
+            String::from_utf8(cmd.get_output().stdout.clone())
+                .expect("failed to get stdout")
+                .lines()
+                .map(PathBuf::from)
+                .collect();
+        for i in 1..=5 {
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
+            assert!(
+                output.remove(&expected),
+                "missing {i}.json in {output:#?}"
+            );
+        }
+        assert!(
+            output.is_empty(),
+            "expected output exhausted, found remaining: {output:#?}"
+        );
+    }
+
+    #[test]
+    fn glob_filters_output_files_single_char_filename() {
+        let tmp = setup_fake_filesystem();
+        let cmd =
+            run_main_from(&["--glob", "bar/?.json", "--files"], tmp.path())
+                .success()
+                .code(0);
+        let mut output: HashSet<PathBuf> =
+            String::from_utf8(cmd.get_output().stdout.clone())
+                .expect("failed to get stdout")
+                .lines()
+                .map(PathBuf::from)
+                .collect();
+        for i in 1..=9 {
+            let expected = PathBuf::from("bar").join(format!("{i}.json"));
+            assert!(
+                output.remove(&expected),
+                "missing {i}.json in {output:#?}"
+            );
+        }
+        assert!(
+            output.is_empty(),
+            "expected output exhausted, found remaining: {output:#?}"
+        );
     }
 }

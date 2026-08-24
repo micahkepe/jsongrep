@@ -346,25 +346,27 @@ Commands:
 
 Arguments:
   [QUERY]    Query string (e.g., "**.name")
-  [FILE]...  Optional path(s) to file(s). If omitted, reads from STDIN
+  [FILE]...  Optional path(s) to file(s). If omitted, reads from STDIN. With multiple files, the query is compiled once and run against each file, with a file heading before each file's matches
 
 Options:
-  -i, --ignore-case      Case insensitive search
-      --compact          Do not pretty-print the JSON output
-  -r, --raw-output       Print matched strings without JSON quotes or escaping (like `jq -r`)
-      --count            Display count of number of matches
-      --depth            Display depth of the input document
-      --porcelain        Machine-readable output: strip labels and colors (useful for piping)
-  -n, --no-display       Do not display matched JSON values
-  -F, --fixed-string     Treat the query as a literal field name and search at any depth
-  -q, --quiet            Write nothing to stdout; communicate via the exit status only
-  -l, --files-with-matches  Print only the names of files containing at least one match
-  -m, --max-count <NUM>  Stop searching after NUM matches per input file
-      --with-path        Always print the path header, even when output is piped
-      --no-path          Never print the path header, even in a terminal
-  -f, --format <FORMAT>  Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
-  -h, --help             Print help (see more with '--help')
-  -V, --version          Print version
+  -g, --glob <GLOB>         Include or exclude files and directories for searching that match the given glob
+      --files               Prints the files that will be searched
+  -l, --files-with-matches  Print only the names of files containing at least one match (like `grep -l`)
+  -i, --ignore-case         Case insensitive search
+      --compact             Do not pretty-print the JSON output
+  -r, --raw-output          Print matched strings without JSON quotes or escaping (like `jq -r`)
+      --count               Display count of number of matches
+      --depth               Display depth of the input document
+      --porcelain           Machine-readable output: strip labels and colors, print one JSON value per line (implies --compact)
+  -n, --no-display          Do not display matched JSON values
+  -F, --fixed-string        Treat the query as a literal field name and search at any depth
+  -m, --max-count <NUM>     Stop searching after NUM matches per input file
+      --with-path           Always print the path header, even when output is piped
+      --no-path             Never print the path header, even in a terminal
+  -q, --quiet               Quiet: write nothing to stdout; communicate via the exit status only (errors still print to stderr)
+  -f, --format <FORMAT>     Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
+  -h, --help                Print help (see more with '--help')
+  -V, --version             Print version
 ```
 
 ### More CLI Examples
