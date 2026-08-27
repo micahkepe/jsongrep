@@ -21,9 +21,9 @@ use std::{
 };
 
 use jsongrep::{
+    cli::{WriteOptions, depth, write_colored_result},
     commands,
     query::{Query, QueryDFA},
-    utils::{WriteOptions, depth, write_colored_result},
 };
 
 /// Query an input JSON document against a jsongrep query.

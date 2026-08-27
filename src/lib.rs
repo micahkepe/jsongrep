@@ -107,9 +107,9 @@ You can try queries interactively in the [playground](https://micahkepe.com/json
 [`dfa`]: crate::query::dfa
 [`query`]: crate::query
 */
+pub mod cli;
 pub mod commands;
 pub mod query;
-pub mod utils;
 
 /// Re-export [`serde_json_borrow::Value`] so downstream users don't need to
 /// depend on `serde_json_borrow` directly.
