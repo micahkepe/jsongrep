@@ -1189,6 +1189,143 @@ mod tests {
         assert_eq!(output.trim(), json_reference("name.last").trim(),);
     }
 
+    // ==============================================================================
+    // Output format (--output / -o) tests
+    // ==============================================================================
+
+    #[test]
+    fn output_json_is_default() {
+        let default = query_stdin_output(
+            &["name", "--no-path", "--compact"],
+            r#"{"name": "Ada"}"#,
+        );
+        let explicit = query_stdin_output(
+            &["-o", "json", "name", "--no-path", "--compact"],
+            r#"{"name": "Ada"}"#,
+        );
+        assert_eq!(default, explicit);
+    }
+
+    #[test]
+    fn output_jsonl_one_value_per_line() {
+        let output = query_stdin_output(
+            &["-o", "jsonl", "*", "--no-path"],
+            r#"{"a": 1, "b": "two"}"#,
+        );
+        for line in output.lines() {
+            serde_json::from_str::<Value>(line)
+                .expect("each -o jsonl line must be valid JSON");
+        }
+        assert_eq!(output.lines().count(), 2);
+    }
+
+    #[test]
+    fn output_yaml_scalar() {
+        let output = query_stdin_output(
+            &["-o", "yaml", "name", "--no-path"],
+            r#"{"name": "Ada"}"#,
+        );
+        assert_eq!(output.trim(), "Ada");
+    }
+
+    #[test]
+    fn output_yaml_object() {
+        let output = query_stdin_output(
+            &["-o", "yaml", "user", "--no-path"],
+            r#"{"user": {"name": "Ada", "age": 30}}"#,
+        );
+        assert!(output.contains("name: Ada"));
+        assert!(output.contains("age: 30"));
+    }
+
+    #[test]
+    fn output_toml_object() {
+        let output = query_stdin_output(
+            &["-o", "toml", "server", "--no-path"],
+            r#"{"server": {"host": "localhost", "port": 8080}}"#,
+        );
+        assert!(output.contains("host = \"localhost\""));
+        assert!(output.contains("port = 8080"));
+    }
+
+    #[test]
+    fn output_toml_rejects_non_table() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-o", "toml", "name", "--no-path"])
+            .write_stdin(r#"{"name": "Ada"}"#)
+            .assert()
+            .failure()
+            .code(2);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone())
+            .expect("Invalid UTF-8 output");
+        assert!(
+            stderr.contains("table"),
+            "TOML non-table error should mention 'table', got: {stderr:?}"
+        );
+    }
+
+    #[test]
+    fn output_cbor_round_trip() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-o", "cbor", "user", "--no-path"])
+            .write_stdin(r#"{"user": {"name": "Ada", "age": 30}}"#)
+            .assert()
+            .success();
+        let cbor_bytes = assert.get_output().stdout.clone();
+        // No trailing newline in binary output.
+        assert!(
+            !cbor_bytes.ends_with(b"\n"),
+            "binary CBOR output must not have trailing newline"
+        );
+        // Round-trip: decode CBOR back through jg.
+        let output = query_stdin_output(
+            &["-f", "cbor", "name", "--no-path", "--compact"],
+            cbor_bytes,
+        );
+        assert_eq!(output.trim(), r#""Ada""#);
+    }
+
+    #[test]
+    fn output_msgpack_round_trip() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-o", "msgpack", "user", "--no-path"])
+            .write_stdin(r#"{"user": {"name": "Ada", "age": 30}}"#)
+            .assert()
+            .success();
+        let mp_bytes = assert.get_output().stdout.clone();
+        assert!(
+            !mp_bytes.ends_with(b"\n"),
+            "binary MessagePack output must not have trailing newline"
+        );
+        let output = query_stdin_output(
+            &["-f", "msgpack", "name", "--no-path", "--compact"],
+            mp_bytes,
+        );
+        assert_eq!(output.trim(), r#""Ada""#);
+    }
+
+    #[test]
+    fn output_binary_skips_path_header() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-o", "cbor", "a", "--with-path"])
+            .write_stdin(r#"{"a": 1}"#)
+            .assert()
+            .success();
+        let bytes = assert.get_output().stdout.clone();
+        assert!(
+            !bytes.windows(2).any(|w| w == b"a:"),
+            "binary output must not include path headers"
+        );
+    }
+
     // ---------- Negative / error cases ----------
 
     #[test]
