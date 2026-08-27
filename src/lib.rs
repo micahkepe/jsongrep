@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![expect(rustdoc::private_intra_doc_links)]
 /*!
 A query language for JSON data that searches for matching **regular** paths in
@@ -48,10 +48,11 @@ The corresponding tree structure would be the root node, with three edges:
 edge would point to a node with three edges of the array access `[0]`, `[1]`,
 and `[2]`, which point to the numbers `1`, `2`, and `3`, respectively.
 
-To query the JSON document, the query and document are both parsed into intermediary
-ASTs. The query AST is then used to construct first a non-deterministic finite
-automaton (NFA) which is then determinized into a deterministic finite automaton
-(DFA) that can be directly simulated against the input JSON document.
+To query the JSON document, the query and document are both parsed into
+intermediary ASTs. The query AST is then used to construct first a
+non-deterministic finite automaton (NFA) which is then determinized into a
+deterministic finite automaton (DFA) that can be directly simulated against the
+input JSON document.
 
 For more details on the automaton constructions, see the [`dfa`] and
 [`nfa`] modules of the [`query`] module.
@@ -82,7 +83,8 @@ Here are some example queries and their meanings:
 
 - `name`: Matches the `name` field in the root object (e.g., ```"John Doe"```).
 - `address.street`: Matches the `street` field inside the `address` object.
-- `address.*`: Matches any field in the `address` object (e.g., `street`, `city`, etc.).
+- `address.*`: Matches any field in the `address` object (e.g., `street`,
+  `city`, etc.).
 - `address.[*]`: Matches all elements in an array if `address` were an array.
 - `(name|age)`: Matches either the `name` or `age` field in the root object.
 - `address.([*] | *)*`: Matches any value at any depth under `address`.
