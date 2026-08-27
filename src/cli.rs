@@ -255,29 +255,6 @@ impl std::fmt::Display for Format {
     }
 }
 
-/// Detect a format from the file extension, else use `JSON` or the explicit
-/// format if given.
-#[must_use]
-pub fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
-    // Use explicit if user overrode the default.
-    if !matches!(explicit, Format::Auto) {
-        return explicit;
-    }
-    let Some(path) = path else {
-        // NOTE: we don't support streaming type inference, maybe someday
-        return Format::Json;
-    };
-
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("ndjson" | "jsonl") => Format::Jsonl,
-        Some("yaml" | "yml") => Format::Yaml,
-        Some("msgpack" | "mp") => Format::Msgpack,
-        Some("toml") => Format::Toml,
-        Some("cbor") => Format::Cbor,
-        _ => Format::Json,
-    }
-}
-
 /// Parse JSONL/NDJSON input line by line into a single top-level array,
 /// borrowing each record directly from the input buffer.
 ///
