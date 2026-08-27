@@ -353,7 +353,7 @@ Options:
       --files               Prints the files that will be searched
   -l, --files-with-matches  Print only the names of files containing at least one match (like `grep -l`)
   -i, --ignore-case         Case insensitive search
-      --compact             Do not pretty-print the JSON output
+      --compact             Do not pretty-print JSON output (ignored for non-JSON output formats)
   -r, --raw-output          Print matched strings without JSON quotes or escaping (like `jq -r`)
       --count               Display count of number of matches
       --depth               Display depth of the input document
@@ -365,6 +365,7 @@ Options:
       --no-path             Never print the path header, even in a terminal
   -q, --quiet               Quiet: write nothing to stdout; communicate via the exit status only (errors still print to stderr)
   -f, --format <FORMAT>     Input format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
+  -o, --output <OUTPUT>     Output format (auto-detects from file extension if omitted) [default: auto] [possible values: auto, json, jsonl, yaml, toml, cbor, msgpack]
   -h, --help                Print help (see more with '--help')
   -V, --version             Print version
 ```

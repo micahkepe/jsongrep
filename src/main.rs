@@ -76,7 +76,7 @@ struct Args {
     /// Case insensitive search.
     #[arg(short, long, action = ArgAction::SetTrue)]
     ignore_case: bool,
-    /// Do not pretty-print the JSON output.
+    /// Do not pretty-print JSON output (ignored for non-JSON output formats).
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
     /// Print matched strings without JSON quotes or escaping (like `jq -r`).
