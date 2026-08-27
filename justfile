@@ -10,7 +10,7 @@ bench: bench-download
     cargo bench --bench query
 
 # Download data for the Criterion benchmarks.
-bench-download:
+bench-download: update-submodules
   #!/usr/bin/env bash
   mkdir -p benches/data
   if [[ ! -f "{{justfile_directory()}}/benches/data/citylots.json" ]]; then

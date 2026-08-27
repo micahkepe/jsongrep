@@ -34,7 +34,7 @@ clap_mangen = "0.2.29"
 clap_complete = "4.5.57"
 memmap2 = "0.9.9"
 colored = "3.1.1"
-serde_yaml = { version = "0.9", optional = true }
+yaml_serde = { version = "0.10.7", optional = true }
 toml = { version = "0.8", optional = true }
 ciborium = { version = "0.2", optional = true }
 rmp-serde = { version = "1", optional = true }
@@ -44,7 +44,7 @@ ignore = "0.4.33"
 
 [features]
 default = ["all-formats"]
-yaml = ["dep:serde_yaml"]
+yaml = ["dep:yaml_serde"]
 toml = ["dep:toml"]
 cbor = ["dep:ciborium"]
 msgpack = ["dep:rmp-serde"]

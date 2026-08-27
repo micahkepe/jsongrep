@@ -8,23 +8,28 @@ use clap_complete::generate;
 use colored::Colorize;
 use globset::Glob;
 use ignore::WalkBuilder;
-use memmap2::{Mmap, MmapOptions};
-use serde_json_borrow::Value;
 use std::{
     collections::HashSet,
-    fs::OpenOptions,
-    io::{
-        self, BufWriter, ErrorKind, IsTerminal as _, Read as _, Write, stdout,
-    },
+    io::{self, BufWriter, ErrorKind, IsTerminal as _, Write, stdout},
     path::PathBuf,
-    str::Utf8Error,
 };
 
 use jsongrep::{
+    cli::{
+        Format, WriteOptions, depth, is_broken_pipe, with_json,
+        write_colored_result,
+    },
     commands,
     query::{Query, QueryDFA},
-    utils::{WriteOptions, depth, write_colored_result},
 };
+
+/// Ceiling on DFA states during query compilation. Subset construction is
+/// worst-case exponential in the query length, so a short adversarial query
+/// could otherwise consume unbounded time and memory; past this budget `jg`
+/// reports "query is too complex" instead. 2^18 states keeps the worst-case
+/// abort around a second while remaining orders of magnitude beyond any
+/// realistic query (which needs tens of states).
+const DEFAULT_MAX_DFA_STATES: usize = 1 << 18;
 
 /// Query an input JSON document against a jsongrep query.
 #[derive(Parser)]
@@ -71,7 +76,7 @@ struct Args {
     /// Case insensitive search.
     #[arg(short, long, action = ArgAction::SetTrue)]
     ignore_case: bool,
-    /// Do not pretty-print the JSON output.
+    /// Do not pretty-print JSON output (ignored for non-JSON output formats).
     #[arg(long, action = ArgAction::SetTrue)]
     compact: bool,
     /// Print matched strings without JSON quotes or escaping (like `jq -r`).
@@ -124,6 +129,9 @@ struct Args {
     /// Input format (auto-detects from file extension if omitted).
     #[arg(short = 'f', long, default_value = "auto")]
     format: Format,
+    /// Output format (auto-detects from file extension if omitted).
+    #[arg(short = 'o', long, default_value = "auto")]
+    output: Format,
 }
 
 /// Available subcommands for `jg`.
@@ -146,309 +154,6 @@ enum GenerateCommand {
         #[clap(short, long)]
         output_dir: Option<PathBuf>,
     },
-}
-
-/// Minimum file size for which memory-mapping is attempted.
-///
-/// For small files, it is likely that a single read call is at least as fast or
-/// faster than mmap (mmap setup and page-fault overhead dominate for small
-/// files) and avoids mmap's file-truncation hazards.
-///
-/// NOTE: with recursive directory walking now in place, consider skipping mmap
-/// for multi-file walks (per-file syscall overhead adds up) and reserving it
-/// for single large files.
-///
-/// See: <https://burntsushi.net/ripgrep/#mechanics>.
-const MMAP_MIN_FILE_SIZE: u64 = 1 << 20; // 1 MiB
-
-/// Ceiling on DFA states during query compilation. Subset construction is
-/// worst-case exponential in the query length, so a short adversarial query
-/// could otherwise consume unbounded time and memory; past this budget `jg`
-/// reports "query is too complex" instead. 2^18 states keeps the worst-case
-/// abort around a second while remaining orders of magnitude beyond any
-/// realistic query (which needs tens of states).
-const DEFAULT_MAX_DFA_STATES: usize = 1 << 18;
-
-/// Possible input sources for jsongrep.
-///
-/// Input is kept as raw bytes so that binary formats (CBOR, `MessagePack`)
-/// work from any source; UTF-8 is validated only when a text format needs
-/// it.
-enum Input {
-    /// Fully buffered input: stdin, small files, non-regular files (FIFOs,
-    /// process substitution), and the fallback when mmap fails.
-    Buffer(Vec<u8>),
-    /// A memory-mapped file from the file system. Assumes an immutable handle.
-    File(Mmap),
-}
-
-impl Input {
-    fn to_str(&self) -> Result<&str, Utf8Error> {
-        str::from_utf8(self.to_bytes())
-    }
-
-    fn to_bytes(&self) -> &[u8] {
-        match self {
-            Self::Buffer(buf) => buf.as_slice(),
-            Self::File(mmap) => mmap.as_ref(),
-        }
-    }
-
-    fn to_json_string(&self, format: Format) -> Result<String> {
-        match format {
-            // YAML
-            #[cfg(feature = "yaml")]
-            Format::Yaml => {
-                let text = self.to_str().map_err(|_| {
-                    anyhow::anyhow!("YAML input is not valid UTF-8")
-                })?;
-                let value: serde_json::Value =
-                    serde_yaml::from_str(text).context("parse YAML input")?;
-                serde_json::to_string(&value).context("serialize YAML as JSON")
-            }
-            #[cfg(not(feature = "yaml"))]
-            Format::Yaml => {
-                anyhow::bail!(
-                    "YAML support not enabled. Rebuild with --features yaml"
-                )
-            }
-
-            // TOML
-            #[cfg(feature = "toml")]
-            Format::Toml => {
-                let text = self.to_str().map_err(|_| {
-                    anyhow::anyhow!("TOML input is not valid UTF-8")
-                })?;
-                let value: serde_json::Value =
-                    toml::from_str(text).context("parse TOML input")?;
-                serde_json::to_string(&value).context("serialize TOML as JSON")
-            }
-            #[cfg(not(feature = "toml"))]
-            Format::Toml => {
-                anyhow::bail!(
-                    "TOML support not enabled. Rebuild with --features toml"
-                )
-            }
-
-            // CBOR
-            #[cfg(feature = "cbor")]
-            Format::Cbor => {
-                let value: serde_json::Value =
-                    ciborium::from_reader(self.to_bytes())
-                        .context("parse CBOR input")?;
-                serde_json::to_string(&value).context("serialize CBOR as JSON")
-            }
-            #[cfg(not(feature = "cbor"))]
-            Format::Cbor => {
-                anyhow::bail!(
-                    "CBOR support not enabled. Rebuild with --features cbor"
-                )
-            }
-
-            // MESSAGEPACK
-            #[cfg(feature = "msgpack")]
-            Format::Msgpack => {
-                let value: serde_json::Value =
-                    rmp_serde::from_slice(self.to_bytes())
-                        .context("parse MessagePack input")?;
-                serde_json::to_string(&value)
-                    .context("serialize MessagePack as JSON")
-            }
-            #[cfg(not(feature = "msgpack"))]
-            Format::Msgpack => {
-                anyhow::bail!(
-                    "MessagePack support not enabled. Rebuild with --features msgpack"
-                )
-            }
-
-            // Unreachable, someone made an oopsie
-            // (JSONL is parsed per line in `parse_jsonl`, borrowing from the
-            // input buffer, so it never goes through this owned-string path.)
-            Format::Auto | Format::Json | Format::Jsonl => {
-                unreachable!(
-                    "to_json_string called with Auto, Json, or Jsonl, not needed"
-                )
-            }
-        }
-    }
-}
-
-/// Whether any error in the chain is a broken pipe (the downstream consumer
-/// of stdout has gone away), which is a signal to stop printing, not an
-/// input-file failure.
-fn is_broken_pipe(err: &anyhow::Error) -> bool {
-    err.chain().any(|cause| {
-        cause
-            .downcast_ref::<io::Error>()
-            .is_some_and(|io_err| io_err.kind() == ErrorKind::BrokenPipe)
-    })
-}
-
-/// Parse input content, from the input path buffer if provided, else try STDIN.
-///
-/// # Errors
-///
-/// Returns early with an error if the file cannot be opened or read. If the
-/// input is not a file or piped input, prints the help message and exits with
-/// an error.
-fn parse_input_content(input: Option<PathBuf>) -> Result<Input> {
-    if let Some(path) = input {
-        let mut fd =
-            OpenOptions::new().read(true).open(&path).with_context(|| {
-                format!("Failed to open file {}", path.display())
-            })?;
-
-        // Only mmap large regular files. Non-regular files (FIFOs, process
-        // substitution like `jg q <(curl ...)`, character devices) cannot be
-        // mapped, and small files gain nothing from mapping. If mapping
-        // fails anyway, fall back to a plain read instead of erroring.
-        let metadata = fd.metadata().ok();
-        let is_large_regular_file = metadata
-            .as_ref()
-            .is_some_and(|m| m.is_file() && m.len() >= MMAP_MIN_FILE_SIZE);
-
-        if is_large_regular_file {
-            // SAFETY:
-            // mmap is unsafe if the backing file is modified, either by
-            // ourselves or by other processes. We will never modify the
-            // file, and if other processes do, there is not much we can do
-            // about it.
-            if let Ok(map) = unsafe { MmapOptions::new().map(&fd) } {
-                return Ok(Input::File(map));
-            }
-        }
-
-        // Capacity hint capped at the mmap threshold: only files below it
-        // (or rare mmap fallbacks) reach this path, and a stale/huge stat
-        // length must not trigger a giant allocation.
-        let capacity_hint = metadata
-            .map_or(0, |m| m.len().min(MMAP_MIN_FILE_SIZE))
-            .try_into()
-            .unwrap_or(0);
-        let mut buffer = Vec::with_capacity(capacity_hint);
-        fd.read_to_end(&mut buffer).with_context(|| {
-            format!("Failed to read file {}", path.display())
-        })?;
-        Ok(Input::Buffer(buffer))
-    } else {
-        if io::stdin().is_terminal() {
-            // No piped input and no file specified
-            let mut cmd = Args::command();
-            cmd.print_help()?;
-            anyhow::bail!("No input specified");
-        }
-        // Read raw bytes: binary formats (CBOR, MessagePack) are valid
-        // stdin inputs; UTF-8 is only required (and validated) for text
-        // formats.
-        let mut buffer = Vec::new();
-        io::stdin().read_to_end(&mut buffer)?;
-        Ok(Input::Buffer(buffer))
-    }
-}
-
-/// Supported input formats beyond JSON.
-#[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]
-enum Format {
-    #[default]
-    Auto,
-    Json,
-    Jsonl,
-    Yaml,
-    Toml,
-    Cbor,
-    Msgpack,
-}
-
-impl std::fmt::Display for Format {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Auto => write!(f, "Auto"),
-            Self::Json => write!(f, "JSON"),
-            Self::Jsonl => write!(f, "JSONL"),
-            Self::Yaml => write!(f, "YAML"),
-            Self::Toml => write!(f, "TOML"),
-            Self::Cbor => write!(f, "CBOR"),
-            Self::Msgpack => write!(f, "MessagePack"),
-        }
-    }
-}
-
-fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
-    // Use explicit if user overrode the default.
-    if !matches!(explicit, Format::Auto) {
-        return explicit;
-    }
-    let Some(path) = path else {
-        // NOTE: we don't support streaming type inference, maybe someday
-        return Format::Json;
-    };
-
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("ndjson" | "jsonl") => Format::Jsonl,
-        Some("yaml" | "yml") => Format::Yaml,
-        Some("msgpack" | "mp") => Format::Msgpack,
-        Some("toml") => Format::Toml,
-        Some("cbor") => Format::Cbor,
-        _ => Format::Json,
-    }
-}
-
-/// Parse JSONL/NDJSON input line by line into a single top-level array,
-/// borrowing each record directly from the input buffer.
-///
-/// Compared to concatenating all lines into a synthetic `[...]` JSON string
-/// and re-parsing it, this avoids a second full-input-sized allocation and
-/// reports parse errors with the actual line number of the offending record.
-fn parse_jsonl(text: &str) -> Result<Value<'_>> {
-    let mut records = Vec::new();
-    for (idx, line) in text.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let record: Value = serde_json::from_str(line).with_context(|| {
-            format!("Failed to parse JSONL line {}", idx + 1)
-        })?;
-        records.push(record);
-    }
-    Ok(Value::Array(records))
-}
-
-/// Parses the input and invokes `f` with a borrowed [`Value`] to preserve zero-copy path for
-/// JSON/Auto and JSONL `Format`s.
-fn with_json<F, T>(input: Option<PathBuf>, format: Format, f: F) -> Result<T>
-where
-    F: FnOnce(&Value) -> Result<T>,
-{
-    let input_content = parse_input_content(input)?;
-
-    // For JSON/Auto we borrow directly from the mmap/stdin buffer,
-    // preserving the zero-copy path that serde_json_borrow provides. JSONL
-    // is parsed per line, likewise borrowing from the input buffer. For
-    // other formats, we convert to an owned JSON string first and then
-    // borrow from that.
-    match format {
-        Format::Json | Format::Auto => {
-            let json_str =
-                input_content.to_str().context("Input is not valid UTF-8")?;
-            let json: Value = serde_json::from_str(json_str)
-                .with_context(|| format!("Failed to parse as {format}"))?;
-            f(&json)
-        }
-        Format::Jsonl => {
-            let text = input_content.to_str().map_err(|_| {
-                anyhow::anyhow!("JSONL input is not valid UTF-8")
-            })?;
-            let json = parse_jsonl(text)?;
-            f(&json)
-        }
-        other => {
-            let json_string_owned = input_content.to_json_string(other)?;
-            let json: Value = serde_json::from_str(&json_string_owned)
-                .with_context(|| format!("Failed to parse as {format}"))?;
-            f(&json)
-        }
-    }
 }
 
 /// Entry point for main binary.
@@ -717,7 +422,7 @@ fn run(mut args: Args) -> Result<bool> {
 
                     if args.files_with_matches {
                         if !results.is_empty() {
-                            writeln!(writer, "{name}")?;
+                            writeln!(writer, "{}", name.magenta())?;
                         }
                         return Ok(());
                     }
@@ -789,6 +494,7 @@ fn run(mut args: Args) -> Result<bool> {
                                     pretty,
                                     show_path,
                                     raw: args.raw_output,
+                                    output_format: args.output,
                                 },
                             )?;
                         }
@@ -837,4 +543,26 @@ fn run(mut args: Args) -> Result<bool> {
     }
 
     Ok(matched)
+}
+
+/// Detect a format from the file extension, else use `JSON` or the explicit
+/// format if given.
+fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
+    // Use explicit if user overrode the default.
+    if !matches!(explicit, Format::Auto) {
+        return explicit;
+    }
+    let Some(path) = path else {
+        // NOTE: we don't support streaming type inference, maybe someday
+        return Format::Json;
+    };
+
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("ndjson" | "jsonl") => Format::Jsonl,
+        Some("yaml" | "yml") => Format::Yaml,
+        Some("msgpack" | "mp") => Format::Msgpack,
+        Some("toml") => Format::Toml,
+        Some("cbor") => Format::Cbor,
+        _ => Format::Json,
+    }
 }
