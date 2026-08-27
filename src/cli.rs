@@ -233,6 +233,14 @@ pub enum Format {
     Msgpack,
 }
 
+impl Format {
+    /// Whether this format produces binary (non-text) output.
+    #[must_use]
+    pub const fn is_binary(self) -> bool {
+        matches!(self, Self::Cbor | Self::Msgpack)
+    }
+}
+
 impl std::fmt::Display for Format {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -371,10 +379,9 @@ pub fn write_colored_result<W: Write>(
     path: &[PathType],
     options: &WriteOptions,
 ) -> anyhow::Result<bool> {
+    let binary = options.output_format.is_binary();
     let result = (|| -> io::Result<()> {
-        if options.show_path && !path.is_empty() {
-            // Only pay for building the joined path string when it is
-            // actually shown.
+        if !binary && options.show_path && !path.is_empty() {
             let mut header = String::new();
             for (i, part) in path.iter().enumerate() {
                 if i > 0 {
@@ -387,14 +394,13 @@ pub fn write_colored_result<W: Write>(
         if options.raw
             && let Value::Str(s) = value
         {
-            // Raw output: the string's contents, not its JSON encoding.
-            // Escape sequences in the source (e.g. \n) have already been
-            // decoded by the JSON parser, so this writes real newlines etc.
             write!(writer, "{s}")?;
         } else {
             write_value(writer, value, options)?;
         }
-        writeln!(writer)?;
+        if !binary {
+            writeln!(writer)?;
+        }
         Ok(())
     })();
 
@@ -433,7 +439,16 @@ fn write_value<W: Write>(
         )),
         #[cfg(feature = "toml")]
         Format::Toml => {
-            let s = toml::to_string(value)
+            let owned: serde_json::Value = serde_json::to_value(value)
+                .map_err(|e| io::Error::new(ErrorKind::InvalidData, e))?;
+            if !owned.is_object() {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    "TOML output requires a table (object) value; \
+                     this match is a non-table type",
+                ));
+            }
+            let s = toml::to_string(&owned)
                 .map_err(|e| io::Error::new(ErrorKind::InvalidData, e))?;
             write!(writer, "{}", s.trim_end())
         }
