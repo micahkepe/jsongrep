@@ -422,7 +422,7 @@ fn run(mut args: Args) -> Result<bool> {
 
                     if args.files_with_matches {
                         if !results.is_empty() {
-                            writeln!(writer, "{name}")?;
+                            writeln!(writer, "{}", name.magenta())?;
                         }
                         return Ok(());
                     }
