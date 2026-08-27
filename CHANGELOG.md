@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixes below.
 - `-g`/ `--glob` option for filtering directories listed in the file paths.
 - `--files` option for displaying files that would have been searched.
+- `-o, --output <OUTPUT>` option for output format of results.
 
 ### Fixed
 
@@ -178,8 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.jsonl`, `.ndjson`, `.cbor`, `.msgpack`, `.mp`)
 - Feature flags for optional format dependencies (`yaml`, `toml`, `cbor`,
   `msgpack`), all enabled by default via `all-formats`
-- JSONL/NDJSON support with no extra dependencies &rarr; lines are wrapped into a
-  JSON array where array indices map to line numbers
+- JSONL/NDJSON support with no extra dependencies &rarr; lines are wrapped into
+  a JSON array where array indices map to line numbers
 - `Display` impl for `Format` enum for user-facing error messages
 - Homebrew formula auto-bump workflow on release
 - CI: `--no-default-features` build check and `cargo fmt --check`
@@ -318,7 +319,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Internal
 
 - Refactored test utilities to use `serde_json::Map` instead of `HashMap`
-- Moved `depth()` function from `JSONValue` method to standalone function in `lib.rs`
+- Moved `depth()` function from `JSONValue` method to standalone function in
+  `lib.rs`
 - Cleaned up type conversions throughout the codebase
 
 ## [0.2.0] - 2025-08-14
