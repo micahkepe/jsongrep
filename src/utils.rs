@@ -165,7 +165,6 @@ fn write_colored_json<W: Write>(
 }
 
 #[cfg(test)]
-#[expect(clippy::unwrap_used, reason = "Unit testing.")]
 mod tests {
     use super::*;
 

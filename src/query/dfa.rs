@@ -1045,7 +1045,6 @@ impl DFAQueryEngine {
 }
 
 #[cfg(test)]
-#[expect(clippy::unwrap_used, reason = "Unit testing.")]
 mod tests {
     use anyhow::Context;
     use std::borrow::Cow;
