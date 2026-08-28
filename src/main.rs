@@ -202,18 +202,21 @@ fn run(mut args: Args) -> Result<bool> {
     }
 
     match args.command {
-        Some(Commands::Generate(cmd)) => match cmd {
-            GenerateCommand::Shell { shell } => {
-                let mut cmd = Args::command();
-                generate(shell, &mut cmd, "jg", &mut stdout().lock());
+        Some(Commands::Generate(cmd)) => {
+            match cmd {
+                GenerateCommand::Shell { shell } => {
+                    let mut cmd = Args::command();
+                    generate(shell, &mut cmd, "jg", &mut stdout().lock());
+                }
+                GenerateCommand::Man { output_dir } => {
+                    commands::generate::generate_man_pages(
+                        &Args::command(),
+                        output_dir,
+                    )?;
+                }
             }
-            GenerateCommand::Man { output_dir } => {
-                commands::generate::generate_man_pages(
-                    &Args::command(),
-                    output_dir,
-                )?;
-            }
-        },
+            return Ok(true);
+        }
         None => {
             // NOTE: use single, locked stdout handle to avoid interleaving
             let stdout = stdout().lock();

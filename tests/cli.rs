@@ -1557,3 +1557,26 @@ mod tests {
         );
     }
 }
+
+#[test]
+fn generate_shell_bash_exits_success() {
+    run_main(&["generate", "shell", "bash"]).success().code(0);
+}
+
+#[test]
+fn generate_shell_zsh_exits_success() {
+    run_main(&["generate", "shell", "zsh"]).success().code(0);
+}
+
+#[test]
+fn generate_shell_fish_exits_success() {
+    run_main(&["generate", "shell", "fish"]).success().code(0);
+}
+
+#[test]
+fn generate_man_exits_success() {
+    let tmp = tempfile::tempdir().expect("failed to create temp dir");
+    run_main(&["generate", "man", "-o", tmp.path().to_str().unwrap()])
+        .success()
+        .code(0);
+}
