@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-27
+
 ### Added
 
 - Bounded DFA compilation for untrusted queries:
@@ -36,9 +38,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produces parseable syntax that stabilizes under repeated reparse. These
   properties guard the whole input space behind the display round-trip
   fixes below.
+- `-m`/`--max-count <NUM>`: stop searching after NUM matches per input
+  file. Each document's traversal terminates as soon as its limit is
+  reached, so `--max-count 1` on a large document only pays for the work
+  up to the first match.
+- `QueryDFA::find_limited` and `QueryDFA::for_each_match` public API
+  methods for bounded and streaming query execution without materializing
+  all matches.
 - `-g`/ `--glob` option for filtering directories listed in the file paths.
 - `--files` option for displaying files that would have been searched.
 - `-o, --output <OUTPUT>` option for output format of results.
+- Nix flake for `nix build` / `nix run` / `nix develop` (using
+  [crane](https://crane.dev)).
 
 ### Fixed
 
@@ -83,6 +94,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the identity of concatenation), instead of emitting unparseable forms
   like `foo..bar` for a hand-built sequence containing an empty
   subsequence.
+- Reading from process substitution (`jg query <(curl ...)`) and FIFOs
+  now works; previously mmap was attempted on non-regular files, which
+  silently failed. Input is now read as raw bytes with a fallback to
+  buffered reads for non-regular or small files.
 
 ### Breaking
 
@@ -101,6 +116,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--depth` now takes only file arguments (`jg --depth file...`).
 - Removed `QueryDFA::index_in_range`.
 
+### Performance
+
+- DFA document traversal rewritten as a visitor with `ControlFlow`-based early
+  exit; `find_limited` and `for_each_match` stop traversing as soon as the
+  caller is satisfied.
+- Subset construction reworked around fixed-width bitsets and a precomputed
+  label-to-symbol table, eliminating per-symbol work in the inner loop.
+- Per-key `Rc<String>` allocations eliminated on the document-walk hot path;
+  field lookups now probe the key map with a borrowed `&str` and reuse the
+  interned alphabet `Rc` for matched path elements.
+- JSONL parsing reworked to parse each line independently instead of building a
+  synthetic `[...]` JSON string, avoiding a second full-input-sized allocation.
+- Broken-pipe handling moved into `write_colored_result` so the caller stops
+  formatting remaining results immediately.
+
 ### Changed
 
 - CI now tests on macOS and Windows in addition to Ubuntu (the platforms
@@ -115,6 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   actions are pinned to commit SHAs, including the Homebrew bump action
   which holds a push-capable PAT and was previously pinned to a moving
   branch; checkout action unified to v6.
+- CI adds `cargo-deny` for supply chain auditing; security advisories
+  RUSTSEC-2026-0186 (`memmap2`) and RUSTSEC-2026-0190 (`anyhow`) fixed.
 
 ## [0.9.0] - 2026-04-18
 
@@ -358,7 +390,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kleene star
   - Optionals
 
-[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/micahkepe/jsongrep/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/micahkepe/jsongrep/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/micahkepe/jsongrep/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/micahkepe/jsongrep/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/micahkepe/jsongrep/compare/v0.7.0...v0.8.0

@@ -501,7 +501,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-jsongrep = "0.9.0"
+jsongrep = "0.10.0"
 ```
 
 Query with a one-liner:
