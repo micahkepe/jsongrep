@@ -805,7 +805,6 @@ dependencies = [
  "serde_json_borrow",
  "tempfile",
  "toml",
- "walkdir",
  "yaml_serde",
 ]
 
