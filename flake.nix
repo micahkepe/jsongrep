@@ -4,6 +4,8 @@
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0";
 
+    crane.url = "github:ipetkov/crane";
+
     alejandra.url = "github:kamadorueda/alejandra/4.0.0";
     alejandra.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -49,28 +51,40 @@
       }
     );
 
-    packages = forEachSupportedSystem ({pkgs, ...}: {
-      default = let
-        cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-      in
-        pkgs.rustPlatform.buildRustPackage {
-          pname = cargoToml.package.name;
-          version = cargoToml.package.version;
-          src = lib.fileset.toSource {
-            root = ./.;
-            fileset = lib.fileset.intersection (lib.fileset.gitTracked ./.) (
-              lib.fileset.unions [
-                ./src
-                ./Cargo.toml
-                ./Cargo.lock
-                ./benches
-                ./tests
-              ]
-            );
-          };
-          cargoHash = "sha256-cP0nStfLr5Lq9ZIctYBnomdUP1fNf5/g7lSMBo0wOWA";
-          buildFeatures = ["all-formats"];
-        };
+    packages = forEachSupportedSystem ({
+      pkgs,
+      system,
+    }: let
+      craneLib = inputs.crane.mkLib pkgs;
+
+      src = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.intersection (lib.fileset.gitTracked ./.) (
+          lib.fileset.unions [
+            (craneLib.fileset.commonCargoSources ./.)
+            (lib.fileset.fileFilter (file: file.hasExt "pest") ./src)
+            ./benches
+            ./tests
+          ]
+        );
+      };
+
+      commonArgs = {
+        inherit src;
+        strictDeps = true;
+        cargoExtraArgs = "--locked --features all-formats";
+        buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+          pkgs.libiconv
+        ];
+      };
+
+      cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+    in {
+      default = craneLib.buildPackage (commonArgs
+        // {
+          inherit cargoArtifacts;
+          meta.mainProgram = "jg";
+        });
     });
   };
 }
