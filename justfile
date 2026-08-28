@@ -6,8 +6,8 @@ update-submodules:
     git submodule update --init --recursive --remote
 
 # Run Criterion benchmarks.
-bench: bench-download
-    cargo bench --bench query
+bench *ARGS: bench-download
+    cargo bench --bench query {{ARGS}}
 
 # Download data for the Criterion benchmarks.
 bench-download: update-submodules

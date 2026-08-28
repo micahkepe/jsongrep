@@ -28,6 +28,9 @@ Or via justfile:
 just bench
 ```
 
+> [!NOTE]
+> You can tag the run with `--save-baseline <tag>`, e.g., `just bench --save-baseline v0.10.0`
+
 HTML reports are generated at `target/criterion/report/index.html`.
 
 To publish the Criterion HTML reports to `gh-pages`:

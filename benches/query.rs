@@ -152,25 +152,31 @@ fn all_queries() -> Vec<QueryVariants> {
 /// Compile a jaq filter from source code.
 fn compile_jaq_filter(
     code: &str,
-) -> jaq_core::Filter<jaq_core::Native<jaq_json::Val>> {
+) -> jaq_core::Filter<jaq_core::data::JustLut<jaq_json::Val>> {
     let arena = jaq_core::load::Arena::default();
-    let loader =
-        jaq_core::load::Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let defs = jaq_core::defs().chain(jaq_std::defs()).chain(jaq_json::defs());
+    let loader = jaq_core::load::Loader::new(defs);
     let program = jaq_core::load::File { code, path: () };
     let modules = loader.load(&arena, program).unwrap();
     jaq_core::Compiler::default()
-        .with_funs(jaq_std::funs().chain(jaq_json::funs()))
+        .with_funs(
+            jaq_core::funs().chain(jaq_std::funs()).chain(jaq_json::funs()),
+        )
         .compile(modules)
         .unwrap()
 }
 
 /// Run a pre-compiled jaq filter on a Val, collecting all results.
 fn run_jaq_filter(
-    filter: &jaq_core::Filter<jaq_core::Native<jaq_json::Val>>,
+    filter: &jaq_core::Filter<jaq_core::data::JustLut<jaq_json::Val>>,
     val: jaq_json::Val,
-) -> Vec<Result<jaq_json::Val, jaq_core::Error<jaq_json::Val>>> {
-    let inputs = jaq_core::RcIter::new(core::iter::empty());
-    filter.run((jaq_core::Ctx::new([], &inputs), val)).collect()
+) -> Vec<jaq_core::ValR<jaq_json::Val>> {
+    use jaq_core::{Ctx, Vars, unwrap_valr};
+    let ctx = Ctx::<jaq_core::data::JustLut<jaq_json::Val>>::new(
+        &filter.lut,
+        Vars::new([]),
+    );
+    filter.id.run((ctx, val)).map(unwrap_valr).collect()
 }
 
 /// Choose a `BatchSize` appropriate for the data size (avoids OOM on large inputs).
@@ -329,7 +335,7 @@ fn bench_query_search(c: &mut Criterion) {
         let serde_doc: serde_json::Value =
             serde_json::from_str(json_str).unwrap();
         let jmespath_doc = jmespath::Variable::from_json(json_str).unwrap();
-        let jaq_val = jaq_json::Val::from(serde_doc.clone());
+        let jaq_val: jaq_json::Val = serde_json::from_str(json_str).unwrap();
         let bs = batch_size_for(json_str);
 
         for q in &queries {
@@ -516,9 +522,8 @@ fn bench_end_to_end(c: &mut Criterion) {
                     &(),
                     |b, ()| {
                         b.iter(|| {
-                            let doc: serde_json::Value =
+                            let val: jaq_json::Val =
                                 serde_json::from_str(json_str).unwrap();
-                            let val = jaq_json::Val::from(doc);
                             let filter = compile_jaq_filter(jaq_query);
                             black_box(run_jaq_filter(&filter, val))
                         });
