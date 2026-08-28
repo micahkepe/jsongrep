@@ -45,6 +45,7 @@
             self.formatter.${system}
             pkgs.just
             pkgs.clippy
+            pkgs.rust-analyzer
             pkgs.cargo-nextest
           ];
         };
