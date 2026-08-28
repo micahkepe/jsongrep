@@ -51,9 +51,8 @@ msgpack = ["dep:rmp-serde"]
 all-formats = ["yaml", "toml", "cbor", "msgpack"]
 
 [lints.clippy]
-# See: <https://rust-lang.github.io/rust-clippy/master/index.html.
-pedantic = { level = "warn" }
-nursery = { level = "warn", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
 doc_paragraphs_missing_punctuation = { level = "warn"}
 allow_attributes = "warn"
 
