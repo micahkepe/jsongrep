@@ -19,7 +19,14 @@ exclude = [
   "tests/",
   "justfile",
   ".gitmodules",
-  "playground"
+  "playground",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "clippy.toml",
+  "deny.toml",
+  "rustfmt.toml",
+  "flake.nix",
+  "flake.lock",
 ]
 
 [dependencies]
