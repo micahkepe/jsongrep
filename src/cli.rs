@@ -555,7 +555,7 @@ mod tests {
         )
         .unwrap();
         assert!(keep_going);
-        assert!(!out.is_empty());
+        assert_ne!(out.len(), 0);
     }
 
     #[test]
