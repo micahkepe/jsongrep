@@ -1306,7 +1306,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
         // Expect empty result set
-        assert!(matches.is_empty());
+        assert_eq!(matches.len(), 0);
     }
 
     #[test]
@@ -1415,7 +1415,7 @@ mod tests {
         let query = QueryBuilder::new().field_wildcard().field("c").build();
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
-        assert!(matches.is_empty());
+        assert_eq!(matches.len(), 0);
     }
 
     #[test]
@@ -1431,7 +1431,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1);
     }
 
@@ -1448,7 +1448,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1);
     }
 
@@ -1471,7 +1471,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
 
         // Expected [(root object), top level c object, c1, c2]
         assert_eq!(matches.len(), 4);
@@ -1505,7 +1505,7 @@ mod tests {
             QueryBuilder::new().field_wildcard().field("c").field("c").build();
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1);
     }
 
@@ -1523,7 +1523,7 @@ mod tests {
             .build();
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 4);
     }
 
@@ -1533,7 +1533,7 @@ mod tests {
         let query = QueryBuilder::new().build();
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1); // identity
     }
 
@@ -1579,7 +1579,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 2);
     }
 
@@ -1600,7 +1600,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1);
     }
 
@@ -1624,7 +1624,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(matches.is_empty());
+        assert_eq!(matches.len(), 0);
     }
 
     #[test]
@@ -1641,7 +1641,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
 
         // expect 6 total: root obj, 2 top-level array elements, 3 inner-most
         //   array elements
@@ -1669,7 +1669,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
 
         // expect 5 total: 2 top-level array elements, 3 inner-most array elements
         assert_eq!(matches.len(), 5);
@@ -1689,7 +1689,7 @@ mod tests {
             "x.(y | z.t)".parse().expect("failed to parse query");
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 2);
     }
 
@@ -1726,7 +1726,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 1);
     }
 
@@ -1763,7 +1763,7 @@ mod tests {
         let matches: Vec<JSONPointer> =
             QueryDFA::from_query(&query).find(&json);
 
-        assert!(!matches.is_empty());
+        assert_ne!(matches.len(), 0);
         assert_eq!(matches.len(), 5);
     }
 
