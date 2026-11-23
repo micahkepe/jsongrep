@@ -301,6 +301,16 @@ jg '[*].email' users.jsonl
 "bob@example.com"
 ```
 
+JSONL is searched one line at a time, so matches are printed as soon as their
+line arrives. This works on a log that is still being written:
+
+```bash
+tail -f app.log.jsonl | jg -f jsonl '[*].error'
+```
+
+Queries that match the whole array (such as `''`) and `--depth` still read
+all of the input first.
+
 **Explicit format flag** (useful for stdin or non-standard extensions):
 
 ```bash

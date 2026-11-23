@@ -5,10 +5,13 @@ use colored::Colorize;
 use memmap2::{Mmap, MmapOptions};
 use serde_json_borrow::Value;
 use std::fs::OpenOptions;
-use std::io::{self, ErrorKind, IsTerminal as _, Read, Write};
+use std::io::{
+    self, BufRead as _, BufReader, ErrorKind, IsTerminal as _, Read, Write,
+};
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 
-use crate::query::PathType;
+use crate::query::{JSONPointer, PathType, QueryDFA};
 
 /// Minimum file size for which memory-mapping is attempted.
 ///
@@ -321,6 +324,90 @@ where
         }
     }
 }
+
+/// Searches JSONL input one line at a time, calling `visit` with `out` for
+/// each match as soon as its line has been read.
+///
+/// Each line is parsed on its own, and matches get the same paths as with
+/// [`with_json`], where record `i` is element `i` of the top-level array.
+/// Blank lines are skipped. A query that matches that array itself (such as
+/// `""` or `**`) needs the whole input, so its root match is not reported
+/// here; use [`with_json`] for those.
+///
+/// `out` is flushed whenever the reader has no more buffered input, so
+/// matches show up before a pipe that is still open sends more lines.
+/// Return [`ControlFlow::Break`] from `visit` to stop reading.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read, if a line is not valid
+/// UTF-8 or JSON (matches from earlier lines have already been passed to
+/// `visit` by then), if flushing `out` fails, or if `visit` returns one.
+pub fn for_each_jsonl_match<R, W, F>(
+    reader: &mut BufReader<R>,
+    dfa: &QueryDFA,
+    out: &mut W,
+    mut visit: F,
+) -> Result<()>
+where
+    R: Read,
+    W: Write,
+    F: for<'a> FnMut(&mut W, JSONPointer<'a>) -> Result<ControlFlow<()>>,
+{
+    let mut line = Vec::new();
+    let mut path = Vec::new();
+    let mut line_number = 0usize;
+    let mut index = 0usize;
+    loop {
+        if reader.buffer().is_empty() {
+            out.flush()?;
+        }
+        line.clear();
+        if reader
+            .read_until(b'\n', &mut line)
+            .context("Failed to read JSONL input")?
+            == 0
+        {
+            return Ok(());
+        }
+        line_number += 1;
+        let text = str::from_utf8(&line).map_err(|_| {
+            anyhow::anyhow!("JSONL line {line_number} is not valid UTF-8")
+        })?;
+        let text = text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let record: Value = serde_json::from_str(text).with_context(|| {
+            format!("Failed to parse JSONL line {line_number}")
+        })?;
+        let record_index = index;
+        index += 1;
+        let Some(state) = dfa
+            .get_index_symbol_id(record_index)
+            .and_then(|symbol| dfa.transition(dfa.start_state, symbol))
+        else {
+            continue;
+        };
+        path.clear();
+        path.push(PathType::Index(record_index));
+        let flow =
+            dfa.for_each_match_from(
+                state,
+                &mut path,
+                &record,
+                |ptr| match visit(out, ptr) {
+                    Ok(ControlFlow::Continue(())) => ControlFlow::Continue(()),
+                    Ok(ControlFlow::Break(())) => ControlFlow::Break(Ok(())),
+                    Err(err) => ControlFlow::Break(Err(err)),
+                },
+            );
+        if let ControlFlow::Break(result) = flow {
+            return result;
+        }
+    }
+}
+
 /// Available options for printing matches.
 #[derive(Debug, Default)]
 pub struct WriteOptions {
@@ -583,5 +670,140 @@ mod tests {
             &WriteOptions { pretty: true, ..Default::default() },
         );
         assert!(result.is_err(), "non-pipe IO errors should propagate");
+    }
+
+    const JSONL: &str = concat!(
+        "{\"id\": 1, \"tags\": [\"a\", \"b\"], \"user\": {\"id\": 10}}\n",
+        "\n",
+        "  {\"id\": 2, \"tags\": []}\r\n",
+        "[{\"id\": 3}, {\"id\": 4}]\n",
+        "\"plain\"\n",
+        "{\"id\": 5, \"user\": {\"id\": 50, \"tags\": [\"c\"]}}",
+    );
+
+    /// Runs [`for_each_jsonl_match`] over `input` and returns each match as
+    /// its path and compact JSON value.
+    fn jsonl_matches(input: &str, dfa: &QueryDFA) -> Vec<(String, String)> {
+        let mut found = Vec::new();
+        let mut reader = BufReader::new(input.as_bytes());
+        for_each_jsonl_match(&mut reader, dfa, &mut io::sink(), |_, ptr| {
+            found.push((
+                format!("{:?}", ptr.path),
+                serde_json::to_string(ptr.value).unwrap(),
+            ));
+            Ok(ControlFlow::Continue(()))
+        })
+        .unwrap();
+        found
+    }
+
+    #[test]
+    fn jsonl_matches_agree_with_whole_input_search() {
+        let whole = parse_jsonl(JSONL).unwrap();
+        for query in [
+            "[*].id",
+            "[1]",
+            "[2].*",
+            "[1:4].id",
+            "[3:].user.id",
+            "**.id",
+            "[*].tags[*]",
+            "[*]",
+            "[*].(id | user)",
+            "[*].**.tags[0]",
+            "[*].**",
+            "missing",
+        ] {
+            let dfa = QueryDFA::from_query_str(query).unwrap();
+            let expected: Vec<_> = dfa
+                .find(&whole)
+                .iter()
+                .map(|ptr| {
+                    (
+                        format!("{:?}", ptr.path),
+                        serde_json::to_string(ptr.value).unwrap(),
+                    )
+                })
+                .collect();
+            assert_eq!(jsonl_matches(JSONL, &dfa), expected, "query {query}");
+        }
+    }
+
+    #[test]
+    fn jsonl_matches_stop_on_break() {
+        let dfa = QueryDFA::from_query_str("[*].id").unwrap();
+        let mut seen = 0;
+        // Line 3 is not JSON: breaking on line 1 must not read that far.
+        let mut reader = BufReader::with_capacity(
+            1,
+            b"{\"id\": 1}\n{\"id\": 2}\nnot json\n".as_slice(),
+        );
+        for_each_jsonl_match(&mut reader, &dfa, &mut io::sink(), |_, _| {
+            seen += 1;
+            Ok(ControlFlow::Break(()))
+        })
+        .unwrap();
+        assert_eq!(seen, 1);
+    }
+
+    #[test]
+    fn jsonl_matches_report_bad_line_after_earlier_matches() {
+        let dfa = QueryDFA::from_query_str("[*].id").unwrap();
+        let mut seen = Vec::new();
+        let mut reader =
+            BufReader::new(b"{\"id\": 1}\n\n{\"id\": oops}\n".as_slice());
+        let err = for_each_jsonl_match(
+            &mut reader,
+            &dfa,
+            &mut io::sink(),
+            |_, ptr| {
+                seen.push(serde_json::to_string(ptr.value).unwrap());
+                Ok(ControlFlow::Continue(()))
+            },
+        )
+        .unwrap_err();
+        assert_eq!(seen, ["1"]);
+        assert!(
+            format!("{err:#}").contains("Failed to parse JSONL line 3"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn jsonl_matches_flush_output_when_input_runs_dry() {
+        /// Counts how often it is flushed.
+        #[derive(Default)]
+        struct CountFlushes(usize);
+
+        impl Write for CountFlushes {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.0 += 1;
+                Ok(())
+            }
+        }
+
+        let dfa = QueryDFA::from_query_str("[*].id").unwrap();
+        let mut out = CountFlushes::default();
+        let mut flushes_at_match = Vec::new();
+        // A one-byte buffer runs dry before every read, like a pipe whose
+        // writer sends a line at a time.
+        let mut reader = BufReader::with_capacity(
+            1,
+            b"{\"id\": 1}\n{\"id\": 2}\n".as_slice(),
+        );
+        for_each_jsonl_match(&mut reader, &dfa, &mut out, |out, _| {
+            flushes_at_match.push(out.0);
+            Ok(ControlFlow::Continue(()))
+        })
+        .unwrap();
+        // The match from line 1 is flushed before line 2 is read.
+        assert!(
+            flushes_at_match[1] > flushes_at_match[0],
+            "{flushes_at_match:?}"
+        );
     }
 }
