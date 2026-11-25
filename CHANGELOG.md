@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- JSONL input is searched one line at a time, and matches are printed as soon
+  as their line has been read, so `tail -f app.log.jsonl | jg -f jsonl
+  '[*].error'` works. `-q`, `-l` and `-m N` stop reading once they are
+  satisfied. If a line is malformed, matches from the lines before it are
+  printed before the error. Queries that match the whole array (such as `''`)
+  and `--depth` still read all of the input first.
+- `-m 0` no longer reads or parses its inputs, since nothing can match. With
+  `--count` it prints a count of 0 for each input.
+
 ## [0.10.0] - 2026-08-27
 
 ### Added

@@ -688,6 +688,35 @@ mod tests {
         );
     }
 
+    #[test]
+    fn max_count_zero_counts_zero_without_parsing() {
+        // Neither input is valid, so parsing either one would fail.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = dir.path().join("a.json");
+        let b = dir.path().join("b.jsonl");
+        std::fs::write(&a, "not json").unwrap();
+        std::fs::write(&b, "{\"id\": oops}\n").unwrap();
+        let (a, b) = (a.to_str().unwrap(), b.to_str().unwrap());
+
+        let assert =
+            run_main(&["id", a, b, "-m", "0", "--count", "--porcelain"])
+                .code(1);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, format!("{a}:0\n{b}:0\n"));
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["id", "-m", "0", "--count", "--porcelain"])
+            .write_stdin("not json")
+            .assert()
+            .code(1);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "0\n");
+    }
+
     // ==============================================================================
     // Path header display tests
     // ==============================================================================
@@ -939,6 +968,179 @@ mod tests {
             r#""bguise0@indiegogo.com""#,
             "JSONL via stdin should produce exact output"
         );
+    }
+
+    /// Starts `jg` with `args` on a stdin pipe that stays open, and a
+    /// thread that sends each stdout line back over a channel.
+    fn spawn_jg_on_pipe(
+        args: &[&str],
+    ) -> (
+        std::process::Child,
+        std::process::ChildStdin,
+        std::sync::mpsc::Receiver<String>,
+    ) {
+        use std::io::BufRead as _;
+        use std::process::Stdio;
+
+        let mut child =
+            std::process::Command::new(assert_cmd::cargo::cargo_bin("jg"))
+                .args(args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("spawn jg");
+        let stdin = child.stdin.take().expect("stdin");
+        let stdout = child.stdout.take().expect("stdout");
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines() {
+                let Ok(line) = line else { break };
+                if tx.send(line).is_err() {
+                    break;
+                }
+            }
+        });
+        (child, stdin, rx)
+    }
+
+    /// Waits up to 10 seconds for `child` to exit on its own.
+    fn wait_with_timeout(
+        child: &mut std::process::Child,
+    ) -> std::process::ExitStatus {
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            if let Some(status) = child.try_wait().expect("try_wait") {
+                return status;
+            }
+            if std::time::Instant::now() > deadline {
+                child.kill().ok();
+                panic!("jg did not exit while its stdin was still open");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn jsonl_prints_matches_before_input_ends() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (mut child, mut stdin, rx) = spawn_jg_on_pipe(&[
+            "-f",
+            "jsonl",
+            "[*].id",
+            "--no-path",
+            "--compact",
+        ]);
+        writeln!(stdin, "{{\"id\": 1}}").unwrap();
+        stdin.flush().unwrap();
+        assert_eq!(rx.recv_timeout(timeout).expect("first match"), "1");
+        writeln!(stdin, "{{\"name\": \"x\"}}\n{{\"id\": 2}}").unwrap();
+        stdin.flush().unwrap();
+        assert_eq!(rx.recv_timeout(timeout).expect("second match"), "2");
+        drop(stdin);
+        assert!(wait_with_timeout(&mut child).success());
+    }
+
+    #[test]
+    fn jsonl_prints_match_while_next_line_is_incomplete() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (mut child, mut stdin, rx) = spawn_jg_on_pipe(&[
+            "-f",
+            "jsonl",
+            "[*].id",
+            "--no-path",
+            "--compact",
+        ]);
+        // A matching line and the start of the next one, in one write.
+        write!(stdin, "{{\"id\": 1}}\n{{\"id\"").unwrap();
+        stdin.flush().unwrap();
+        assert_eq!(rx.recv_timeout(timeout).expect("first match"), "1");
+        writeln!(stdin, ": 2}}").unwrap();
+        drop(stdin);
+        assert_eq!(rx.recv_timeout(timeout).expect("second match"), "2");
+        assert!(wait_with_timeout(&mut child).success());
+    }
+
+    #[test]
+    fn jsonl_max_count_exits_without_waiting_for_more_input() {
+        let (mut child, mut stdin, rx) = spawn_jg_on_pipe(&[
+            "-f",
+            "jsonl",
+            "-m",
+            "2",
+            "[*].id",
+            "--no-path",
+            "--compact",
+        ]);
+        writeln!(stdin, "{{\"id\": 1}}\n{{\"id\": 2}}\n{{\"id\": 3}}").unwrap();
+        stdin.flush().unwrap();
+        // stdin stays open: jg must stop after the second match by itself.
+        assert!(wait_with_timeout(&mut child).success());
+        drop(stdin);
+        assert_eq!(rx.iter().collect::<Vec<_>>(), ["1", "2"]);
+    }
+
+    #[test]
+    fn jsonl_quiet_exits_on_first_match() {
+        let (mut child, mut stdin, _rx) =
+            spawn_jg_on_pipe(&["-f", "jsonl", "-q", "[*].id"]);
+        writeln!(stdin, "{{\"name\": \"x\"}}\n{{\"id\": 1}}").unwrap();
+        stdin.flush().unwrap();
+        assert!(wait_with_timeout(&mut child).success());
+    }
+
+    #[test]
+    fn jsonl_index_queries_count_records_not_lines() {
+        // Blank lines are not records, so `[1]` is the second record.
+        let output = query_stdin_output(
+            &["-f", "jsonl", "[1].id", "--with-path", "--compact"],
+            "{\"id\": 1}\n\n{\"id\": 2}\n{\"id\": 3}\n",
+        );
+        assert_eq!(output, "[1].id:\n2\n");
+    }
+
+    #[test]
+    fn jsonl_bad_line_keeps_earlier_matches() {
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["-f", "jsonl", "[*].id", "--no-path", "--compact"])
+            .write_stdin("{\"id\": 1}\n{\"id\": oops}\n{\"id\": 3}\n")
+            .assert()
+            .code(2);
+        let stdout = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(stdout, "1\n");
+    }
+
+    #[test]
+    fn jsonl_root_query_still_sees_whole_input() {
+        let output = query_stdin_output(
+            &["-f", "jsonl", "", "--no-path", "--compact"],
+            "{\"id\": 1}\n{\"id\": 2}\n",
+        );
+        assert_eq!(output.trim(), r#"[{"id":1},{"id":2}]"#);
+    }
+
+    #[test]
+    fn jsonl_count_and_files_with_matches_per_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = dir.path().join("a.jsonl");
+        let b = dir.path().join("b.jsonl");
+        std::fs::write(&a, "{\"id\": 1}\n{\"id\": 2}\n").unwrap();
+        std::fs::write(&b, "{\"name\": \"x\"}\n").unwrap();
+        let (a, b) = (a.to_str().unwrap(), b.to_str().unwrap());
+
+        let counts = query_output(&["[*].id", a, b, "--count", "--porcelain"]);
+        assert_eq!(counts, format!("{a}:2\n{b}:0\n"));
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd.args(["-l", "[*].id", a, b]).assert().success();
+        let listed = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(listed, format!("{a}\n"));
     }
 
     // ---------- YAML ----------

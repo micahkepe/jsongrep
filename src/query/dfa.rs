@@ -456,6 +456,22 @@ impl QueryDFA {
         DFAQueryEngine::visit_with_dfa(json, self, visit)
     }
 
+    /// Like [`QueryDFA::for_each_match`], but starts the walk of `json` in
+    /// `state` with `path` as the path already taken. Used to search one
+    /// JSONL record as if it were an element of the whole input array.
+    pub(crate) fn for_each_match_from<'a, B, F>(
+        &self,
+        state: usize,
+        path: &mut Vec<PathType>,
+        json: &'a Value<'a>,
+        mut visit: F,
+    ) -> ControlFlow<B>
+    where
+        F: FnMut(JSONPointer<'a>) -> ControlFlow<B>,
+    {
+        DFAQueryEngine::traverse_json(self, state, path, json, &mut visit)
+    }
+
     /// Check if a given state is accepting/final.
     #[must_use]
     pub fn is_accepting_state(&self, state: usize) -> bool {

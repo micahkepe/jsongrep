@@ -10,14 +10,18 @@ use globset::Glob;
 use ignore::WalkBuilder;
 use std::{
     collections::HashSet,
-    io::{self, BufWriter, ErrorKind, IsTerminal as _, Write, stdout},
+    fs::File,
+    io::{
+        self, BufReader, BufWriter, ErrorKind, IsTerminal as _, Write, stdout,
+    },
+    ops::ControlFlow,
     path::PathBuf,
 };
 
 use jsongrep::{
     cli::{
-        Format, WriteOptions, depth, is_broken_pipe, with_json,
-        write_colored_result,
+        Format, WriteOptions, depth, for_each_jsonl_match, is_broken_pipe,
+        with_json, write_colored_result,
     },
     commands,
     query::{Query, QueryDFA},
@@ -400,6 +404,12 @@ fn run(mut args: Args) -> Result<bool> {
             // (grep semantics); remember and report at the end.
             let mut failed_inputs = 0usize;
             let mut printed_block = false;
+            let write_options = WriteOptions {
+                pretty: !args.compact,
+                show_path,
+                raw: args.raw_output,
+                output_format: args.output,
+            };
 
             for input in inputs {
                 let format = detect_format(input.as_ref(), args.format);
@@ -407,6 +417,117 @@ fn run(mut args: Args) -> Result<bool> {
                     || "(standard input)".to_string(),
                     |p| p.display().to_string(),
                 );
+
+                // `-m 0` can't match anything, so the input isn't read or
+                // parsed at all.
+                if args.max_count == Some(0) {
+                    if args.count {
+                        write_count(
+                            &mut writer,
+                            &name,
+                            0,
+                            multi,
+                            args.porcelain,
+                        )?;
+                    }
+                    continue;
+                }
+
+                // JSONL is searched line by line, so matches print while a
+                // pipe is still open (`tail -f log.jsonl | jg ...`). Queries
+                // that match the top-level array and `--depth` need the
+                // whole input.
+                if matches!(format, Format::Jsonl)
+                    && !args.depth
+                    && !dfa.is_accepting_state(dfa.start_state)
+                {
+                    let mut found = 0usize;
+                    let mut printed_name = false;
+                    let file_result = (|| -> Result<()> {
+                        let source: Box<dyn io::Read> = match &input {
+                            None => Box::new(io::stdin()),
+                            Some(path) => Box::new(
+                                File::open(path).with_context(|| {
+                                    format!(
+                                        "Failed to open file {}",
+                                        path.display()
+                                    )
+                                })?,
+                            ),
+                        };
+                        let mut reader = BufReader::new(source);
+                        for_each_jsonl_match(
+                            &mut reader,
+                            &dfa,
+                            &mut writer,
+                            |out, result| {
+                                found += 1;
+                                matched = true;
+                                if args.quiet {
+                                    return Ok(ControlFlow::Break(()));
+                                }
+                                if args.files_with_matches {
+                                    writeln!(out, "{}", name.magenta())?;
+                                    return Ok(ControlFlow::Break(()));
+                                }
+                                if !args.no_display {
+                                    if !printed_name {
+                                        printed_name = true;
+                                        write_file_heading(
+                                            out,
+                                            &name,
+                                            multi,
+                                            args.porcelain,
+                                            &mut printed_block,
+                                        )?;
+                                    }
+                                    let open = write_colored_result(
+                                        out,
+                                        result.value,
+                                        &result.path,
+                                        &write_options,
+                                    )?;
+                                    if !open {
+                                        return Err(io::Error::from(
+                                            ErrorKind::BrokenPipe,
+                                        )
+                                        .into());
+                                    }
+                                }
+                                if args
+                                    .max_count
+                                    .is_some_and(|max| found >= max)
+                                {
+                                    Ok(ControlFlow::Break(()))
+                                } else {
+                                    Ok(ControlFlow::Continue(()))
+                                }
+                            },
+                        )?;
+                        if args.count {
+                            write_count(
+                                &mut writer,
+                                &name,
+                                found,
+                                multi,
+                                args.porcelain,
+                            )?;
+                        }
+                        Ok(())
+                    })();
+                    match file_result {
+                        Ok(()) => {}
+                        // stdout is gone: stop reading and exit quietly.
+                        Err(err) if is_broken_pipe(&err) => break,
+                        Err(err) if multi => {
+                            writer.flush().ok();
+                            eprintln!("jg: {name}: {err:#}");
+                            failed_inputs += 1;
+                        }
+                        Err(err) => return Err(err),
+                    }
+                    continue;
+                }
 
                 let file_result = with_json(input, format, |json| {
                     // --max-count applies per input file, so the limit
@@ -431,30 +552,13 @@ fn run(mut args: Args) -> Result<bool> {
                     }
 
                     if args.count {
-                        if multi {
-                            // grep -c style per-file attribution.
-                            let styled_name = if args.porcelain {
-                                name.normal()
-                            } else {
-                                name.bold().magenta()
-                            };
-                            writeln!(
-                                writer,
-                                "{}:{}",
-                                styled_name,
-                                results.len()
-                            )?;
-                        } else if args.porcelain {
-                            writeln!(writer, "{}", results.len())?;
-                        } else {
-                            writeln!(
-                                writer,
-                                "{} {}",
-                                "Found matches:".bold().blue(),
-                                results.len()
-                            )
-                            .with_context(|| "Failed to write to stdout")?;
-                        }
+                        write_count(
+                            &mut writer,
+                            &name,
+                            results.len(),
+                            multi,
+                            args.porcelain,
+                        )?;
                     }
 
                     if args.depth {
@@ -471,34 +575,19 @@ fn run(mut args: Args) -> Result<bool> {
                     }
 
                     if !args.no_display && !results.is_empty() {
-                        // ripgrep-style headings: with several inputs, name
-                        // the file once before its matches, with a blank
-                        // line between file blocks.
-                        if multi {
-                            if printed_block {
-                                writeln!(writer)?;
-                            }
-                            let styled_name = if args.porcelain {
-                                name.normal()
-                            } else {
-                                name.bold().green()
-                            };
-                            writeln!(writer, "{styled_name}")?;
-                        }
-                        printed_block = true;
-
-                        let pretty = !args.compact;
+                        write_file_heading(
+                            &mut writer,
+                            &name,
+                            multi,
+                            args.porcelain,
+                            &mut printed_block,
+                        )?;
                         for result in &results {
                             write_colored_result(
                                 &mut writer,
                                 result.value,
                                 &result.path,
-                                &WriteOptions {
-                                    pretty,
-                                    show_path,
-                                    raw: args.raw_output,
-                                    output_format: args.output,
-                                },
+                                &write_options,
                             )?;
                         }
                     }
@@ -550,6 +639,51 @@ fn run(mut args: Args) -> Result<bool> {
 
 /// Detect a format from the file extension, else use `JSON` or the explicit
 /// format if given.
+/// Writes the `--count` line for one input.
+fn write_count<W: Write>(
+    writer: &mut W,
+    name: &str,
+    count: usize,
+    multi: bool,
+    porcelain: bool,
+) -> Result<()> {
+    if multi {
+        // grep -c style per-file attribution.
+        let styled_name =
+            if porcelain { name.normal() } else { name.bold().magenta() };
+        writeln!(writer, "{styled_name}:{count}")?;
+    } else if porcelain {
+        writeln!(writer, "{count}")?;
+    } else {
+        writeln!(writer, "{} {}", "Found matches:".bold().blue(), count)
+            .with_context(|| "Failed to write to stdout")?;
+    }
+    Ok(())
+}
+
+/// Writes the heading that goes before an input's matches.
+///
+/// ripgrep-style headings: with several inputs, name the file once before
+/// its matches, with a blank line between file blocks.
+fn write_file_heading<W: Write>(
+    writer: &mut W,
+    name: &str,
+    multi: bool,
+    porcelain: bool,
+    printed_block: &mut bool,
+) -> Result<()> {
+    if multi {
+        if *printed_block {
+            writeln!(writer)?;
+        }
+        let styled_name =
+            if porcelain { name.normal() } else { name.bold().green() };
+        writeln!(writer, "{styled_name}")?;
+    }
+    *printed_block = true;
+    Ok(())
+}
+
 fn detect_format(path: Option<&PathBuf>, explicit: Format) -> Format {
     // Use explicit if user overrode the default.
     if !matches!(explicit, Format::Auto) {
