@@ -171,6 +171,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn repeated_group_at_query_start_matches_zero_repetitions() {
+        let cases = [
+            (
+                "(children.[*])*.name",
+                r#"{"name": "root", "children": [{"name": "kid"}]}"#,
+                "\"root\"\n\"kid\"",
+            ),
+            ("(a.b)?.c", r#"{"b": {"c": 5}, "c": 1}"#, "1"),
+        ];
+        for (query, input, expected) in cases {
+            let mut cmd =
+                Command::cargo_bin("jg").expect("Failed to find main binary");
+            let assert = cmd
+                .args(["-f", "json", query, "--no-path", "--compact"])
+                .write_stdin(input)
+                .assert()
+                .success();
+            let output = String::from_utf8(assert.get_output().stdout.clone())
+                .expect("Invalid UTF-8 output");
+            assert_eq!(output.trim(), expected, "query {query}");
+        }
+    }
+
     // ==============================================================================
     // Quoted field and --fixed-string tests
     // ==============================================================================
