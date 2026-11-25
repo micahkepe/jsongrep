@@ -418,13 +418,27 @@ fn run(mut args: Args) -> Result<bool> {
                     |p| p.display().to_string(),
                 );
 
+                // `-m 0` can't match anything, so the input isn't read or
+                // parsed at all.
+                if args.max_count == Some(0) {
+                    if args.count {
+                        write_count(
+                            &mut writer,
+                            &name,
+                            0,
+                            multi,
+                            args.porcelain,
+                        )?;
+                    }
+                    continue;
+                }
+
                 // JSONL is searched line by line, so matches print while a
                 // pipe is still open (`tail -f log.jsonl | jg ...`). Queries
                 // that match the top-level array and `--depth` need the
-                // whole input, and `-m 0` reads nothing.
+                // whole input.
                 if matches!(format, Format::Jsonl)
                     && !args.depth
-                    && args.max_count != Some(0)
                     && !dfa.is_accepting_state(dfa.start_state)
                 {
                     let mut found = 0usize;

@@ -688,6 +688,35 @@ mod tests {
         );
     }
 
+    #[test]
+    fn max_count_zero_counts_zero_without_parsing() {
+        // Neither input is valid, so parsing either one would fail.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = dir.path().join("a.json");
+        let b = dir.path().join("b.jsonl");
+        std::fs::write(&a, "not json").unwrap();
+        std::fs::write(&b, "{\"id\": oops}\n").unwrap();
+        let (a, b) = (a.to_str().unwrap(), b.to_str().unwrap());
+
+        let assert =
+            run_main(&["id", a, b, "-m", "0", "--count", "--porcelain"])
+                .code(1);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, format!("{a}:0\n{b}:0\n"));
+
+        let mut cmd =
+            Command::cargo_bin("jg").expect("Failed to find main binary");
+        let assert = cmd
+            .args(["id", "-m", "0", "--count", "--porcelain"])
+            .write_stdin("not json")
+            .assert()
+            .code(1);
+        let output = String::from_utf8(assert.get_output().stdout.clone())
+            .expect("Invalid UTF-8 output");
+        assert_eq!(output, "0\n");
+    }
+
     // ==============================================================================
     // Path header display tests
     // ==============================================================================
