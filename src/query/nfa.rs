@@ -350,12 +350,20 @@ pub fn compute_first_set(
             }
         }
         Query::Sequence(queries) => {
+            let seq_start_pos = *position;
+            let mut subquery_start = seq_start_pos;
             for q in queries {
-                compute_first_set(first_set, q, position);
+                let mut pos = subquery_start;
+                compute_first_set(first_set, q, &mut pos);
+                // A nested sequence can stop early, so step by the full length
+                subquery_start += count_subquery_positions(q);
                 if !contains_empty_word(q) {
                     break;
                 }
             }
+            // Advance past the sequence
+            *position = seq_start_pos
+                + queries.iter().map(count_subquery_positions).sum::<usize>();
         }
         Query::KleeneStar(q) | Query::Optional(q) => {
             compute_first_set(first_set, q, position);
