@@ -334,8 +334,9 @@ where
 /// `""` or `**`) needs the whole input, so its root match is not reported
 /// here; use [`with_json`] for those.
 ///
-/// `out` is flushed whenever the reader has no more buffered input, so
-/// matches show up before a pipe that is still open sends more lines.
+/// `out` is flushed before every read that may block, that is whenever the
+/// reader has no complete line buffered, so matches show up before a pipe
+/// that is still open sends more lines.
 /// Return [`ControlFlow::Break`] from `visit` to stop reading.
 ///
 /// # Errors
@@ -359,7 +360,9 @@ where
     let mut line_number = 0usize;
     let mut index = 0usize;
     loop {
-        if reader.buffer().is_empty() {
+        // Reading the next line may block, so flush the matches printed
+        // so far unless that line is already buffered in full.
+        if !reader.buffer().contains(&b'\n') {
             out.flush()?;
         }
         line.clear();
@@ -804,6 +807,73 @@ mod tests {
         assert!(
             flushes_at_match[1] > flushes_at_match[0],
             "{flushes_at_match:?}"
+        );
+    }
+
+    #[test]
+    fn jsonl_matches_flush_output_before_waiting_on_partial_line() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        /// Logs what happens to the input and the output, in order.
+        type Log = Rc<RefCell<Vec<&'static str>>>;
+
+        /// Hands out one chunk of input per read, logging each read.
+        struct Chunks(Vec<&'static [u8]>, Log);
+
+        impl Read for Chunks {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                if self.0.is_empty() {
+                    return Ok(0);
+                }
+                let chunk = self.0.remove(0);
+                buf[..chunk.len()].copy_from_slice(chunk);
+                self.1.borrow_mut().push("read");
+                Ok(chunk.len())
+            }
+        }
+
+        /// Logs writes and flushes.
+        struct Output(Log);
+
+        impl Write for Output {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.borrow_mut().push("write");
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.0.borrow_mut().push("flush");
+                Ok(())
+            }
+        }
+
+        let log = Log::default();
+        let dfa = QueryDFA::from_query_str("[*].id").unwrap();
+        // The first read brings a whole matching line and the start of the
+        // next one, so reading the rest of that line would wait on a pipe.
+        let mut reader = BufReader::new(Chunks(
+            vec![b"{\"id\": 1}\n{\"id\"", b": 2}\n"],
+            Rc::clone(&log),
+        ));
+        let mut out = Output(Rc::clone(&log));
+        for_each_jsonl_match(&mut reader, &dfa, &mut out, |out, _| {
+            out.write_all(b"match")?;
+            Ok(ControlFlow::Continue(()))
+        })
+        .unwrap();
+        let log = log.borrow();
+        let first_write = log.iter().position(|&e| e == "write").unwrap();
+        let second_read = log
+            .iter()
+            .enumerate()
+            .filter(|&(_, &e)| e == "read")
+            .nth(1)
+            .unwrap()
+            .0;
+        assert!(
+            log[first_write..second_read].contains(&"flush"),
+            "the first match must be flushed before the second read: {log:?}"
         );
     }
 }

@@ -1043,6 +1043,26 @@ mod tests {
     }
 
     #[test]
+    fn jsonl_prints_match_while_next_line_is_incomplete() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (mut child, mut stdin, rx) = spawn_jg_on_pipe(&[
+            "-f",
+            "jsonl",
+            "[*].id",
+            "--no-path",
+            "--compact",
+        ]);
+        // A matching line and the start of the next one, in one write.
+        write!(stdin, "{{\"id\": 1}}\n{{\"id\"").unwrap();
+        stdin.flush().unwrap();
+        assert_eq!(rx.recv_timeout(timeout).expect("first match"), "1");
+        writeln!(stdin, ": 2}}").unwrap();
+        drop(stdin);
+        assert_eq!(rx.recv_timeout(timeout).expect("second match"), "2");
+        assert!(wait_with_timeout(&mut child).success());
+    }
+
+    #[test]
     fn jsonl_max_count_exits_without_waiting_for_more_input() {
         let (mut child, mut stdin, rx) = spawn_jg_on_pipe(&[
             "-f",
